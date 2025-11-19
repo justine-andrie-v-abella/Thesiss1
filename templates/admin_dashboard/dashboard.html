@@ -581,6 +581,124 @@
         padding: 0.875rem 1rem;
     }
 }
+/* Panel Header with Actions */
+.panel-header {
+    display: flex;
+    align-items: center;
+    padding: 1.5rem 1.5rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    position: relative;
+}
+
+.panel-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2d3748;
+    margin: 0;
+    flex: 1;
+}
+
+.panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.btn-mark-read {
+    background: transparent;
+    border: 1px solid #4361ee;
+    color: #4361ee;
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.btn-mark-read:hover {
+    background: #4361ee;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.notification-badge {
+    background: #e53e3e;
+    color: white;
+    border-radius: 20px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    min-width: 24px;
+    text-align: center;
+}
+
+/* Activity Item Improvements */
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #f7fafc;
+    transition: all 0.2s ease;
+    position: relative;
+    cursor: pointer;
+}
+
+.activity-item:hover {
+    background: #f8f9fa;
+}
+
+.activity-item.unread {
+    background: #ebf8ff;
+    border-left: 3px solid #4361ee;
+}
+
+.activity-indicator {
+    width: 8px;
+    height: 8px;
+    background: #4361ee;
+    border-radius: 50%;
+    margin-left: 0.5rem;
+    flex-shrink: 0;
+    margin-top: 0.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.activity-indicator:hover {
+    transform: scale(1.3);
+    background: #3a0ca3;
+}
+
+/* Mark as read animation */
+.activity-item.read {
+    background: white;
+    border-left: 3px solid transparent;
+    opacity: 0.8;
+}
+
+.activity-item.read .activity-title,
+.activity-item.read .activity-description {
+    color: #718096;
+}
+.notification-badge.read {
+    background: #718096 !important; /* Gray color when all are read */
+}
+
+.notification-badge {
+    background: #e53e3e;
+    color: white;
+    border-radius: 20px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    min-width: 24px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
 </style>
 
 <!-- Dashboard Header -->
@@ -753,59 +871,195 @@
         </div> {% endcomment %}
 
         <div class="info-panel">
-            <div class="panel-header">
-                <i class="bi bi-clock-history"></i>
-                <h3 class="panel-title">Recent Activities</h3>
-                <span class="notification-badge">{{ recent_activities|length }}</span>
+    <div class="panel-header">
+        <i class="bi bi-clock-history"></i>
+        <h3 class="panel-title">Recent Activities</h3>
+        <div class="panel-actions">
+            {% if unread_count > 0 %}
+            <button class="btn-mark-read" onclick="markAllAsRead()" title="Mark all as read">
+                <i class="bi bi-check-all"></i>
+                Mark All Read
+            </button>
+            {% endif %}
+            <span class="notification-badge {% if unread_count == 0 %}read{% endif %}" id="notificationBadge">
+                {% if unread_count > 9 %}
+                    9+
+                {% else %}
+                    {{ unread_count }}
+                {% endif %}
+            </span>
+        </div>
+    </div>
+    
+    <div class="activities-container">
+        {% for activity in recent_activities %}
+        <div class="activity-item {% if not activity.read %}unread{% else %}read{% endif %}" data-activity-id="{{ activity.id }}">
+            <div class="activity-icon">
+                <i class="{{ activity.icon }} text-{{ activity.color }}"></i>
             </div>
-            
-            <div class="activities-container">
-                {% for activity in recent_activities %}
-                <div class="activity-item {% if not activity.read %}unread{% endif %}">
-                    <div class="activity-icon">
-                        <i class="{{ activity.icon }} text-{{ activity.color }}"></i>
-                    </div>
-                    <div class="activity-content">
-                        <div class="activity-title">{{ activity.title }}</div>
-                        <div class="activity-description">{{ activity.description }}</div>
-                        <div class="activity-time">{{ activity.time|timesince }} ago</div>
-                    </div>
-                    {% if not activity.read %}
-                    <div class="activity-indicator"></div>
-                    {% endif %}
-                </div>
-                {% empty %}
-                <div class="empty-activities">
-                    <i class="bi bi-inbox"></i>
-                    <p>No recent activities</p>
-                    <small class="text-muted">Activities will appear here as they happen</small>
-                </div>
-                {% endfor %}
+            <div class="activity-content">
+                <div class="activity-title">{{ activity.title }}</div>
+                <div class="activity-description">{{ activity.description }}</div>
+                <div class="activity-time">{{ activity.time|timesince }} ago</div>
             </div>
-            
-            {% if recent_activities %}
-            <div class="activities-footer">
-                <a href="#" class="view-more-btn">
-                    <i class="bi bi-arrow-right"></i>
-                    View All Activities
-                </a>
-            </div>
+            {% if not activity.read %}
+            <div class="activity-indicator" onclick="markAsRead({{ activity.id }})" title="Mark as read"></div>
             {% endif %}
         </div>
+        {% empty %}
+        <div class="empty-activities">
+            <i class="bi bi-inbox"></i>
+            <p>No recent activities</p>
+            <small class="text-muted">Activities will appear here as they happen</small>
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% if recent_activities %}
+    <div class="activities-footer">
+        <a href="#" class="view-more-btn">
+            <i class="bi bi-arrow-right"></i>
+            View All Activities
+        </a>
+    </div>
+    {% endif %}
+</div>
     </div>
 </div>
 
 <script>
-    // Animate progress bars on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        const progressBars = document.querySelectorAll('.progress-bar');
-        progressBars.forEach(bar => {
-            const currentWidth = bar.style.width;
-            bar.style.width = '0%';
-            setTimeout(() => {
-                bar.style.width = currentWidth;
-            }, 300);
+// Animate progress bars on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const progressBars = document.querySelectorAll('.progress-bar');
+    progressBars.forEach(bar => {
+        const currentWidth = bar.style.width;
+        bar.style.width = '0%';
+        setTimeout(() => {
+            bar.style.width = currentWidth;
+        }, 300);
+    });
+});
+// Mark all activities as read
+function markAllAsRead() {
+    // Send AJAX request to mark all as read
+    fetch('/accounts/mark-all-activities-read/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Option 1: Refresh the page to get updated data from server
+            window.location.reload();
+            
+            // Option 2: Update UI without refresh (if you prefer)
+            // document.querySelectorAll('.activity-item.unread').forEach(item => {
+            //     item.classList.remove('unread');
+            //     item.classList.add('read');
+            //     
+            //     const indicator = item.querySelector('.activity-indicator');
+            //     if (indicator) indicator.remove();
+            // });
+            // updateUnreadCount();
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+// Mark single activity as read
+function markAsRead(activityId) {
+    const activityItem = document.querySelector(`[data-activity-id="${activityId}"]`);
+    if (!activityItem) return;
+    
+    // Send AJAX request to mark as read
+    fetch(`/accounts/mark-activity-read/${activityId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update UI immediately
+            activityItem.classList.remove('unread');
+            activityItem.classList.add('read');
+            
+            const indicator = activityItem.querySelector('.activity-indicator');
+            if (indicator) indicator.remove();
+            
+            updateUnreadCount();
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+// Update unread count in the UI
+function updateUnreadCount() {
+    const unreadItems = document.querySelectorAll('.activity-item.unread');
+    const unreadCount = unreadItems.length;
+    const badge = document.getElementById('notificationBadge');
+    const markAllBtn = document.querySelector('.btn-mark-read');
+    
+    // Update badge with correct format
+    if (badge) {
+        if (unreadCount > 9) {
+            badge.textContent = '9+';
+        } else {
+            badge.textContent = unreadCount;
+        }
+        
+        // Update badge style based on count
+        if (unreadCount === 0) {
+            badge.classList.add('read');
+        } else {
+            badge.classList.remove('read');
+        }
+    }
+    
+    // Hide mark all button if no unread activities
+    if (markAllBtn) {
+        if (unreadCount === 0) {
+            markAllBtn.style.display = 'none';
+        } else {
+            markAllBtn.style.display = 'flex';
+        }
+    }
+}
+
+// CSRF token helper function
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Auto-mark as read when clicking on activity
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.activity-item.unread').forEach(item => {
+        item.addEventListener('click', function() {
+            const activityId = this.getAttribute('data-activity-id');
+            if (activityId) {
+                markAsRead(activityId);
+            }
         });
     });
+    
+    // Initialize the unread count display
+    updateUnreadCount();
+});
 </script>
 {% endblock %}

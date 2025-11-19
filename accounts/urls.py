@@ -25,4 +25,7 @@ urlpatterns = [
     # Teacher URLs
     path('teacher-dashboard/', views.teacher_dashboard, name='teacher_dashboard'),
     path('test-activity/', views.test_activity, name='test_activity'),
+    
+    path('mark-activity-read/<int:activity_id>/', views.mark_activity_read, name='mark_activity_read'),
+    path('mark-all-activities-read/', views.mark_all_activities_read, name='mark_all_activities_read'),
 ]

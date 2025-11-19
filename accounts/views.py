@@ -2,6 +2,7 @@
 # FILE: accounts/views.py
 # ============================================================================
 
+from django.http import JsonResponse
 from django.utils import timezone
 from datetime import timedelta
 from django.shortcuts import render, redirect, get_object_or_404
@@ -90,6 +91,7 @@ def admin_dashboard(request):
     from .models import ActivityLog
     since = timezone.now() - timedelta(hours=24)
     recent_activities_db = ActivityLog.objects.filter(created_at__gte=since).select_related('user')[:10]
+    unread_count = ActivityLog.objects.filter(is_read=False, created_at__gte=since).count()
     
     # Format activities for template
     recent_activities = []
@@ -111,6 +113,7 @@ def admin_dashboard(request):
         'total_departments': total_departments,
         'total_subjects': total_subjects,
         'recent_activities': recent_activities,
+        'unread_count': unread_count,
     }
     return render(request, 'admin_dashboard/dashboard.html', context)
 
@@ -467,3 +470,27 @@ def test_activity(request):
     
     # Redirect to dashboard to see if it appears
     return redirect('accounts:admin_dashboard')
+
+@login_required
+def mark_activity_read(request, activity_id):
+    """Mark a single activity as read"""
+    from .models import ActivityLog
+    try:
+        activity = ActivityLog.objects.get(id=activity_id)
+        activity.is_read = True
+        activity.save()
+        return JsonResponse({'success': True})
+    except ActivityLog.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Activity not found'})
+
+@login_required
+def mark_all_activities_read(request):
+    """Mark all activities as read"""
+    from .models import ActivityLog
+    try:
+        # Update all unread activities in the database
+        since = timezone.now() - timedelta(hours=24)
+        ActivityLog.objects.filter(is_read=False, created_at__gte=since).update(is_read=True)
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
