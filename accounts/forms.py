@@ -64,13 +64,10 @@ class DepartmentForm(forms.ModelForm):
         fields = ['name', 'code', 'description']
 
 class SubjectForm(forms.ModelForm):
-    departments = forms.ModelMultipleChoiceField(
-        queryset=Department.objects.all(),
-        widget=forms.CheckboxSelectMultiple,
-        required=True,
-        help_text="Select all departments that offer this subject"
-    )
-    
     class Meta:
         model = Subject
-        fields = ['departments', 'name', 'code', 'description']
+        fields = ['departments', 'code', 'name', 'description']  # Should be 'departments' not 'department'
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3}),
+            'departments': forms.CheckboxSelectMultiple(),
+        }

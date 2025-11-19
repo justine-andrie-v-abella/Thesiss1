@@ -6,99 +6,135 @@ FILE: templates/admin_dashboard/manage_subjects.html
 {% block title %}Manage Subjects - Admin{% endblock %}
 
 {% block content %}
-<h1 class="mb-4"><i class="bi bi-book"></i> Manage Subjects</h1>
+<div class="dashboard-header">
+    <div class="container">
+        <h1 class="dashboard-title">
+            <i class="bi bi-book me-3"></i>Manage Subjects
+        </h1>
+        <p class="dashboard-subtitle">Add and manage subjects across departments</p>
+    </div>
+</div>
 
-<div class="row">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">Add New Subject</h5>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label">Departments * <small class="text-muted">(Select all that apply)</small></label>
-                        <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
-                            {{ form.departments }}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="bi bi-plus-circle me-2"></i>Add New Subject</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Departments Field -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Departments</label>
+                            <small class="text-muted d-block mb-2">Select all that apply</small>
+                            <div class="departments-checkbox border rounded p-3 bg-light">
+                                {{ form.departments }}
+                            </div>
+                            {% if form.departments.errors %}
+                                <div class="text-danger small mt-1">{{ form.departments.errors }}</div>
+                            {% endif %}
                         </div>
-                        {% if form.departments.errors %}
-                            <div class="text-danger">{{ form.departments.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Subject Code *</label>
-                        <input type="text" class="form-control" name="code" placeholder="e.g., ETHIC1" required>
-                        {% if form.code.errors %}
-                            <div class="text-danger">{{ form.code.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Subject Name *</label>
-                        <input type="text" class="form-control" name="name" placeholder="e.g., Ethics" required>
-                        {% if form.name.errors %}
-                            <div class="text-danger">{{ form.name.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control" name="description" rows="3" placeholder="Optional description"></textarea>
-                        {% if form.description.errors %}
-                            <div class="text-danger">{{ form.description.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-plus-circle"></i> Add Subject
-                    </button>
-                </form>
+
+                        <!-- Code Field -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Subject Code</label>
+                            {{ form.code }}
+                            {% if form.code.errors %}
+                                <div class="text-danger small mt-1">{{ form.code.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Name Field -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Subject Name</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                                <div class="text-danger small mt-1">{{ form.name.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Description Field -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Description</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="text-danger small mt-1">{{ form.description.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 py-2">
+                            <i class="bi bi-plus-circle me-2"></i>Add Subject
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-white">
-                <h5 class="mb-0">Existing Subjects</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Code</th>
-                                <th>Name</th>
-                                <th>Departments</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for subject in subjects %}
-                            <tr>
-                                <td><strong>{{ subject.code }}</strong></td>
-                                <td>{{ subject.name }}</td>
-                                <td>
-                                    {% for dept in subject.departments.all %}
-                                        <span class="badge bg-info me-1">{{ dept.code }}</span>
-                                    {% empty %}
-                                        <span class="text-muted">No departments</span>
-                                    {% endfor %}
-                                </td>
-                                <td>
-                                    <a href="{% url 'accounts:edit_subject' subject.pk %}" class="btn btn-sm btn-warning">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <a href="{% url 'accounts:delete_subject' subject.pk %}" class="btn btn-sm btn-danger">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center">No subjects found</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="bi bi-list-ul me-2"></i>Existing Subjects</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if subjects %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Departments</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for subject in subjects %}
+                                <tr>
+                                    <td>
+                                        <strong class="text-primary">{{ subject.code }}</strong>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">{{ subject.name }}</div>
+                                        {% if subject.description %}
+                                        <small class="text-muted">{{ subject.description|truncatewords:5 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% for dept in subject.departments.all %}
+                                            <span class="badge bg-info me-1 mb-1">{{ dept.code }}</span>
+                                        {% empty %}
+                                            <span class="text-muted small">No departments</span>
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'accounts:edit_subject' subject.pk %}" 
+                                               class="btn btn-outline-warning" 
+                                               title="Edit Subject">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="{% url 'accounts:delete_subject' subject.pk %}" 
+                                               class="btn btn-outline-danger" 
+                                               title="Delete Subject">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-book display-1 text-muted"></i>
+                        <h5 class="text-muted mt-3">No Subjects Found</h5>
+                        <p class="text-muted">Get started by adding your first subject.</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -108,28 +144,92 @@ FILE: templates/admin_dashboard/manage_subjects.html
 
 {% block extra_css %}
 <style>
-    .form-control, select, textarea {
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
+    /* Form Styling */
+    .form-control, .form-select, textarea {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
     }
-    select {
-        width: 100%;
+
+    .form-control:focus, .form-select:focus, textarea:focus {
+        border-color: #4361ee;
+        box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
     }
-    /* Style for department checkboxes */
-    input[type="checkbox"] {
-        margin-right: 8px;
-        cursor: pointer;
+
+    /* Departments Checkbox Styling */
+    .departments-checkbox {
+        max-height: 200px;
+        overflow-y: auto;
+        background: white !important;
     }
-    label {
-        cursor: pointer;
-        margin-bottom: 8px;
-        display: block;
-    }
-    ul {
+
+    .departments-checkbox ul {
         list-style: none;
         padding: 0;
         margin: 0;
+    }
+
+    .departments-checkbox li {
+        margin-bottom: 0.5rem;
+        padding: 0.25rem 0;
+    }
+
+    .departments-checkbox input[type="checkbox"] {
+        margin-right: 0.5rem;
+        transform: scale(1.1);
+    }
+
+    .departments-checkbox label {
+        margin-bottom: 0;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+    }
+
+    /* Table Styling */
+    .table th {
+        background: #f8f9fa;
+        border-bottom: 2px solid #e2e8f0;
+        font-weight: 600;
+        padding: 1rem 0.75rem;
+    }
+
+    .table td {
+        padding: 1rem 0.75rem;
+        vertical-align: middle;
+    }
+
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.35em 0.65em;
+    }
+
+    /* Button Styling */
+    .btn-group .btn {
+        border-radius: 6px;
+        margin: 0 2px;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .dashboard-title {
+            font-size: 1.5rem;
+        }
+        
+        .card-body {
+            padding: 1rem;
+        }
+        
+        .table-responsive {
+            font-size: 0.875rem;
+        }
+        
+        .btn-group .btn {
+            padding: 0.25rem 0.5rem;
+        }
     }
 </style>
 {% endblock %}

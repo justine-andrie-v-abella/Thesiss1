@@ -6,51 +6,77 @@ FILE: templates/admin_dashboard/edit_subject.html
 {% block title %}Edit Subject - Admin{% endblock %}
 
 {% block content %}
-<h1 class="mb-4"><i class="bi bi-pencil"></i> Edit Subject</h1>
+<div class="dashboard-header">
+    <div class="container">
+        <h1 class="dashboard-title">
+            <i class="bi bi-pencil me-3"></i>Edit Subject
+        </h1>
+        <p class="dashboard-subtitle">Update subject information</p>
+    </div>
+</div>
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label">Department *</label>
-                        {{ form.department }}
-                        {% if form.department.errors %}
-                            <div class="text-danger">{{ form.department.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Subject Code *</label>
-                        {{ form.code }}
-                        {% if form.code.errors %}
-                            <div class="text-danger">{{ form.code.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Subject Name *</label>
-                        {{ form.name }}
-                        {% if form.name.errors %}
-                            <div class="text-danger">{{ form.name.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        {{ form.description }}
-                        {% if form.description.errors %}
-                            <div class="text-danger">{{ form.description.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle"></i> Update Subject
-                        </button>
-                        <a href="{% url 'accounts:manage_subjects' %}" class="btn btn-secondary">
-                            <i class="bi bi-x-circle"></i> Cancel
-                        </a>
-                    </div>
-                </form>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-book me-2"></i>Edit {{ subject.name }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Departments Field (Multiple Selection) -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Departments</label>
+                            <small class="text-muted d-block mb-2">Select all departments that offer this subject</small>
+                            <div class="departments-checkbox border rounded p-3 bg-light">
+                                {{ form.departments }}
+                            </div>
+                            {% if form.departments.errors %}
+                                <div class="text-danger small mt-2">{{ form.departments.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Code Field -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Subject Code</label>
+                            {{ form.code }}
+                            {% if form.code.errors %}
+                                <div class="text-danger small mt-2">{{ form.code.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Name Field -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Subject Name</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                                <div class="text-danger small mt-2">{{ form.name.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Description Field -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Description</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="text-danger small mt-2">{{ form.description.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-check-circle me-2"></i>Update Subject
+                            </button>
+                            <a href="{% url 'accounts:manage_subjects' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -59,11 +85,80 @@ FILE: templates/admin_dashboard/edit_subject.html
 
 {% block extra_css %}
 <style>
-    .form-control, select, textarea {
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
+    /* Form Styling */
+    .form-control, .form-select, textarea {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
         width: 100%;
+    }
+
+    .form-control:focus, .form-select:focus, textarea:focus {
+        border-color: #4361ee;
+        box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+    }
+
+    /* Departments Checkbox Styling */
+    .departments-checkbox {
+        max-height: 200px;
+        overflow-y: auto;
+        background: white !important;
+    }
+
+    .departments-checkbox ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .departments-checkbox li {
+        margin-bottom: 0.5rem;
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #f8f9fa;
+    }
+
+    .departments-checkbox li:last-child {
+        border-bottom: none;
+    }
+
+    .departments-checkbox input[type="checkbox"] {
+        margin-right: 0.75rem;
+        transform: scale(1.1);
+        cursor: pointer;
+    }
+
+    .departments-checkbox label {
+        margin-bottom: 0;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        padding: 0.25rem 0;
+        width: 100%;
+    }
+
+    /* Button Styling */
+    .btn {
+        border-radius: 8px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .dashboard-title {
+            font-size: 1.5rem;
+        }
+        
+        .card-body {
+            padding: 1.25rem;
+        }
+        
+        .btn {
+            padding: 0.75rem 1rem;
+        }
     }
 </style>
 {% endblock %}
