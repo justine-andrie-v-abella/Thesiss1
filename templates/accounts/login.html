@@ -8,42 +8,116 @@
         background-size: cover;
     }
 
-    /* Optional: same transparent card effect */
     .card {
-        background: rgba(255, 255, 255, 0.92);
-        backdrop-filter: blur(4px);
+        background: linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.92) 0%, 
+            rgba(255, 255, 255, 0.85) 100%);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+
+    .login-icon {
+        font-size: 2.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 1rem;
+    }
+
+    .form-control {
+        border-radius: 8px;
+        border: 1px solid #e1e5e9;
+        padding: 12px 15px;
+        transition: all 0.3s ease;
+    }
+
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+    }
+
+    .btn-login {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 12px;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-login:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .back-link {
+        color: #6c757d;
+        text-decoration: none;
+        transition: color 0.3s ease;
+    }
+
+    .back-link:hover {
+        color: #667eea;
     }
 </style>
 
 <div class="container">
     <div class="row min-vh-100 align-items-center">
-        <div class="col-md-5 mx-auto">
+        <div class="col-lg-5 col-md-6 mx-auto">
             <div class="card">
                 <div class="card-body p-5">
-                    <h2 class="text-center mb-4">
-                        <i class="bi bi-lock-fill text-primary"></i><br>
-                        Login
-                    </h2>
+                    <!-- Header -->
+                    <div class="text-center mb-4">
+                        <div class="login-icon">
+                            <i class="bi bi-lock-fill"></i>
+                        </div>
+                        <h2 class="card-title fw-bold" style="color: #2c3e50;">
+                            Login to Your Account
+                        </h2>
+                        <p class="text-muted">Access the BISU Test Banking System</p>
+                    </div>
 
+                    <!-- Login Form -->
                     <form method="post">
                         {% csrf_token %}
+                        
+                        <!-- Username Field -->
                         <div class="mb-3">
-                            <label for="username" class="form-label">Username</label>
-                            <input type="text" class="form-control" id="username" name="username" required autofocus>
-                        </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
+                            <label for="username" class="form-label fw-semibold">Username</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-person text-muted"></i>
+                                </span>
+                                <input type="text" class="form-control" id="username" name="username" 
+                                       placeholder="Enter your username" required autofocus>
+                            </div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-box-arrow-in-right"></i> Login
+                        <!-- Password Field -->
+                        <div class="mb-4">
+                            <label for="password" class="form-label fw-semibold">Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-key text-muted"></i>
+                                </span>
+                                <input type="password" class="form-control" id="password" name="password" 
+                                       placeholder="Enter your password" required>
+                            </div>
+                        </div>
+
+                        <!-- Login Button -->
+                        <button type="submit" class="btn btn-login text-white w-100 py-2 mb-3">
+                            <i class="bi bi-box-arrow-in-right me-2"></i> Login
                         </button>
                     </form>
 
-                    <div class="text-center mt-3">
-                        <a href="{% url 'home' %}" class="text-muted">
-                            <i class="bi bi-arrow-left"></i> Back to Home
+                    <!-- Back to Home Link -->
+                    <div class="text-center mt-4">
+                        <a href="{% url 'home' %}" class="back-link">
+                            <i class="bi bi-arrow-left me-1"></i> Back to Home
                         </a>
                     </div>
 

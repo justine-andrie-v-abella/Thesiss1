@@ -8,43 +8,86 @@
         background-size: cover;
     }
 
-   
     .card {
-        background: rgba(255, 255, 255, 0.83);
-        backdrop-filter: blur(4px);
+        background: linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.75) 0%, 
+            rgba(255, 255, 255, .85) 100%);
+        backdrop-filter: blur(12px);
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+
+    .bisu-logo {
+        width: 90px;
+        height: 90px;
+        object-fit: contain;
+        margin-bottom: 1rem;
+    }
+
+    .title-text {
+        color: #2c3e50;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    .lead-text {
+        color: #5a6c7d;
+        font-size: 1.1rem;
+        line-height: 1.6;
+    }
+
+    .btn-custom {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 12px 35px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        color: white;
+    }
+
+    .btn-custom:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        color: white;
     }
 </style>
 
 <div class="container">
     <div class="row min-vh-100 align-items-center">
-        <div class="col-lg-6 mx-auto text-center">
-            <div class="card p-5">
-                <h1 class="display-4 mb-4">
-             <img src="{% static 'images/bisulogo.png' %}" 
-             alt="BISU Logo"
-             style="width: 80px; height: 80px; object-fit: contain;">
-             <br>
-            BISU Test Banking System
+        <div class="col-lg-6 col-md-8 mx-auto">
+            <div class="card p-5 text-center">
+                <!-- Logo -->
+                <img src="{% static 'images/bisulogo.png' %}" 
+                     alt="BISU Logo"
+                     class="bisu-logo mx-auto">
+
+                <!-- Title -->
+                <h1 class="display-5 title-text">
+                    BISU Test Banking System
                 </h1>
 
-
-                <p class="lead mb-4">
+                <!-- Description -->
+                <p class="lead-text mb-4">
                     A centralized digital repository of test questionnaires for BISU Balilihan
                 </p>
 
+                <!-- Action Button -->
                 {% if user.is_authenticated %}
                     {% if user.is_staff %}
-                        <a href="{% url 'accounts:admin_dashboard' %}" class="btn btn-primary btn-lg">
-                            <i class="bi bi-speedometer2"></i> Go to Admin Dashboard
+                        <a href="{% url 'accounts:admin_dashboard' %}" class="btn btn-custom">
+                            <i class="bi bi-speedometer2 me-2"></i> Go to Admin Dashboard
                         </a>
                     {% else %}
-                        <a href="{% url 'accounts:teacher_dashboard' %}" class="btn btn-primary btn-lg">
-                            <i class="bi bi-speedometer2"></i> Go to Dashboard
+                        <a href="{% url 'accounts:teacher_dashboard' %}" class="btn btn-custom">
+                            <i class="bi bi-speedometer2 me-2"></i> Go to Dashboard
                         </a>
                     {% endif %}
                 {% else %}
-                    <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-lg">
-                        <i class="bi bi-box-arrow-in-right"></i> Login to Continue
+                    <a href="{% url 'accounts:login' %}" class="btn btn-custom">
+                         Login to Continue
                     </a>
                 {% endif %}
             </div>
