@@ -9,7 +9,258 @@
     {% comment %} {% load static %} {% endcomment %}
     
     <style>
-        {% include 'style/style.css' %}
+        :root {
+            --sidebar-width: 220px; /* Reduced from 250px */
+            --primary-color: #4361ee;
+            --secondary-color: #3a0ca3;
+            --accent-color: #4cc9f0;
+            --light-color: #f8f9fa;
+            --dark-color: #212529;
+            --success-color: #4bb543;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --sidebar-gradient: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+            --card-gradient: linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fb;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            background: var(--sidebar-gradient);
+            padding-top: 15px; /* Reduced padding */
+            z-index: 1000;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 10px 15px; /* Reduced padding */
+            margin: 4px 12px; /* Reduced margins */
+            border-radius: 6px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem; /* Smaller font size */
+        }
+
+        .sidebar .nav-link i {
+            margin-right: 8px; /* Reduced spacing */
+            font-size: 1rem; /* Smaller icons */
+        }
+
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            transform: translateX(3px); /* Smaller transform */
+        }
+
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 15px; /* Reduced padding */
+            min-height: 100vh;
+            background: #f5f7fb;
+            transition: margin-left 0.3s ease;
+        }
+
+        .sidebar-brand {
+            color: white;
+            font-size: 1.1rem; /* Reduced from 1.5rem */
+            font-weight: bold;
+            padding: 0 15px 15px; /* Reduced padding */
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 15px; /* Reduced margin */
+            display: flex;
+            align-items: center;
+            white-space: nowrap; /* Prevent text wrapping */
+            overflow: hidden;
+        }
+
+        .sidebar-brand i {
+            margin-right: 8px; /* Reduced spacing */
+            font-size: 1.2rem; /* Adjusted icon size */
+            flex-shrink: 0; /* Prevent icon from shrinking */
+        }
+
+        .user-info {
+            color: white;
+            padding: 12px 15px; /* Reduced padding */
+            border-top: 1px solid rgba(255,255,255,0.2);
+            margin-top: 15px; /* Reduced margin */
+            font-size: 0.85rem; /* Smaller font */
+        }
+
+        .user-info .btn {
+            font-size: 0.8rem; /* Smaller button text */
+            padding: 5px 10px; /* Smaller button padding */
+        }
+
+        /* Card Styles */
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            margin-bottom: 15px; /* Reduced margin */
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+
+        .stat-card {
+            background: var(--card-gradient);
+            color: white;
+        }
+
+        .btn-primary {
+            background: var(--card-gradient);
+            border: none;
+            font-weight: 500;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3);
+        }
+
+        /* Enhanced form styling */
+        .form-control, .form-select {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+        }
+
+        /* Improved empty states */
+        .empty-state {
+            padding: 2rem 1rem; /* Reduced padding */
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem; /* Reduced size */
+            color: #e2e8f0;
+            margin-bottom: 1rem;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 240px; /* Reduced mobile width */
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+                padding: 10px; /* Reduced padding for mobile */
+            }
+            
+            .main-content.sidebar-active {
+                margin-left: 0;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+                position: fixed;
+                top: 10px; /* Adjusted position */
+                left: 10px; /* Adjusted position */
+                z-index: 1100;
+                background: var(--primary-color);
+                color: white;
+                border: none;
+                border-radius: 50%;
+                width: 40px; /* Smaller button */
+                height: 40px; /* Smaller button */
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                font-size: 1.1rem; /* Smaller icon */
+            }
+        }
+
+        @media (min-width: 993px) {
+            .mobile-menu-btn {
+                display: none;
+            }
+        }
+
+        /* Overlay for mobile sidebar */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* Table improvements */
+        .table-responsive {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .table th {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 15px; /* Reduced padding */
+            font-size: 0.9rem; /* Smaller font */
+        }
+
+        .table td {
+            padding: 10px 12px; /* Reduced padding */
+            vertical-align: middle;
+            font-size: 0.85rem; /* Smaller font */
+        }
+
+        /* Alert improvements */
+        .alert {
+            border: none;
+            border-radius: 10px;
+            padding: 12px 15px; /* Reduced padding */
+            font-size: 0.9rem; /* Smaller font */
+        }
+
+        /* Badge improvements */
+        .badge {
+            padding: 5px 10px; /* Reduced padding */
+            border-radius: 20px;
+            font-weight: 500;
+            font-size: 0.75rem; /* Smaller font */
+        }
     </style>
 </head>
 <body>
@@ -63,7 +314,7 @@
         <div class="user-info">
             <div class="mb-2"><strong>{{ user.get_full_name }}</strong></div>
             <div class="small">{{ user.email }}</div>
-            <a href="{% url 'accounts:logout' %}" class="btn btn-sm btn-light mt-3 w-100">
+            <a href="{% url 'accounts:logout' %}" class="btn btn-sm btn-light mt-2 w-100">
                 <i class="bi bi-box-arrow-right"></i> Logout
             </a>
         </div>

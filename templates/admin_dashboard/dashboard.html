@@ -4,38 +4,329 @@
 
 {% block content %}
 <style>
+    /* Header Styles */
     .dashboard-header {
         background: white;
-        padding: 2rem 0 1rem 0;
-        margin: -20px -20px 2rem -20px;
+        padding: 1.5rem 0 1rem 0;
+        margin: -20px -20px 1.5rem -20px;
         border-bottom: 1px solid #e2e8f0;
+        position: relative;
+    }
+    
+    .header-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .header-info {
+        flex: 1;
     }
     
     .dashboard-title {
         color: #2d3748;
         font-weight: 700;
-        font-size: 2rem;
-        margin-bottom: 0.5rem;
+        font-size: 1.5rem;
+        margin-bottom: 0.25rem;
     }
     
     .dashboard-subtitle {
         color: #718096;
-        font-size: 1.1rem;
+        font-size: 0.9rem;
         font-weight: 400;
     }
     
-    /* Stat Cards */
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    /* Notification Bell */
+    .notification-wrapper {
+        position: relative;
+    }
+    
+    .notification-bell {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #f7fafc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #4a5568;
+        font-size: 1.2rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .notification-bell:hover {
+        background: #4361ee;
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .notification-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #e53e3e;
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: 600;
+        border: 2px solid white;
+    }
+    
+    /* Profile Dropdown */
+    .profile-dropdown {
+        position: relative;
+    }
+    
+    .profile-trigger {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 8px;
+        transition: background 0.3s ease;
+    }
+    
+    .profile-trigger:hover {
+        background: #f7fafc;
+    }
+    
+    .profile-photo {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4361ee, #3a0ca3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+    
+    .profile-name {
+        color: #2d3748;
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+    
+    .dropdown-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        min-width: 180px;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.3s ease;
+    }
+    
+    .dropdown-menu.show {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+    
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        color: #4a5568;
+        text-decoration: none;
+        transition: background 0.3s ease;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+        cursor: pointer;
+    }
+    
+    .dropdown-item:first-child {
+        border-radius: 8px 8px 0 0;
+    }
+    
+    .dropdown-item:last-child {
+        border-radius: 0 0 8px 8px;
+    }
+    
+    .dropdown-item:hover {
+        background: #f7fafc;
+        color: #2d3748;
+    }
+    
+    .dropdown-item.logout {
+        color: #e53e3e;
+        border-top: 1px solid #e2e8f0;
+    }
+    
+    .dropdown-item.logout:hover {
+        background: #fed7d7;
+    }
+    
+    /* Notification Dropdown */
+    .notification-dropdown {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        width: 350px;
+        max-height: 400px;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.3s ease;
+    }
+    
+    .notification-dropdown.show {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+    
+    .notification-header {
+        padding: 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .notification-title {
+        font-weight: 600;
+        color: #2d3748;
+        margin: 0;
+        font-size: 1rem;
+    }
+    
+    .mark-all-read {
+        background: none;
+        border: none;
+        color: #4361ee;
+        font-size: 0.8rem;
+        cursor: pointer;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        transition: background 0.3s ease;
+    }
+    
+    .mark-all-read:hover {
+        background: rgba(67, 97, 238, 0.1);
+    }
+    
+    .notification-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .notification-item {
+        padding: 0.875rem 1rem;
+        border-bottom: 1px solid #f7fafc;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+    
+    .notification-item:last-child {
+        border-bottom: none;
+    }
+    
+    .notification-item:hover {
+        background: #f8f9fa;
+    }
+    
+    .notification-item.unread {
+        background: #ebf8ff;
+    }
+    
+    .notification-content {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .notification-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: #f7fafc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        color: #4361ee;
+        flex-shrink: 0;
+    }
+    
+    .notification-text {
+        flex: 1;
+    }
+    
+    .notification-message {
+        font-weight: 500;
+        color: #2d3748;
+        font-size: 0.85rem;
+        margin-bottom: 0.25rem;
+        line-height: 1.3;
+    }
+    
+    .notification-time {
+        color: #718096;
+        font-size: 0.75rem;
+    }
+    
+    .notification-footer {
+        padding: 0.75rem;
+        border-top: 1px solid #e2e8f0;
+        text-align: center;
+    }
+    
+    .view-all-notifications {
+        color: #4361ee;
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    
+    .view-all-notifications:hover {
+        text-decoration: underline;
+    }
+    
+    /* Stat Cards - Icon on Left Layout */
     .stat-card {
         background: white;
-        border-radius: 16px;
-        padding: 2rem 1.5rem;
-        text-align: center;
+        border-radius: 12px;
+        padding: 1.25rem;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.03);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
         border: 1px solid #e2e8f0;
         height: 100%;
         position: relative;
         overflow: hidden;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
     }
     
     .stat-card::before {
@@ -44,13 +335,13 @@
         top: 0;
         left: 0;
         right: 0;
-        height: 4px;
+        height: 3px;
         background: linear-gradient(135deg, #4361ee, #3a0ca3);
     }
     
     .stat-card:hover {
-        box-shadow: 0 20px 25px rgba(0, 0, 0, 0.1);
-        transform: translateY(-5px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.08);
+        transform: translateY(-3px);
     }
     
     .stat-icon {
@@ -60,8 +351,8 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 1rem;
         font-size: 1.5rem;
+        flex-shrink: 0;
     }
     
     .stat-icon.teachers { background: linear-gradient(135deg, #4361ee, #4cc9f0); }
@@ -69,76 +360,96 @@
     .stat-icon.subjects { background: linear-gradient(135deg, #f72585, #ff9e00); }
     .stat-icon.total { background: linear-gradient(135deg, #4cc9f0, #4361ee); }
     
+    .stat-content {
+        flex: 1;
+    }
+    
     .stat-number {
-        font-size: 2.5rem;
-        font-weight: 800;
+        font-size: 2rem;
+        font-weight: 700;
         color: #2d3748;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.25rem;
         line-height: 1;
     }
     
     .stat-label {
         color: #718096;
-        font-size: 0.95rem;
-        font-weight: 600;
+        font-size: 0.9rem;
+        font-weight: 500;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
     
-    /* Quick Actions */
+    /* Layout for Chart and Quick Actions */
+    .chart-actions-section {
+        display: flex;
+        gap: 1.5rem;
+        margin: 2rem 0;
+    }
+    
+    .chart-section {
+        flex: 3;
+    }
+    
+    .actions-section {
+        flex: 1;
+    }
+    
+    /* Quick Actions - Compact */
     .action-section {
-        margin: 3rem 0;
+        margin-bottom: 0;
     }
     
     .section-title {
-        font-size: 1.5rem;
-        font-weight: 700;
+        font-size: 1.1rem;
+        font-weight: 600;
         color: #2d3748;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
         display: flex;
         align-items: center;
     }
     
     .section-title i {
-        margin-right: 0.75rem;
+        margin-right: 0.5rem;
         color: #4361ee;
+        font-size: 1rem;
     }
     
     .action-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
     }
     
     .action-card {
         background: white;
-        border-radius: 16px;
-        padding: 2rem;
+        border-radius: 10px;
+        padding: 1rem;
         text-decoration: none;
         color: inherit;
         transition: all 0.3s ease;
         border: 1px solid #e2e8f0;
         display: flex;
         align-items: center;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.03);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
     }
     
     .action-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
         color: inherit;
         border-color: #4361ee;
     }
     
     .action-icon {
-        width: 60px;
-        height: 60px;
-        border-radius: 12px;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-right: 1.5rem;
-        font-size: 1.5rem;
+        margin-right: 0.75rem;
+        font-size: 1.1rem;
         color: white;
         flex-shrink: 0;
     }
@@ -149,578 +460,293 @@
     .action-icon.view-files { background: linear-gradient(135deg, #4cc9f0, #4361ee); }
     
     .action-content h4 {
-        font-size: 1.1rem;
+        font-size: 0.9rem;
         font-weight: 600;
         color: #2d3748;
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.1rem;
     }
     
     .action-content p {
         color: #718096;
-        font-size: 0.9rem;
+        font-size: 0.75rem;
         margin: 0;
     }
     
-    /* System Overview */
+    /* Graph Section */
+    .graph-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+        height: 100%;
+    }
+    
+    .graph-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .graph-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #2d3748;
+        margin: 0;
+    }
+    
+    .graph-container {
+        height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8f9fa;
+        border-radius: 8px;
+        color: #718096;
+        font-size: 0.9rem;
+    }
+    
+    /* System Overview - Removed Recent Activities Panel */
     .overview-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 2rem;
-        margin-top: 2rem;
+        gap: 1.5rem;
     }
     
     .info-panel {
         background: white;
-        border-radius: 16px;
-        padding: 2rem;
+        border-radius: 12px;
+        padding: 1.5rem;
         border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.03);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+        height: 100%;
     }
     
     .panel-header {
         display: flex;
         align-items: center;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: 1rem;
     }
     
     .panel-header i {
-        font-size: 1.25rem;
+        font-size: 1.1rem;
         color: #4361ee;
-        margin-right: 0.75rem;
+        margin-right: 0.5rem;
     }
     
     .panel-title {
-        font-size: 1.25rem;
+        font-size: 1.1rem;
         font-weight: 600;
         color: #2d3748;
         margin: 0;
-    }
-    
-    /* Progress Bar */
-    .progress-container {
-        background: #f7fafc;
-        border-radius: 10px;
-        overflow: hidden;
-        height: 12px;
-        margin: 1rem 0 2rem;
-    }
-    
-    .progress-bar {
-        background: linear-gradient(135deg, #4361ee, #3a0ca3);
-        height: 100%;
-        border-radius: 10px;
-        transition: width 1s ease-in-out;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .progress-bar::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-        animation: shimmer 2s infinite;
-    }
-    
-    @keyframes shimmer {
-        0% { left: -100%; }
-        100% { left: 100%; }
-    }
-    
-    .progress-info {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.5rem;
-    }
-    
-    .progress-label {
-        color: #718096;
-        font-size: 0.9rem;
-    }
-    
-    .progress-value {
-        color: #2d3748;
-        font-weight: 600;
-        font-size: 0.9rem;
-    }
-    
-    /* System Items */
-    .system-item {
-        display: flex;
-        align-items: center;
-        padding: 1rem 0;
-        border-bottom: 1px solid #f7fafc;
-    }
-    
-    .system-item:last-child {
-        border-bottom: none;
-    }
-    
-    .system-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 1rem;
-        color: white;
-        font-size: 1rem;
-        flex-shrink: 0;
-    }
-    
-    .system-icon.success { background: linear-gradient(135deg, #48bb78, #38a169); }
-    .system-icon.primary { background: linear-gradient(135deg, #4361ee, #3a0ca3); }
-    .system-icon.info { background: linear-gradient(135deg, #4299e1, #3182ce); }
-    
-    .system-content {
         flex: 1;
     }
     
-    .system-content span {
-        color: #718096;
-        font-size: 0.9rem;
-    }
-    
-    .system-value {
-        color: #2d3748;
-        font-weight: 600;
-        font-size: 1rem;
-    }
-    
-    /* Tips List */
-    .tips-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-    }
-    
-    .tips-list li {
-        padding: 0.75rem 0;
-        color: #718096;
-        font-size: 0.9rem;
-        display: flex;
-        align-items: flex-start;
-    }
-    
-    .tips-list li::before {
-        content: "💡";
-        margin-right: 0.75rem;
-        font-size: 0.8rem;
-        margin-top: 0.1rem;
-    }
-    
     /* Responsive Design */
+    @media (max-width: 992px) {
+        .chart-actions-section {
+            flex-direction: column;
+        }
+        
+        .notification-dropdown {
+            width: 300px;
+            right: -50px;
+        }
+    }
+    
     @media (max-width: 768px) {
         .dashboard-header {
-            margin: -20px -20px 2rem -20px;
-            padding: 1.5rem 0 1rem 0;
+            margin: -20px -20px 1.5rem -20px;
+            padding: 1.25rem 0 0.75rem 0;
+        }
+        
+        .header-content {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        
+        .header-actions {
+            align-self: flex-end;
         }
         
         .dashboard-title {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
         }
         
-        .stat-number {
-            font-size: 2rem;
-        }
-        
-        .action-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .overview-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .action-card {
-            padding: 1.5rem;
-        }
-        
-        .info-panel {
-            padding: 1.5rem;
-        }
-    }
-    
-    @media (max-width: 576px) {
         .stat-card {
-            padding: 1.5rem 1rem;
+            padding: 1rem;
+            gap: 0.75rem;
+        }
+        
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            font-size: 1.25rem;
         }
         
         .stat-number {
             font-size: 1.75rem;
         }
         
-        .action-icon {
-            width: 50px;
-            height: 50px;
-            margin-right: 1rem;
+        .overview-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .graph-container {
+            height: 250px;
+        }
+        
+        .notification-dropdown {
+            width: 280px;
+            right: -80px;
+        }
+        
+        .profile-name {
+            display: none;
         }
     }
-    /* Recent Activities Panel */
-.info-panel {
-    background: white;
-    border-radius: 16px;
-    padding: 0;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.03);
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.panel-header {
-    display: flex;
-    align-items: center;
-    padding: 1.5rem 1.5rem 1rem;
-    border-bottom: 1px solid #e2e8f0;
-    position: relative;
-}
-
-.panel-header i {
-    font-size: 1.25rem;
-    color: #4361ee;
-    margin-right: 0.75rem;
-}
-
-.panel-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: #2d3748;
-    margin: 0;
-    flex: 1;
-}
-
-.notification-badge {
-    background: #e53e3e;
-    color: white;
-    border-radius: 20px;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    min-width: 24px;
-    text-align: center;
-}
-
-/* Activities Container */
-.activities-container {
-    flex: 1;
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 0.5rem 0;
-}
-
-.activities-container::-webkit-scrollbar {
-    width: 6px;
-}
-
-.activities-container::-webkit-scrollbar-track {
-    background: #f7fafc;
-    border-radius: 3px;
-}
-
-.activities-container::-webkit-scrollbar-thumb {
-    background: #cbd5e0;
-    border-radius: 3px;
-}
-
-.activities-container::-webkit-scrollbar-thumb:hover {
-    background: #a0aec0;
-}
-
-/* Activity Items */
-.activity-item {
-    display: flex;
-    align-items: flex-start;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid #f7fafc;
-    transition: background 0.2s ease;
-    position: relative;
-}
-
-.activity-item:hover {
-    background: #f8f9fa;
-}
-
-.activity-item.unread {
-    background: #ebf8ff;
-    border-left: 3px solid #4361ee;
-}
-
-.activity-item:last-child {
-    border-bottom: none;
-}
-
-.activity-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    background: #f7fafc;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 1rem;
-    flex-shrink: 0;
-}
-
-.activity-content {
-    flex: 1;
-    min-width: 0; /* Prevents text overflow */
-}
-
-.activity-title {
-    font-weight: 600;
-    color: #2d3748;
-    font-size: 0.9rem;
-    margin-bottom: 0.25rem;
-    line-height: 1.3;
-}
-
-.activity-description {
-    color: #4a5568;
-    font-size: 0.85rem;
-    line-height: 1.4;
-    margin-bottom: 0.25rem;
-    word-wrap: break-word;
-}
-
-.activity-time {
-    color: #718096;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.activity-indicator {
-    width: 8px;
-    height: 8px;
-    background: #4361ee;
-    border-radius: 50%;
-    margin-left: 0.5rem;
-    flex-shrink: 0;
-    margin-top: 0.5rem;
-}
-
-/* Empty State */
-.empty-activities {
-    padding: 3rem 2rem;
-    text-align: center;
-    color: #718096;
-}
-
-.empty-activities i {
-    font-size: 3rem;
-    color: #e2e8f0;
-    margin-bottom: 1rem;
-    display: block;
-}
-
-.empty-activities p {
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-}
-
-.empty-activities small {
-    font-size: 0.8rem;
-}
-
-/* Activities Footer */
-.activities-footer {
-    padding: 1rem 1.5rem;
-    border-top: 1px solid #e2e8f0;
-    background: #f8f9fa;
-}
-
-.view-more-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #4361ee;
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
-    padding: 0.5rem;
-    border-radius: 6px;
-}
-
-.view-more-btn:hover {
-    background: rgba(67, 97, 238, 0.1);
-    color: #3a0ca3;
-}
-
-.view-more-btn i {
-    margin-left: 0.5rem;
-    transition: transform 0.2s ease;
-}
-
-.view-more-btn:hover i {
-    transform: translateX(3px);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .activities-container {
-        max-height: 300px;
-    }
     
-    .activity-item {
-        padding: 0.875rem 1rem;
+    @media (max-width: 576px) {
+        .stat-icon {
+            width: 45px;
+            height: 45px;
+        }
+        
+        .stat-number {
+            font-size: 1.5rem;
+        }
+        
+        .action-icon {
+            width: 36px;
+            height: 36px;
+            margin-right: 0.6rem;
+        }
+        
+        .graph-container {
+            height: 200px;
+        }
+        
+        .notification-dropdown {
+            width: 250px;
+            right: -100px;
+        }
     }
-    
-    .panel-header {
-        padding: 1.25rem 1rem 0.875rem;
-    }
-    
-    .activities-footer {
-        padding: 0.875rem 1rem;
-    }
-}
-/* Panel Header with Actions */
-.panel-header {
-    display: flex;
-    align-items: center;
-    padding: 1.5rem 1.5rem 1rem;
-    border-bottom: 1px solid #e2e8f0;
-    position: relative;
-}
-
-.panel-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: #2d3748;
-    margin: 0;
-    flex: 1;
-}
-
-.panel-actions {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.btn-mark-read {
-    background: transparent;
-    border: 1px solid #4361ee;
-    color: #4361ee;
-    padding: 0.4rem 0.75rem;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.btn-mark-read:hover {
-    background: #4361ee;
-    color: white;
-    transform: translateY(-1px);
-}
-
-.notification-badge {
-    background: #e53e3e;
-    color: white;
-    border-radius: 20px;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    min-width: 24px;
-    text-align: center;
-}
-
-/* Activity Item Improvements */
-.activity-item {
-    display: flex;
-    align-items: flex-start;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid #f7fafc;
-    transition: all 0.2s ease;
-    position: relative;
-    cursor: pointer;
-}
-
-.activity-item:hover {
-    background: #f8f9fa;
-}
-
-.activity-item.unread {
-    background: #ebf8ff;
-    border-left: 3px solid #4361ee;
-}
-
-.activity-indicator {
-    width: 8px;
-    height: 8px;
-    background: #4361ee;
-    border-radius: 50%;
-    margin-left: 0.5rem;
-    flex-shrink: 0;
-    margin-top: 0.5rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.activity-indicator:hover {
-    transform: scale(1.3);
-    background: #3a0ca3;
-}
-
-/* Mark as read animation */
-.activity-item.read {
-    background: white;
-    border-left: 3px solid transparent;
-    opacity: 0.8;
-}
-
-.activity-item.read .activity-title,
-.activity-item.read .activity-description {
-    color: #718096;
-}
-.notification-badge.read {
-    background: #718096 !important; /* Gray color when all are read */
-}
-
-.notification-badge {
-    background: #e53e3e;
-    color: white;
-    border-radius: 20px;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    min-width: 24px;
-    text-align: center;
-    transition: all 0.3s ease;
-}
 </style>
 
-<!-- Dashboard Header -->
+<!-- Dashboard Header with Notification and Profile -->
 <div class="dashboard-header">
     <div class="container">
-        <h1 class="dashboard-title">
-            <i class="bi bi-speedometer2 me-3"></i>Admin Dashboard
-        </h1>
-        <p class="dashboard-subtitle">Welcome back! Here's what's happening with your system today.</p>
+        <div class="header-content">
+            <div class="header-info">
+                <h1 class="dashboard-title">
+                    <i class="bi bi-speedometer2 me-2"></i>Admin Dashboard
+                </h1>
+                <p class="dashboard-subtitle">Welcome back! Here's what's happening with your system today.</p>
+            </div>
+            
+            <div class="header-actions">
+                <!-- Notification Bell -->
+                <div class="notification-wrapper">
+                    <div class="notification-bell" id="notificationBell">
+                        <i class="bi bi-bell"></i>
+                        {% if unread_count > 0 %}
+                        <span class="notification-badge" id="headerNotificationBadge">
+                            {% if unread_count > 9 %}9+{% else %}{{ unread_count }}{% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Notification Dropdown -->
+                    <div class="notification-dropdown" id="notificationDropdown">
+                        <div class="notification-header">
+                            <h4 class="notification-title">Notifications</h4>
+                            {% if unread_count > 0 %}
+                            <button class="mark-all-read" onclick="markAllAsRead()">
+                                Mark all as read
+                            </button>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="notification-list">
+                            {% for activity in recent_activities %}
+                            <div class="notification-item {% if not activity.read %}unread{% endif %}" data-activity-id="{{ activity.id }}">
+                                <div class="notification-content">
+                                    <div class="notification-icon">
+                                        <i class="{{ activity.icon }}"></i>
+                                    </div>
+                                    <div class="notification-text">
+                                        <div class="notification-message">{{ activity.title }}</div>
+                                        <div class="notification-time">{{ activity.time|timesince }} ago</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="notification-item">
+                                <div class="notification-content">
+                                    <div class="notification-text">
+                                        <div class="notification-message">No new notifications</div>
+                                        <div class="notification-time">All caught up!</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        {% if recent_activities %}
+                        <div class="notification-footer">
+                            <a href="#" class="view-all-notifications">View All Notifications</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Profile Dropdown -->
+                <div class="profile-dropdown">
+                    <div class="profile-trigger" id="profileTrigger">
+                        <div class="profile-photo">
+                            {{ user.username|first|upper }}
+                        </div>
+                        <div class="profile-name">{{ user.username }}</div>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                    
+                    <div class="dropdown-menu" id="profileDropdown">
+                        <a href="#" class="dropdown-item">
+                            <i class="bi bi-person"></i>
+                            My Profile
+                        </a>
+                        <a href="#" class="dropdown-item">
+                            <i class="bi bi-gear"></i>
+                            Settings
+                        </a>
+                        <form method="post" action="{% url 'accounts:logout' %}" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item logout">
+                                <i class="bi bi-box-arrow-right"></i>
+                                Logout
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <div class="container">
-    <!-- Stats Overview -->
-    <div class="row g-4">
+    <!-- Stats Overview - Full Width -->
+    <div class="row g-3 mb-4">
         <div class="col-xl-3 col-md-6">
             <div class="stat-card">
                 <div class="stat-icon teachers">
                     <i class="bi bi-people-fill"></i>
                 </div>
-                <div class="stat-number">{{ active_teachers }}</div>
-                <div class="stat-label">Active Teachers</div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ active_teachers }}</div>
+                    <div class="stat-label">Active Teachers</div>
+                </div>
             </div>
         </div>
         <div class="col-xl-3 col-md-6">
@@ -728,8 +754,10 @@
                 <div class="stat-icon departments">
                     <i class="bi bi-building"></i>
                 </div>
-                <div class="stat-number">{{ total_departments }}</div>
-                <div class="stat-label">Departments</div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ total_departments }}</div>
+                    <div class="stat-label">Departments</div>
+                </div>
             </div>
         </div>
         <div class="col-xl-3 col-md-6">
@@ -737,8 +765,10 @@
                 <div class="stat-icon subjects">
                     <i class="bi bi-book"></i>
                 </div>
-                <div class="stat-number">{{ total_subjects }}</div>
-                <div class="stat-label">Subjects</div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ total_subjects }}</div>
+                    <div class="stat-label">Subjects</div>
+                </div>
             </div>
         </div>
         <div class="col-xl-3 col-md-6">
@@ -746,202 +776,132 @@
                 <div class="stat-icon total">
                     <i class="bi bi-person-badge"></i>
                 </div>
-                <div class="stat-number">{{ total_teachers }}</div>
-                <div class="stat-label">Total Teachers</div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ total_teachers }}</div>
+                    <div class="stat-label">Total Teachers</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Chart and Quick Actions Section -->
+    <div class="chart-actions-section">
+        <!-- Chart Section (3/4 width) -->
+        <div class="chart-section">
+            <div class="graph-section">
+                <div class="graph-header">
+                    <h3 class="graph-title">Questionnaires by Department</h3>
+                </div>
+                <div class="graph-container">
+                    <div class="text-center">
+                        <i class="bi bi-bar-chart-fill mb-2" style="font-size: 2rem;"></i>
+                        <p>Questionnaire distribution chart</p>
+                        <small class="text-muted">Visualization of questionnaires per department</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions (1/4 width) -->
+        <div class="actions-section">
+            <div class="action-section">
+                <h3 class="section-title">
+                    <i class="bi bi-lightning"></i>Quick Actions
+                </h3>
+                <div class="action-grid">
+                    <a href="{% url 'accounts:add_teacher' %}" class="action-card">
+                        <div class="action-icon add-teacher">
+                            <i class="bi bi-person-plus"></i>
+                        </div>
+                        <div class="action-content">
+                            <h4>Add Teacher</h4>
+                            <p>Create a new teacher account</p>
+                        </div>
+                    </a>
+                    
+                    <a href="{% url 'accounts:manage_departments' %}" class="action-card">
+                        <div class="action-icon add-department">
+                            <i class="bi bi-building-add"></i>
+                        </div>
+                        <div class="action-content">
+                            <h4>Manage Departments</h4>
+                            <p>Add or edit departments</p>
+                        </div>
+                    </a>
+                    
+                    <a href="{% url 'accounts:manage_subjects' %}" class="action-card">
+                        <div class="action-icon add-subject">
+                            <i class="bi bi-journal-plus"></i>
+                        </div>
+                        <div class="action-content">
+                            <h4>Manage Subjects</h4>
+                            <p>Create or update subjects</p>
+                        </div>
+                    </a>
+                    
+                    <a href="{% url 'questionnaires:all_questionnaires' %}" class="action-card">
+                        <div class="action-icon view-files">
+                            <i class="bi bi-folder-check"></i>
+                        </div>
+                        <div class="action-content">
+                            <h4>View All Files</h4>
+                            <p>Browse all questionnaires</p>
+                        </div>
+                    </a>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Quick Actions -->
-    <div class="action-section">
-        <h3 class="section-title">
-            <i class="bi bi-lightning"></i>Quick Actions
-        </h3>
-        <div class="action-grid">
-            <a href="{% url 'accounts:add_teacher' %}" class="action-card">
-                <div class="action-icon add-teacher">
-                    <i class="bi bi-person-plus"></i>
-                </div>
-                <div class="action-content">
-                    <h4>Add Teacher</h4>
-                    <p>Create a new teacher account</p>
-                </div>
-            </a>
-            
-            <a href="{% url 'accounts:manage_departments' %}" class="action-card">
-                <div class="action-icon add-department">
-                    <i class="bi bi-building-add"></i>
-                </div>
-                <div class="action-content">
-                    <h4>Manage Departments</h4>
-                    <p>Add or edit departments</p>
-                </div>
-            </a>
-            
-            <a href="{% url 'accounts:manage_subjects' %}" class="action-card">
-                <div class="action-icon add-subject">
-                    <i class="bi bi-journal-plus"></i>
-                </div>
-                <div class="action-content">
-                    <h4>Manage Subjects</h4>
-                    <p>Create or update subjects</p>
-                </div>
-            </a>
-            
-            <a href="{% url 'questionnaires:all_questionnaires' %}" class="action-card">
-                <div class="action-icon view-files">
-                    <i class="bi bi-folder-check"></i>
-                </div>
-                <div class="action-content">
-                    <h4>View All Files</h4>
-                    <p>Browse all questionnaires</p>
-                </div>
-            </a>
-        </div>
-    </div>
-
-    <!-- System Overview -->
+    <!-- System Overview - You can add other panels here -->
     <div class="overview-grid">
-        {% comment %} <div class="info-panel">
+        <div class="info-panel">
             <div class="panel-header">
                 <i class="bi bi-graph-up"></i>
-                <h3 class="panel-title">System Overview</h3>
+                <h3 class="panel-title">System Performance</h3>
             </div>
-            
-            <div class="panel-body">
-                <!-- Teacher Activity Progress -->
-                <div class="progress-section">
-                    <div class="progress-info">
-                        <span class="progress-label">Teacher Activity</span>
-                        <span class="progress-value">{{ active_teachers }} / {{ total_teachers }}</span>
-                    </div>
-                    <div class="progress-container">
-                        {% if total_teachers > 0 %}
-                            {% widthratio active_teachers total_teachers 100 as percentage %}
-                            <div class="progress-bar" style="width: {{ percentage }}%;"></div>
-                        {% else %}
-                            <div class="progress-bar" style="width: 0%;"></div>
-                        {% endif %}
-                    </div>
-                </div>
-                
-                <!-- System Stats -->
-                <div class="stats-section">
-                    <div class="system-item">
-                        <div class="system-icon primary">
-                            <i class="bi bi-building"></i>
-                        </div>
-                        <div class="system-content">
-                            <span>Departments</span>
-                        </div>
-                        <div class="system-value">{{ total_departments }}</div>
-                    </div>
-                    
-                    <div class="system-item">
-                        <div class="system-icon info">
-                            <i class="bi bi-book"></i>
-                        </div>
-                        <div class="system-content">
-                            <span>Subjects</span>
-                        </div>
-                        <div class="system-value">{{ total_subjects }}</div>
-                    </div>
-                    
-                    <div class="system-item">
-                        <div class="system-icon success">
-                            <i class="bi bi-people"></i>
-                        </div>
-                        <div class="system-content">
-                            <span>Active Teachers</span>
-                        </div>
-                        <div class="system-value">{{ active_teachers }}</div>
-                    </div>
-                    
-                    <div class="system-item">
-                        <div class="system-icon warning">
-                            <i class="bi bi-person-badge"></i>
-                        </div>
-                        <div class="system-content">
-                            <span>Total Teachers</span>
-                        </div>
-                        <div class="system-value">{{ total_teachers }}</div>
-                    </div>
-                </div>
-            </div>
-        </div> {% endcomment %}
-
+            <p>System is running optimally. All services are operational.</p>
+        </div>
+        
         <div class="info-panel">
-    <div class="panel-header">
-        <i class="bi bi-clock-history"></i>
-        <h3 class="panel-title">Recent Activities</h3>
-        <div class="panel-actions">
-            {% if unread_count > 0 %}
-            <button class="btn-mark-read" onclick="markAllAsRead()" title="Mark all as read">
-                <i class="bi bi-check-all"></i>
-                Mark All Read
-            </button>
-            {% endif %}
-            <span class="notification-badge {% if unread_count == 0 %}read{% endif %}" id="notificationBadge">
-                {% if unread_count > 9 %}
-                    9+
-                {% else %}
-                    {{ unread_count }}
-                {% endif %}
-            </span>
-        </div>
-    </div>
-    
-    <div class="activities-container">
-        {% for activity in recent_activities %}
-        <div class="activity-item {% if not activity.read %}unread{% else %}read{% endif %}" data-activity-id="{{ activity.id }}">
-            <div class="activity-icon">
-                <i class="{{ activity.icon }} text-{{ activity.color }}"></i>
+            <div class="panel-header">
+                <i class="bi bi-calendar-check"></i>
+                <h3 class="panel-title">Recent Updates</h3>
             </div>
-            <div class="activity-content">
-                <div class="activity-title">{{ activity.title }}</div>
-                <div class="activity-description">{{ activity.description }}</div>
-                <div class="activity-time">{{ activity.time|timesince }} ago</div>
-            </div>
-            {% if not activity.read %}
-            <div class="activity-indicator" onclick="markAsRead({{ activity.id }})" title="Mark as read"></div>
-            {% endif %}
+            <p>Last system update: 2 days ago</p>
         </div>
-        {% empty %}
-        <div class="empty-activities">
-            <i class="bi bi-inbox"></i>
-            <p>No recent activities</p>
-            <small class="text-muted">Activities will appear here as they happen</small>
-        </div>
-        {% endfor %}
-    </div>
-    
-    {% if recent_activities %}
-    <div class="activities-footer">
-        <a href="#" class="view-more-btn">
-            <i class="bi bi-arrow-right"></i>
-            View All Activities
-        </a>
-    </div>
-    {% endif %}
-</div>
     </div>
 </div>
 
 <script>
-// Animate progress bars on page load
-document.addEventListener('DOMContentLoaded', function() {
-    const progressBars = document.querySelectorAll('.progress-bar');
-    progressBars.forEach(bar => {
-        const currentWidth = bar.style.width;
-        bar.style.width = '0%';
-        setTimeout(() => {
-            bar.style.width = currentWidth;
-        }, 300);
-    });
+// Toggle notification dropdown
+document.getElementById('notificationBell').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const dropdown = document.getElementById('notificationDropdown');
+    dropdown.classList.toggle('show');
+    
+    // Close profile dropdown if open
+    document.getElementById('profileDropdown').classList.remove('show');
 });
+
+// Toggle profile dropdown
+document.getElementById('profileTrigger').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const dropdown = document.getElementById('profileDropdown');
+    dropdown.classList.toggle('show');
+    
+    // Close notification dropdown if open
+    document.getElementById('notificationDropdown').classList.remove('show');
+});
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function() {
+    document.getElementById('notificationDropdown').classList.remove('show');
+    document.getElementById('profileDropdown').classList.remove('show');
+});
+
 // Mark all activities as read
 function markAllAsRead() {
-    // Send AJAX request to mark all as read
     fetch('/accounts/mark-all-activities-read/', {
         method: 'POST',
         headers: {
@@ -952,81 +912,48 @@ function markAllAsRead() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Option 1: Refresh the page to get updated data from server
             window.location.reload();
-            
-            // Option 2: Update UI without refresh (if you prefer)
-            // document.querySelectorAll('.activity-item.unread').forEach(item => {
-            //     item.classList.remove('unread');
-            //     item.classList.add('read');
-            //     
-            //     const indicator = item.querySelector('.activity-indicator');
-            //     if (indicator) indicator.remove();
-            // });
-            // updateUnreadCount();
         }
     })
     .catch(error => console.error('Error:', error));
 }
 
-// Mark single activity as read
-function markAsRead(activityId) {
-    const activityItem = document.querySelector(`[data-activity-id="${activityId}"]`);
-    if (!activityItem) return;
-    
-    // Send AJAX request to mark as read
-    fetch(`/accounts/mark-activity-read/${activityId}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Update UI immediately
-            activityItem.classList.remove('unread');
-            activityItem.classList.add('read');
-            
-            const indicator = activityItem.querySelector('.activity-indicator');
-            if (indicator) indicator.remove();
-            
-            updateUnreadCount();
+// Mark single notification as read when clicked
+document.querySelectorAll('.notification-item.unread').forEach(item => {
+    item.addEventListener('click', function() {
+        const activityId = this.getAttribute('data-activity-id');
+        if (activityId) {
+            fetch(`/accounts/mark-activity-read/${activityId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.classList.remove('unread');
+                    updateNotificationBadge();
+                }
+            })
+            .catch(error => console.error('Error:', error));
         }
-    })
-    .catch(error => console.error('Error:', error));
-}
+    });
+});
 
-// Update unread count in the UI
-function updateUnreadCount() {
-    const unreadItems = document.querySelectorAll('.activity-item.unread');
+// Update notification badge count
+function updateNotificationBadge() {
+    const unreadItems = document.querySelectorAll('.notification-item.unread');
     const unreadCount = unreadItems.length;
-    const badge = document.getElementById('notificationBadge');
-    const markAllBtn = document.querySelector('.btn-mark-read');
+    const badge = document.getElementById('headerNotificationBadge');
     
-    // Update badge with correct format
     if (badge) {
-        if (unreadCount > 9) {
-            badge.textContent = '9+';
-        } else {
-            badge.textContent = unreadCount;
-        }
-        
-        // Update badge style based on count
         if (unreadCount === 0) {
-            badge.classList.add('read');
+            badge.style.display = 'none';
         } else {
-            badge.classList.remove('read');
-        }
-    }
-    
-    // Hide mark all button if no unread activities
-    if (markAllBtn) {
-        if (unreadCount === 0) {
-            markAllBtn.style.display = 'none';
-        } else {
-            markAllBtn.style.display = 'flex';
+            badge.style.display = 'flex';
+            badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
         }
     }
 }
@@ -1046,20 +973,5 @@ function getCookie(name) {
     }
     return cookieValue;
 }
-
-// Auto-mark as read when clicking on activity
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.activity-item.unread').forEach(item => {
-        item.addEventListener('click', function() {
-            const activityId = this.getAttribute('data-activity-id');
-            if (activityId) {
-                markAsRead(activityId);
-            }
-        });
-    });
-    
-    // Initialize the unread count display
-    updateUnreadCount();
-});
 </script>
 {% endblock %}
