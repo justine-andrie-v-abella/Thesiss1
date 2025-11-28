@@ -4,781 +4,384 @@
 
 {% block content %}
 <style>
-    /* Header Styles */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        background: linear-gradient(135deg, #f5f7fa 0%, #e8f0fe 100%);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        color: #1a202c;
+    }
+
     .dashboard-header {
         background: white;
-        padding: 1.5rem 0 1rem 0;
-        margin: -20px -20px 1.5rem -20px;
-        border-bottom: 1px solid #e2e8f0;
-        position: relative;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border-radius: 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e5e7eb;
     }
-    
-    .header-content {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .header-info {
-        flex: 1;
-    }
-    
+
     .dashboard-title {
-        color: #2d3748;
+        font-size: 2rem;
         font-weight: 700;
-        font-size: 1.5rem;
-        margin-bottom: 0.25rem;
+        color: #1a202c;
+        margin-bottom: 0.5rem;
     }
-    
+
     .dashboard-subtitle {
-        color: #718096;
-        font-size: 0.9rem;
+        font-size: 0.95rem;
+        color: #6b7280;
         font-weight: 400;
     }
-    
-    .header-actions {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-    
-    /* Notification Bell */
-    .notification-wrapper {
-        position: relative;
-    }
-    
-    .notification-bell {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: #f7fafc;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #4a5568;
-        font-size: 1.2rem;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        border: 1px solid #e2e8f0;
-    }
-    
-    .notification-bell:hover {
-        background: #4361ee;
-        color: white;
-        transform: translateY(-2px);
-    }
-    
-    .notification-badge {
-        position: absolute;
-        top: -5px;
-        right: -5px;
-        background: #e53e3e;
-        color: white;
-        border-radius: 50%;
-        width: 20px;
-        height: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.7rem;
-        font-weight: 600;
-        border: 2px solid white;
-    }
-    
-    /* Profile Dropdown */
-    .profile-dropdown {
-        position: relative;
-    }
-    
-    .profile-trigger {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        cursor: pointer;
-        padding: 0.5rem;
-        border-radius: 8px;
-        transition: background 0.3s ease;
-    }
-    
-    .profile-trigger:hover {
-        background: #f7fafc;
-    }
-    
-    .profile-photo {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #4361ee, #3a0ca3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: 600;
-        font-size: 1rem;
-    }
-    
-    .profile-name {
-        color: #2d3748;
-        font-weight: 500;
-        font-size: 0.9rem;
-    }
-    
-    .dropdown-menu {
-        position: absolute;
-        top: 100%;
-        right: 0;
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        min-width: 180px;
-        z-index: 1000;
-        opacity: 0;
-        visibility: hidden;
-        transform: translateY(-10px);
-        transition: all 0.3s ease;
-    }
-    
-    .dropdown-menu.show {
-        opacity: 1;
-        visibility: visible;
-        transform: translateY(0);
-    }
-    
-    .dropdown-item {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 0.75rem 1rem;
-        color: #4a5568;
-        text-decoration: none;
-        transition: background 0.3s ease;
-        border: none;
-        background: none;
-        width: 100%;
-        text-align: left;
-        cursor: pointer;
-    }
-    
-    .dropdown-item:first-child {
-        border-radius: 8px 8px 0 0;
-    }
-    
-    .dropdown-item:last-child {
-        border-radius: 0 0 8px 8px;
-    }
-    
-    .dropdown-item:hover {
-        background: #f7fafc;
-        color: #2d3748;
-    }
-    
-    .dropdown-item.logout {
-        color: #e53e3e;
-        border-top: 1px solid #e2e8f0;
-    }
-    
-    .dropdown-item.logout:hover {
-        background: #fed7d7;
-    }
-    
-    /* Notification Dropdown */
-    .notification-dropdown {
-        position: absolute;
-        top: 100%;
-        right: 0;
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        width: 350px;
-        max-height: 400px;
-        z-index: 1000;
-        opacity: 0;
-        visibility: hidden;
-        transform: translateY(-10px);
-        transition: all 0.3s ease;
-    }
-    
-    .notification-dropdown.show {
-        opacity: 1;
-        visibility: visible;
-        transform: translateY(0);
-    }
-    
-    .notification-header {
-        padding: 1rem;
-        border-bottom: 1px solid #e2e8f0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .notification-title {
-        font-weight: 600;
-        color: #2d3748;
-        margin: 0;
-        font-size: 1rem;
-    }
-    
-    .mark-all-read {
-        background: none;
-        border: none;
-        color: #4361ee;
-        font-size: 0.8rem;
-        cursor: pointer;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        transition: background 0.3s ease;
-    }
-    
-    .mark-all-read:hover {
-        background: rgba(67, 97, 238, 0.1);
-    }
-    
-    .notification-list {
-        max-height: 300px;
-        overflow-y: auto;
-    }
-    
-    .notification-item {
-        padding: 0.875rem 1rem;
-        border-bottom: 1px solid #f7fafc;
-        cursor: pointer;
-        transition: background 0.3s ease;
-    }
-    
-    .notification-item:last-child {
-        border-bottom: none;
-    }
-    
-    .notification-item:hover {
-        background: #f8f9fa;
-    }
-    
-    .notification-item.unread {
-        background: #ebf8ff;
-    }
-    
-    .notification-content {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.75rem;
-    }
-    
-    .notification-icon {
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
-        background: #f7fafc;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.9rem;
-        color: #4361ee;
-        flex-shrink: 0;
-    }
-    
-    .notification-text {
-        flex: 1;
-    }
-    
-    .notification-message {
-        font-weight: 500;
-        color: #2d3748;
-        font-size: 0.85rem;
-        margin-bottom: 0.25rem;
-        line-height: 1.3;
-    }
-    
-    .notification-time {
-        color: #718096;
-        font-size: 0.75rem;
-    }
-    
-    .notification-footer {
-        padding: 0.75rem;
-        border-top: 1px solid #e2e8f0;
-        text-align: center;
-    }
-    
-    .view-all-notifications {
-        color: #4361ee;
-        text-decoration: none;
-        font-size: 0.85rem;
-        font-weight: 500;
-    }
-    
-    .view-all-notifications:hover {
-        text-decoration: underline;
-    }
-    
-    /* Stat Cards - Icon on Left Layout */
+
+    /* Stats Cards */
     .stat-card {
         background: white;
-        border-radius: 12px;
+        border-radius: 16px;
         padding: 1.25rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e5e7eb;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
         transition: all 0.3s ease;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
-        border: 1px solid #e2e8f0;
         height: 100%;
-        position: relative;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        gap: 1rem;
     }
-    
-    .stat-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(135deg, #4361ee, #3a0ca3);
-    }
-    
+
     .stat-card:hover {
-        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.08);
-        transform: translateY(-3px);
+        transform: translateY(-4px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
-    
-    .stat-icon {
-        width: 60px;
-        height: 60px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        flex-shrink: 0;
-    }
-    
-    .stat-icon.teachers { background: linear-gradient(135deg, #4361ee, #4cc9f0); }
-    .stat-icon.departments { background: linear-gradient(135deg, #7209b7, #b5179e); }
-    .stat-icon.subjects { background: linear-gradient(135deg, #f72585, #ff9e00); }
-    .stat-icon.total { background: linear-gradient(135deg, #4cc9f0, #4361ee); }
-    
+
     .stat-content {
         flex: 1;
     }
-    
+
     .stat-number {
         font-size: 2rem;
         font-weight: 700;
-        color: #2d3748;
+        color: #1a202c;
         margin-bottom: 0.25rem;
-        line-height: 1;
     }
-    
+
     .stat-label {
-        color: #718096;
-        font-size: 0.9rem;
+        font-size: 0.875rem;
+        color: #6b7280;
         font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
     }
-    
-    /* Layout for Chart and Quick Actions */
-    .chart-actions-section {
-        display: flex;
-        gap: 1.5rem;
-        margin: 2rem 0;
-    }
-    
-    .chart-section {
-        flex: 3;
-    }
-    
-    .actions-section {
-        flex: 1;
-    }
-    
-    /* Quick Actions - Compact */
-    .action-section {
-        margin-bottom: 0;
-    }
-    
-    .section-title {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #2d3748;
-        margin-bottom: 1rem;
+
+    .stat-icon {
+        padding: 0.875rem;
+        border-radius: 12px;
         display: flex;
         align-items: center;
+        justify-content: center;
+        transition: transform 0.3s ease;
     }
-    
+
+    .stat-card:hover .stat-icon {
+        transform: scale(1.1);
+    }
+
+    .stat-icon i {
+        font-size: 1.5rem;
+        color: white;
+    }
+
+    .stat-icon.teachers {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    }
+
+    .stat-icon.departments {
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    }
+
+    .stat-icon.subjects {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .stat-icon.total {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    /* Chart and Actions Section */
+    .chart-actions-section {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 992px) {
+        .chart-actions-section {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .graph-section {
+        background: white;
+        border-radius: 16px;
+        padding: 1.25rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e5e7eb;
+    }
+
+    .graph-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+    }
+
+    .graph-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1a202c;
+    }
+
+    .graph-container {
+        background: linear-gradient(135deg, #f9fafb 0%, #e8f0fe 100%);
+        border-radius: 12px;
+        padding: 3rem 1.5rem;
+        text-align: center;
+    }
+
+    .graph-container i {
+        font-size: 4rem;
+        color: #3b82f6;
+        opacity: 0.5;
+    }
+
+    .graph-container p {
+        color: #374151;
+        margin-top: 1rem;
+    }
+
+    .graph-container small {
+        color: #6b7280;
+    }
+
+    /* Quick Actions */
+    .action-section {
+        background: white;
+        border-radius: 16px;
+        padding: 1.25rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e5e7eb;
+    }
+
+    .section-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
     .section-title i {
-        margin-right: 0.5rem;
-        color: #4361ee;
-        font-size: 1rem;
+        color: #3b82f6;
     }
-    
+
     .action-grid {
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
+        gap: 0.5rem;
     }
-    
+
     .action-card {
-        background: white;
-        border-radius: 10px;
-        padding: 1rem;
-        text-decoration: none;
-        color: inherit;
-        transition: all 0.3s ease;
-        border: 1px solid #e2e8f0;
         display: flex;
         align-items: center;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
-    }
-    
-    .action-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
-        color: inherit;
-        border-color: #4361ee;
-    }
-    
-    .action-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 0.75rem;
-        font-size: 1.1rem;
-        color: white;
-        flex-shrink: 0;
-    }
-    
-    .action-icon.add-teacher { background: linear-gradient(135deg, #4361ee, #4cc9f0); }
-    .action-icon.add-department { background: linear-gradient(135deg, #7209b7, #b5179e); }
-    .action-icon.add-subject { background: linear-gradient(135deg, #f72585, #ff9e00); }
-    .action-icon.view-files { background: linear-gradient(135deg, #4cc9f0, #4361ee); }
-    
-    .action-content h4 {
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: #2d3748;
-        margin-bottom: 0.1rem;
-    }
-    
-    .action-content p {
-        color: #718096;
-        font-size: 0.75rem;
-        margin: 0;
-    }
-    
-    /* Graph Section */
-    .graph-section {
+        gap: 0.875rem;
+        padding: 0.875rem;
         background: white;
         border-radius: 12px;
-        padding: 1.5rem;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
-        height: 100%;
+        border: 1px solid #e5e7eb;
+        text-decoration: none;
+        transition: all 0.3s ease;
     }
-    
-    .graph-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.5rem;
+
+    .action-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        text-decoration: none;
     }
-    
-    .graph-title {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: #2d3748;
-        margin: 0;
-    }
-    
-    .graph-container {
-        height: 300px;
+
+    .action-icon {
+        padding: 0.75rem;
+        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #f8f9fa;
-        border-radius: 8px;
-        color: #718096;
-        font-size: 0.9rem;
+        transition: transform 0.3s ease;
     }
-    
-    /* System Overview - Removed Recent Activities Panel */
+
+    .action-card:hover .action-icon {
+        transform: scale(1.1);
+    }
+
+    .action-icon i {
+        font-size: 1.25rem;
+        color: white;
+    }
+
+    .action-icon.add-teacher {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    }
+
+    .action-icon.add-department {
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    }
+
+    .action-icon.add-subject {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .action-icon.view-files {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .action-content h4 {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 0.125rem;
+    }
+
+    .action-content p {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin: 0;
+    }
+
+    /* Info Panels */
     .overview-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 1.5rem;
+        gap: 1rem;
     }
-    
+
     .info-panel {
         background: white;
-        border-radius: 12px;
-        padding: 1.5rem;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
-        height: 100%;
+        border-radius: 16px;
+        padding: 1.25rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e5e7eb;
     }
-    
+
     .panel-header {
         display: flex;
         align-items: center;
-        margin-bottom: 1rem;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
     }
-    
+
     .panel-header i {
-        font-size: 1.1rem;
-        color: #4361ee;
-        margin-right: 0.5rem;
+        font-size: 1.25rem;
+        padding: 0.5rem;
+        border-radius: 8px;
     }
-    
+
+    .info-panel:first-child .panel-header i {
+        background: #d1fae5;
+        color: #059669;
+    }
+
+    .info-panel:last-child .panel-header i {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
     .panel-title {
-        font-size: 1.1rem;
+        font-size: 1rem;
         font-weight: 600;
-        color: #2d3748;
+        color: #1a202c;
+    }
+
+    .info-panel p {
+        font-size: 0.875rem;
+        color: #6b7280;
+        line-height: 1.6;
         margin: 0;
-        flex: 1;
     }
-    
-    /* Responsive Design */
-    @media (max-width: 992px) {
-        .chart-actions-section {
-            flex-direction: column;
-        }
-        
-        .notification-dropdown {
-            width: 300px;
-            right: -50px;
-        }
-    }
-    
+
+    /* Responsive */
     @media (max-width: 768px) {
         .dashboard-header {
-            margin: -20px -20px 1.5rem -20px;
-            padding: 1.25rem 0 0.75rem 0;
+            padding: 1.5rem;
         }
-        
-        .header-content {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 1rem;
-        }
-        
-        .header-actions {
-            align-self: flex-end;
-        }
-        
+
         .dashboard-title {
-            font-size: 1.25rem;
+            font-size: 1.5rem;
         }
-        
-        .stat-card {
-            padding: 1rem;
-            gap: 0.75rem;
-        }
-        
-        .stat-icon {
-            width: 50px;
-            height: 50px;
-            font-size: 1.25rem;
-        }
-        
+
         .stat-number {
             font-size: 1.75rem;
         }
-        
+
         .overview-grid {
             grid-template-columns: 1fr;
-        }
-        
-        .graph-container {
-            height: 250px;
-        }
-        
-        .notification-dropdown {
-            width: 280px;
-            right: -80px;
-        }
-        
-        .profile-name {
-            display: none;
-        }
-    }
-    
-    @media (max-width: 576px) {
-        .stat-icon {
-            width: 45px;
-            height: 45px;
-        }
-        
-        .stat-number {
-            font-size: 1.5rem;
-        }
-        
-        .action-icon {
-            width: 36px;
-            height: 36px;
-            margin-right: 0.6rem;
-        }
-        
-        .graph-container {
-            height: 200px;
-        }
-        
-        .notification-dropdown {
-            width: 250px;
-            right: -100px;
         }
     }
 </style>
 
-<!-- Dashboard Header with Notification and Profile -->
+<!-- Dashboard Header -->
 <div class="dashboard-header">
-    <div class="container">
-        <div class="header-content">
-            <div class="header-info">
-                <h1 class="dashboard-title">
-                    <i class="bi bi-speedometer2 me-2"></i>Admin Dashboard
-                </h1>
-                <p class="dashboard-subtitle">Welcome back! Here's what's happening with your system today.</p>
-            </div>
-            
-            <div class="header-actions">
-                <!-- Notification Bell -->
-                <div class="notification-wrapper">
-                    <div class="notification-bell" id="notificationBell">
-                        <i class="bi bi-bell"></i>
-                        {% if unread_count > 0 %}
-                        <span class="notification-badge" id="headerNotificationBadge">
-                            {% if unread_count > 9 %}9+{% else %}{{ unread_count }}{% endif %}
-                        </span>
-                        {% endif %}
-                    </div>
-                    
-                    <!-- Notification Dropdown -->
-                    <div class="notification-dropdown" id="notificationDropdown">
-                        <div class="notification-header">
-                            <h4 class="notification-title">Notifications</h4>
-                            {% if unread_count > 0 %}
-                            <button class="mark-all-read" onclick="markAllAsRead()">
-                                Mark all as read
-                            </button>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="notification-list">
-                            {% for activity in recent_activities %}
-                            <div class="notification-item {% if not activity.read %}unread{% endif %}" data-activity-id="{{ activity.id }}">
-                                <div class="notification-content">
-                                    <div class="notification-icon">
-                                        <i class="{{ activity.icon }}"></i>
-                                    </div>
-                                    <div class="notification-text">
-                                        <div class="notification-message">{{ activity.title }}</div>
-                                        <div class="notification-time">{{ activity.time|timesince }} ago</div>
-                                    </div>
-                                </div>
-                            </div>
-                            {% empty %}
-                            <div class="notification-item">
-                                <div class="notification-content">
-                                    <div class="notification-text">
-                                        <div class="notification-message">No new notifications</div>
-                                        <div class="notification-time">All caught up!</div>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        
-                        {% if recent_activities %}
-                        <div class="notification-footer">
-                            <a href="#" class="view-all-notifications">View All Notifications</a>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-                
-                <!-- Profile Dropdown -->
-                <div class="profile-dropdown">
-                    <div class="profile-trigger" id="profileTrigger">
-                        <div class="profile-photo">
-                            {{ user.username|first|upper }}
-                        </div>
-                        <div class="profile-name">{{ user.username }}</div>
-                        <i class="bi bi-chevron-down"></i>
-                    </div>
-                    
-                    <div class="dropdown-menu" id="profileDropdown">
-                        <a href="#" class="dropdown-item">
-                            <i class="bi bi-person"></i>
-                            My Profile
-                        </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="bi bi-gear"></i>
-                            Settings
-                        </a>
-                        <form method="post" action="{% url 'accounts:logout' %}" style="display: inline;">
-                            {% csrf_token %}
-                            <button type="submit" class="dropdown-item logout">
-                                <i class="bi bi-box-arrow-right"></i>
-                                Logout
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <h1 class="dashboard-title">
+        <i class="bi bi-speedometer2 me-2"></i>Admin Dashboard
+    </h1>
+    <p class="dashboard-subtitle">Welcome back! Here's what's happening with your system today.</p>
 </div>
 
-<div class="container">
-    <!-- Stats Overview - Full Width -->
+<div class="container-fluid px-0">
+    <!-- Stats Overview -->
     <div class="row g-3 mb-4">
         <div class="col-xl-3 col-md-6">
             <div class="stat-card">
-                <div class="stat-icon teachers">
-                    <i class="bi bi-people-fill"></i>
-                </div>
                 <div class="stat-content">
                     <div class="stat-number">{{ active_teachers }}</div>
                     <div class="stat-label">Active Teachers</div>
                 </div>
+                <div class="stat-icon teachers">
+                    <i class="bi bi-people-fill"></i>
+                </div>
             </div>
         </div>
         <div class="col-xl-3 col-md-6">
             <div class="stat-card">
-                <div class="stat-icon departments">
-                    <i class="bi bi-building"></i>
-                </div>
                 <div class="stat-content">
                     <div class="stat-number">{{ total_departments }}</div>
                     <div class="stat-label">Departments</div>
                 </div>
+                <div class="stat-icon departments">
+                    <i class="bi bi-building"></i>
+                </div>
             </div>
         </div>
         <div class="col-xl-3 col-md-6">
             <div class="stat-card">
-                <div class="stat-icon subjects">
-                    <i class="bi bi-book"></i>
-                </div>
                 <div class="stat-content">
                     <div class="stat-number">{{ total_subjects }}</div>
                     <div class="stat-label">Subjects</div>
                 </div>
+                <div class="stat-icon subjects">
+                    <i class="bi bi-book"></i>
+                </div>
             </div>
         </div>
         <div class="col-xl-3 col-md-6">
             <div class="stat-card">
-                <div class="stat-icon total">
-                    <i class="bi bi-person-badge"></i>
-                </div>
                 <div class="stat-content">
                     <div class="stat-number">{{ total_teachers }}</div>
                     <div class="stat-label">Total Teachers</div>
+                </div>
+                <div class="stat-icon total">
+                    <i class="bi bi-person-badge"></i>
                 </div>
             </div>
         </div>
@@ -786,7 +389,7 @@
     
     <!-- Chart and Quick Actions Section -->
     <div class="chart-actions-section">
-        <!-- Chart Section (3/4 width) -->
+        <!-- Chart Section -->
         <div class="chart-section">
             <div class="graph-section">
                 <div class="graph-header">
@@ -794,19 +397,19 @@
                 </div>
                 <div class="graph-container">
                     <div class="text-center">
-                        <i class="bi bi-bar-chart-fill mb-2" style="font-size: 2rem;"></i>
-                        <p>Questionnaire distribution chart</p>
+                        <i class="bi bi-bar-chart-fill mb-3 d-block"></i>
+                        <p class="mb-1 fw-semibold">Questionnaire Distribution Chart</p>
                         <small class="text-muted">Visualization of questionnaires per department</small>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Quick Actions (1/4 width) -->
+        <!-- Quick Actions -->
         <div class="actions-section">
             <div class="action-section">
                 <h3 class="section-title">
-                    <i class="bi bi-lightning"></i>Quick Actions
+                    <i class="bi bi-lightning-fill"></i>Quick Actions
                 </h3>
                 <div class="action-grid">
                     <a href="{% url 'accounts:add_teacher' %}" class="action-card">
@@ -853,14 +456,14 @@
         </div>
     </div>
 
-    <!-- System Overview - You can add other panels here -->
+    <!-- System Overview -->
     <div class="overview-grid">
         <div class="info-panel">
             <div class="panel-header">
                 <i class="bi bi-graph-up"></i>
                 <h3 class="panel-title">System Performance</h3>
             </div>
-            <p>System is running optimally. All services are operational.</p>
+            <p>System is running optimally. All services are operational and performing at peak efficiency.</p>
         </div>
         
         <div class="info-panel">
@@ -868,110 +471,8 @@
                 <i class="bi bi-calendar-check"></i>
                 <h3 class="panel-title">Recent Updates</h3>
             </div>
-            <p>Last system update: 2 days ago</p>
+            <p>Last system update: 2 days ago. All features are up to date and working correctly.</p>
         </div>
     </div>
 </div>
-
-<script>
-// Toggle notification dropdown
-document.getElementById('notificationBell').addEventListener('click', function(e) {
-    e.stopPropagation();
-    const dropdown = document.getElementById('notificationDropdown');
-    dropdown.classList.toggle('show');
-    
-    // Close profile dropdown if open
-    document.getElementById('profileDropdown').classList.remove('show');
-});
-
-// Toggle profile dropdown
-document.getElementById('profileTrigger').addEventListener('click', function(e) {
-    e.stopPropagation();
-    const dropdown = document.getElementById('profileDropdown');
-    dropdown.classList.toggle('show');
-    
-    // Close notification dropdown if open
-    document.getElementById('notificationDropdown').classList.remove('show');
-});
-
-// Close dropdowns when clicking outside
-document.addEventListener('click', function() {
-    document.getElementById('notificationDropdown').classList.remove('show');
-    document.getElementById('profileDropdown').classList.remove('show');
-});
-
-// Mark all activities as read
-function markAllAsRead() {
-    fetch('/accounts/mark-all-activities-read/', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.reload();
-        }
-    })
-    .catch(error => console.error('Error:', error));
-}
-
-// Mark single notification as read when clicked
-document.querySelectorAll('.notification-item.unread').forEach(item => {
-    item.addEventListener('click', function() {
-        const activityId = this.getAttribute('data-activity-id');
-        if (activityId) {
-            fetch(`/accounts/mark-activity-read/${activityId}/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                    'Content-Type': 'application/json',
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    this.classList.remove('unread');
-                    updateNotificationBadge();
-                }
-            })
-            .catch(error => console.error('Error:', error));
-        }
-    });
-});
-
-// Update notification badge count
-function updateNotificationBadge() {
-    const unreadItems = document.querySelectorAll('.notification-item.unread');
-    const unreadCount = unreadItems.length;
-    const badge = document.getElementById('headerNotificationBadge');
-    
-    if (badge) {
-        if (unreadCount === 0) {
-            badge.style.display = 'none';
-        } else {
-            badge.style.display = 'flex';
-            badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
-        }
-    }
-}
-
-// CSRF token helper function
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-</script>
 {% endblock %}
