@@ -87,20 +87,84 @@ def logout_view(request):
 @login_required
 @user_passes_test(is_admin)
 def admin_dashboard(request):
+    from questionnaires.models import Questionnaire, Download
+    from django.db.models import Count
+    from django.db.models.functions import TruncDate
+    import json
+    
+    # Basic stats
     total_teachers = TeacherProfile.objects.count()
     active_teachers = TeacherProfile.objects.filter(is_active=True).count()
     total_departments = Department.objects.count()
     total_subjects = Subject.objects.count()
     
-    # Activities are now provided by context processor
-    # No need to fetch them here anymore!
+    # Get department filter if provided
+    selected_department = request.GET.get('department', 'all')
+    
+    # Filter questionnaires by department if selected
+    questionnaires_qs = Questionnaire.objects.all()
+    if selected_department != 'all':
+        questionnaires_qs = questionnaires_qs.filter(department_id=selected_department)
+    
+    # Activity stats
+    total_uploads = questionnaires_qs.count()
+    total_downloads = Download.objects.filter(
+        questionnaire__in=questionnaires_qs
+    ).count() if selected_department != 'all' else Download.objects.count()
+    total_questionnaires = questionnaires_qs.count()
+    
+    # Get all departments for dropdown
+    departments = Department.objects.all().order_by('name')
+    
+    # Department statistics for table
+    department_stats = []
+    max_downloads = 1  # For calculating popularity percentage
+    
+    for dept in departments:
+        dept_questionnaires = Questionnaire.objects.filter(department=dept)
+        upload_count = dept_questionnaires.count()
+        download_count = Download.objects.filter(
+            questionnaire__in=dept_questionnaires
+        ).count()
+        
+        if download_count > max_downloads:
+            max_downloads = download_count
+        
+        department_stats.append({
+            'department_name': dept.name,
+            'questionnaire_count': upload_count,
+            'upload_count': upload_count,
+            'download_count': download_count,
+            'popularity_percent': 0  # Will calculate after loop
+        })
+    
+    # Calculate popularity percentages
+    for stat in department_stats:
+        if max_downloads > 0:
+            stat['popularity_percent'] = int((stat['download_count'] / max_downloads) * 100)
+    
+    # Sort by questionnaire count descending
+    department_stats.sort(key=lambda x: x['questionnaire_count'], reverse=True)
+    
+    # Activity chart data (last 7 days)
+    activity_chart_data = get_activity_chart_data(selected_department)
+    
+    # Department distribution chart data
+    department_chart_data = get_department_chart_data()
     
     context = {
         'total_teachers': total_teachers,
         'active_teachers': active_teachers,
         'total_departments': total_departments,
         'total_subjects': total_subjects,
-        # recent_activities will be added automatically by context processor
+        'total_uploads': total_uploads,
+        'total_downloads': total_downloads,
+        'total_questionnaires': total_questionnaires,
+        'departments': departments,
+        'department_stats': department_stats,
+        'activity_chart_data': json.dumps(activity_chart_data),
+        'department_chart_data': json.dumps(department_chart_data),
+        'selected_department': selected_department,
     }
     return render(request, 'admin_dashboard/dashboard.html', context)
 
@@ -485,3 +549,63 @@ def mark_all_notifications_read(request):
             'success': False,
             'error': str(e)
         }, status=500)
+        
+def get_activity_chart_data(department_filter='all'):
+    """Get upload/download activity data for the chart"""
+    from questionnaires.models import Questionnaire, Download
+    from django.db.models.functions import TruncDate
+    
+    # Get data for last 7 days
+    today = timezone.now().date()
+    date_range = [today - timedelta(days=i) for i in range(6, -1, -1)]
+    
+    labels = [d.strftime('%b %d') for d in date_range]
+    uploads = []
+    downloads = []
+    
+    for date in date_range:
+        # Count uploads for this date
+        upload_qs = Questionnaire.objects.filter(
+            uploaded_at__date=date
+        )
+        if department_filter != 'all':
+            upload_qs = upload_qs.filter(department_id=department_filter)
+        
+        upload_count = upload_qs.count()
+        uploads.append(upload_count)
+        
+        # Count downloads for this date
+        download_qs = Download.objects.filter(
+            downloaded_at__date=date
+        )
+        if department_filter != 'all':
+            download_qs = download_qs.filter(
+                questionnaire__department_id=department_filter
+            )
+        
+        download_count = download_qs.count()
+        downloads.append(download_count)
+    
+    return {
+        'labels': labels,
+        'uploads': uploads,
+        'downloads': downloads
+    }
+
+
+def get_department_chart_data():
+    """Get questionnaire distribution by department for pie chart"""
+    from questionnaires.models import Questionnaire
+    from django.db.models import Count
+    
+    departments = Department.objects.annotate(
+        questionnaire_count=Count('questionnaires')
+    ).filter(questionnaire_count__gt=0).order_by('-questionnaire_count')
+    
+    labels = [dept.name for dept in departments]
+    values = [dept.questionnaire_count for dept in departments]
+    
+    return {
+        'labels': labels,
+        'values': values
+    }

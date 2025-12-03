@@ -89,6 +89,181 @@
     </div>
 </div>
 
+<!-- Data Visualization Section -->
+<div class="mb-8">
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center">
+            <i class="bi bi-bar-chart-fill text-indigo-500 text-2xl mr-3"></i>
+            <h3 class="text-2xl font-bold text-gray-800">Analytics & Statistics</h3>
+        </div>
+        <div class="flex items-center space-x-3">
+            <select id="departmentFilter" class="px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors text-sm font-medium">
+                <option value="all">All Departments</option>
+                {% for dept in departments %}
+                <option value="{{ dept.id }}">{{ dept.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- Activity Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <!-- Total Uploads Card -->
+        <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-indigo-500">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                        <i class="bi bi-cloud-upload text-indigo-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Total Uploads</p>
+                        <p class="text-3xl font-bold text-gray-800" id="totalUploads">{{ total_uploads }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center text-xs text-indigo-600">
+                <i class="bi bi-arrow-up mr-1"></i>
+                <span>Questionnaires uploaded</span>
+            </div>
+        </div>
+
+        <!-- Total Downloads Card -->
+        <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-teal-500">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
+                        <i class="bi bi-cloud-download text-teal-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Total Downloads</p>
+                        <p class="text-3xl font-bold text-gray-800" id="totalDownloads">{{ total_downloads }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center text-xs text-teal-600">
+                <i class="bi bi-arrow-down mr-1"></i>
+                <span>Files downloaded</span>
+            </div>
+        </div>
+
+        <!-- Total Questionnaires Card -->
+        <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-pink-500">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+                        <i class="bi bi-file-earmark-text text-pink-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Total Questionnaires</p>
+                        <p class="text-3xl font-bold text-gray-800" id="totalQuestionnaires">{{ total_questionnaires }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center text-xs text-pink-600">
+                <i class="bi bi-files mr-1"></i>
+                <span>In the system</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+        <!-- Upload/Download Trends Chart -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h4 class="text-lg font-bold text-gray-800">Upload & Download Activity</h4>
+                <div class="flex items-center space-x-2">
+                    <span class="flex items-center text-xs">
+                        <span class="w-3 h-3 bg-indigo-500 rounded-full mr-1"></span>
+                        <span class="text-gray-600">Uploads</span>
+                    </span>
+                    <span class="flex items-center text-xs ml-3">
+                        <span class="w-3 h-3 bg-teal-500 rounded-full mr-1"></span>
+                        <span class="text-gray-600">Downloads</span>
+                    </span>
+                </div>
+            </div>
+            <canvas id="activityChart" class="max-h-80"></canvas>
+        </div>
+
+        <!-- Department Distribution Chart -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h4 class="text-lg font-bold text-gray-800">Questionnaires by Department</h4>
+                <i class="bi bi-pie-chart text-gray-400"></i>
+            </div>
+            <canvas id="departmentChart" class="max-h-80"></canvas>
+        </div>
+    </div>
+
+    <!-- Department Statistics Table -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="p-6 border-b border-gray-200">
+            <h4 class="text-lg font-bold text-gray-800 flex items-center">
+                <i class="bi bi-table text-gray-600 mr-2"></i>
+                Department Statistics
+            </h4>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Department</th>
+                        <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Questionnaires</th>
+                        <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Uploads</th>
+                        <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Downloads</th>
+                        <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Popularity</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200" id="departmentStatsBody">
+                    {% for stat in department_stats %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="bi bi-building text-white text-sm"></i>
+                                </div>
+                                <span class="font-medium text-gray-800">{{ stat.department_name }}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="text-gray-800 font-semibold">{{ stat.questionnaire_count }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                <i class="bi bi-cloud-upload text-xs mr-1"></i>
+                                {{ stat.upload_count }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-teal-100 text-teal-800">
+                                <i class="bi bi-cloud-download text-xs mr-1"></i>
+                                {{ stat.download_count }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <div class="flex items-center justify-center">
+                                <div class="w-32 bg-gray-200 rounded-full h-2 mr-2">
+                                    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full" style="width: {{ stat.popularity_percent }}%"></div>
+                                </div>
+                                <span class="text-xs text-gray-600 font-medium">{{ stat.popularity_percent }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                            <i class="bi bi-inbox text-4xl mb-2 block"></i>
+                            No data available
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Quick Actions -->
 <div class="mb-8">
     <div class="flex items-center mb-6">
@@ -147,4 +322,137 @@
     </div>
 </div>
 
+<!-- Chart.js Script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Activity Chart Data (passed from Django view)
+    const activityData = {{ activity_chart_data|safe }};
+    
+    // Department Chart Data (passed from Django view)
+    const departmentData = {{ department_chart_data|safe }};
+    
+    // Initialize Activity Chart (Line Chart)
+    const activityCtx = document.getElementById('activityChart').getContext('2d');
+    const activityChart = new Chart(activityCtx, {
+        type: 'line',
+        data: {
+            labels: activityData.labels,
+            datasets: [{
+                label: 'Uploads',
+                data: activityData.uploads,
+                borderColor: 'rgb(99, 102, 241)',
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }, {
+                label: 'Downloads',
+                data: activityData.downloads,
+                borderColor: 'rgb(20, 184, 166)',
+                backgroundColor: 'rgba(20, 184, 166, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: {
+                        size: 14
+                    },
+                    bodyFont: {
+                        size: 13
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+    
+    // Initialize Department Chart (Doughnut Chart)
+    const departmentCtx = document.getElementById('departmentChart').getContext('2d');
+    const departmentChart = new Chart(departmentCtx, {
+        type: 'doughnut',
+        data: {
+            labels: departmentData.labels,
+            datasets: [{
+                data: departmentData.values,
+                backgroundColor: [
+                    'rgba(99, 102, 241, 0.8)',
+                    'rgba(139, 92, 246, 0.8)',
+                    'rgba(236, 72, 153, 0.8)',
+                    'rgba(251, 146, 60, 0.8)',
+                    'rgba(34, 197, 94, 0.8)',
+                    'rgba(59, 130, 246, 0.8)',
+                    'rgba(168, 85, 247, 0.8)',
+                    'rgba(244, 63, 94, 0.8)'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        font: {
+                            size: 12
+                        },
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: {
+                        size: 14
+                    },
+                    bodyFont: {
+                        size: 13
+                    }
+                }
+            }
+        }
+    });
+    
+    // Department Filter Functionality
+    document.getElementById('departmentFilter').addEventListener('change', function() {
+        const deptId = this.value;
+        // Redirect to filtered view or update via AJAX
+        if (deptId === 'all') {
+            window.location.href = '{% url "accounts:admin_dashboard" %}';
+        } else {
+            window.location.href = '{% url "accounts:admin_dashboard" %}?department=' + deptId;
+        }
+    });
+</script>
 {% endblock %}

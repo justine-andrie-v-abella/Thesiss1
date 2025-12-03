@@ -1,3 +1,4 @@
+# questionnaires/models.py
 from django.db import models
 from accounts.models import TeacherProfile, Department, Subject
 import os
@@ -47,3 +48,28 @@ class Questionnaire(models.Model):
             self.file_size = self.file.size
             self.file_type = self.get_file_extension()
         super().save(*args, **kwargs)
+        
+class Download(models.Model):
+    """Track questionnaire downloads"""
+    questionnaire = models.ForeignKey(
+        Questionnaire, 
+        on_delete=models.CASCADE,
+        related_name='downloads'
+    )
+    user = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='questionnaire_downloads'
+    )
+    downloaded_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-downloaded_at']
+        verbose_name = 'Download'
+        verbose_name_plural = 'Downloads'
+    
+    def __str__(self):
+        return f"{self.questionnaire.title} - {self.downloaded_at.strftime('%Y-%m-%d %H:%M')}"
