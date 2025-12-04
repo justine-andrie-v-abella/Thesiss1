@@ -5,99 +5,301 @@ FILE: templates/admin_dashboard/manage_departments.html
 
 {% block title %}Manage Departments - Admin{% endblock %}
 
-{% block content %}
-<h1 class="mb-4"><i class="bi bi-building"></i> Manage Departments</h1>
+{% block header_title %}Manage Departments{% endblock %}
+{% block header_subtitle %}Create, edit, and organize academic departments{% endblock %}
 
-<div class="row">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">Add New Department</h5>
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Add Department Form -->
+    <div class="lg:col-span-1">
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden sticky top-6">
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
+                <h2 class="text-xl font-bold text-white flex items-center">
+                    <i class="bi bi-building-add text-2xl mr-3"></i>
+                    Add New Department
+                </h2>
             </div>
-            <div class="card-body">
-                <form method="post">
+            <div class="p-6">
+                <form method="post" class="space-y-5">
                     {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label">Department Name</label>
-                        {{ form.name }}
+                    
+                    <!-- Department Name -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-building text-blue-500 mr-1"></i>
+                            Department Name
+                        </label>
+                        <input 
+                            type="text" 
+                            name="name" 
+                            value="{{ form.name.value|default:'' }}"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+                            placeholder="e.g., Computer Science"
+                            required
+                        >
                         {% if form.name.errors %}
-                            <div class="text-danger">{{ form.name.errors }}</div>
+                            <p class="text-red-500 text-sm mt-1 flex items-center">
+                                <i class="bi bi-exclamation-circle mr-1"></i>
+                                {{ form.name.errors.0 }}
+                            </p>
                         {% endif %}
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Department Code</label>
-                        {{ form.code }}
+
+                    <!-- Department Code -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-hash text-blue-500 mr-1"></i>
+                            Department Code
+                        </label>
+                        <input 
+                            type="text" 
+                            name="code" 
+                            value="{{ form.code.value|default:'' }}"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors uppercase"
+                            placeholder="e.g., CS"
+                            required
+                        >
                         {% if form.code.errors %}
-                            <div class="text-danger">{{ form.code.errors }}</div>
+                            <p class="text-red-500 text-sm mt-1 flex items-center">
+                                <i class="bi bi-exclamation-circle mr-1"></i>
+                                {{ form.code.errors.0 }}
+                            </p>
                         {% endif %}
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        {{ form.description }}
+
+                    <!-- Description -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-card-text text-blue-500 mr-1"></i>
+                            Description
+                        </label>
+                        <textarea 
+                            name="description" 
+                            rows="4"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                            placeholder="Brief description of the department..."
+                        >{{ form.description.value|default:'' }}</textarea>
                         {% if form.description.errors %}
-                            <div class="text-danger">{{ form.description.errors }}</div>
+                            <p class="text-red-500 text-sm mt-1 flex items-center">
+                                <i class="bi bi-exclamation-circle mr-1"></i>
+                                {{ form.description.errors.0 }}
+                            </p>
                         {% endif %}
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-plus-circle"></i> Add Department
+
+                    <!-- Submit Button -->
+                    <button 
+                        type="submit" 
+                        class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center"
+                    >
+                        <i class="bi bi-plus-circle text-xl mr-2"></i>
+                        Add Department
                     </button>
                 </form>
             </div>
         </div>
     </div>
 
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-white">
-                <h5 class="mb-0">Existing Departments</h5>
+    <!-- Departments List -->
+    <div class="lg:col-span-2">
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                        <i class="bi bi-buildings text-2xl text-blue-500 mr-3"></i>
+                        Existing Departments
+                        <span class="ml-3 bg-blue-100 text-blue-700 text-sm font-semibold px-3 py-1 rounded-full">
+                            {{ departments.count }}
+                        </span>
+                    </h2>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Code</th>
-                                <th>Name</th>
-                                <th>Description</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for dept in departments %}
-                            <tr>
-                                <td><strong>{{ dept.code }}</strong></td>
-                                <td>{{ dept.name }}</td>
-                                <td>{{ dept.description|truncatewords:10 }}</td>
-                                <td>
-                                    <a href="{% url 'accounts:edit_department' dept.pk %}" class="btn btn-sm btn-warning">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <a href="{% url 'accounts:delete_department' dept.pk %}" class="btn btn-sm btn-danger">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center">No departments found</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+
+            <div class="p-6">
+                {% if departments %}
+                    <!-- Desktop View -->
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b-2 border-gray-200">
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Code</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Name</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Description</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                {% for dept in departments %}
+                                <tr class="hover:bg-gray-50 transition-colors">
+                                    <td class="px-4 py-4">
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-blue-100 text-blue-800">
+                                            {{ dept.code }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center mr-3">
+                                                <i class="bi bi-building text-white"></i>
+                                            </div>
+                                            <span class="font-semibold text-gray-800">{{ dept.name }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-4 text-gray-600 text-sm">
+                                        {{ dept.description|truncatewords:12|default:"No description" }}
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <div class="flex items-center justify-center space-x-2">
+                                            <a 
+                                                href="{% url 'accounts:edit_department' dept.pk %}" 
+                                                class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-all transform hover:scale-105 shadow hover:shadow-lg flex items-center"
+                                                title="Edit Department"
+                                            >
+                                                <i class="bi bi-pencil-square"></i>
+                                            </a>
+                                            <a 
+                                                href="{% url 'accounts:delete_department' dept.pk %}" 
+                                                class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-all transform hover:scale-105 shadow hover:shadow-lg flex items-center"
+                                                title="Delete Department"
+                                            >
+                                                <i class="bi bi-trash3"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Mobile View -->
+                    <div class="md:hidden space-y-4">
+                        {% for dept in departments %}
+                        <div class="bg-gray-50 rounded-xl p-4 border-l-4 border-blue-500 hover:shadow-md transition-shadow">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center mr-3">
+                                        <i class="bi bi-building text-white text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-gray-800">{{ dept.name }}</h3>
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                                            {{ dept.code }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {% if dept.description %}
+                            <p class="text-sm text-gray-600 mb-3">
+                                {{ dept.description|truncatewords:15 }}
+                            </p>
+                            {% endif %}
+                            
+                            <div class="flex space-x-2">
+                                <a 
+                                    href="{% url 'accounts:edit_department' dept.pk %}" 
+                                    class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-center"
+                                >
+                                    <i class="bi bi-pencil-square mr-1"></i> Edit
+                                </a>
+                                <a 
+                                    href="{% url 'accounts:delete_department' dept.pk %}" 
+                                    class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-center"
+                                >
+                                    <i class="bi bi-trash3 mr-1"></i> Delete
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <!-- Empty State -->
+                    <div class="text-center py-16">
+                        <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="bi bi-building text-5xl text-gray-400"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-700 mb-2">No Departments Yet</h3>
+                        <p class="text-gray-500 mb-6">Get started by adding your first department</p>
+                        <div class="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-lg">
+                            <i class="bi bi-arrow-left mr-2"></i>
+                            Use the form on the left to add a department
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Department Statistics Card -->
+        {% if departments %}
+        <div class="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">Department Summary</h3>
+                    <div class="flex items-center space-x-6 text-sm">
+                        <div class="flex items-center">
+                            <i class="bi bi-buildings text-blue-600 text-xl mr-2"></i>
+                            <span class="text-gray-600">Total: <strong class="text-gray-800">{{ departments.count }}</strong></span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="bi bi-people text-green-600 text-xl mr-2"></i>
+                            <span class="text-gray-600">Active: <strong class="text-gray-800">{{ departments.count }}</strong></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hidden sm:block">
+                    <div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                        <i class="bi bi-graph-up text-white text-2xl"></i>
+                    </div>
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
+
+<!-- Success/Error Messages Toast -->
+{% if messages %}
+<div class="fixed top-20 right-6 z-50 space-y-3">
+    {% for message in messages %}
+    <div class="bg-white rounded-lg shadow-2xl border-l-4 {% if message.tags == 'success' %}border-green-500{% elif message.tags == 'error' %}border-red-500{% else %}border-blue-500{% endif %} p-4 flex items-center animate-slide-in">
+        <div class="flex-shrink-0 mr-3">
+            {% if message.tags == 'success' %}
+                <i class="bi bi-check-circle-fill text-green-500 text-2xl"></i>
+            {% elif message.tags == 'error' %}
+                <i class="bi bi-exclamation-circle-fill text-red-500 text-2xl"></i>
+            {% else %}
+                <i class="bi bi-info-circle-fill text-blue-500 text-2xl"></i>
+            {% endif %}
+        </div>
+        <div>
+            <p class="font-semibold text-gray-800">{{ message }}</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_css %}
 <style>
-    form input, form select, form textarea {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
+    @keyframes slide-in {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    .animate-slide-in {
+        animation: slide-in 0.3s ease-out;
+    }
+    
+    /* Auto-uppercase for code input */
+    input[name="code"] {
+        text-transform: uppercase;
     }
 </style>
 {% endblock %}

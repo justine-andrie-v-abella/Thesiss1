@@ -5,144 +5,92 @@ FILE: templates/admin_dashboard/delete_subject.html
 
 {% block title %}Delete Subject - Admin{% endblock %}
 
+{% block header_title %}Delete Subject{% endblock %}
+{% block header_subtitle %}Confirm subject deletion{% endblock %}
+
 {% block content %}
-<div class="dashboard-header">
-    <div class="container">
-        <h1 class="dashboard-title text-danger">
-            <i class="bi bi-trash me-3"></i>Delete Subject
-        </h1>
-        <p class="dashboard-subtitle">Confirm subject deletion</p>
-    </div>
-</div>
-
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-lg-6">
-            <div class="card border-danger">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Confirm Deletion</h5>
-                </div>
-                <div class="card-body">
-                    <p class="lead">Are you sure you want to delete this subject?</p>
-                    
-                    <div class="subject-details bg-light rounded p-3 mb-4">
-                        <ul class="list-unstyled mb-0">
-                            <li class="mb-2">
-                                <strong>Code:</strong> 
-                                <span class="text-primary">{{ subject.code }}</span>
-                            </li>
-                            <li class="mb-2">
-                                <strong>Name:</strong> 
-                                {{ subject.name }}
-                            </li>
-                            <li class="mb-2">
-                                <strong>Departments:</strong>
-                                {% if subject.departments.all %}
-                                    {% for dept in subject.departments.all %}
-                                        <span class="badge bg-info me-1">{{ dept.name }}</span>
-                                    {% endfor %}
-                                {% else %}
-                                    <span class="text-muted">No departments assigned</span>
-                                {% endif %}
-                            </li>
-                            {% if subject.description %}
-                            <li class="mb-0">
-                                <strong>Description:</strong> 
-                                <span class="text-muted">{{ subject.description }}</span>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </div>
-
-                    <div class="alert alert-warning">
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
-                            <div>
-                                <strong>Warning:</strong> This action cannot be undone. 
-                                {% comment %} Uncomment when you have questionnaires {% endcomment %}
-                                {# Deleting this subject will also remove all associated questionnaires! #}
-                            </div>
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden border-2 border-red-200">
+        <div class="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-exclamation-triangle text-2xl mr-3"></i>
+                Confirm Deletion
+            </h2>
+        </div>
+        <div class="p-8">
+            <p class="text-lg text-gray-700 mb-6 font-semibold">Are you sure you want to delete this subject?</p>
+            
+            <div class="bg-gray-50 rounded-xl p-6 mb-6 border-l-4 border-red-500">
+                <div class="space-y-4">
+                    <div class="flex items-center">
+                        <i class="bi bi-hash text-red-500 text-xl mr-3"></i>
+                        <div>
+                            <p class="text-xs text-gray-500">Code</p>
+                            <p class="font-bold text-gray-800">{{ subject.code }}</p>
                         </div>
                     </div>
-
-                    <form method="post">
-                        {% csrf_token %}
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-danger flex-fill">
-                                <i class="bi bi-trash me-2"></i>Yes, Delete Subject
-                            </button>
-                            <a href="{% url 'accounts:manage_subjects' %}" class="btn btn-outline-secondary flex-fill">
-                                <i class="bi bi-x-circle me-2"></i>Cancel
-                            </a>
+                    <div class="flex items-center">
+                        <i class="bi bi-book text-red-500 text-xl mr-3"></i>
+                        <div>
+                            <p class="text-xs text-gray-500">Name</p>
+                            <p class="font-bold text-gray-800">{{ subject.name }}</p>
                         </div>
-                    </form>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 mb-2 flex items-center">
+                            <i class="bi bi-buildings text-red-500 mr-2"></i>
+                            Departments
+                        </p>
+                        <div class="flex flex-wrap gap-2">
+                            {% for dept in subject.departments.all %}
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                    {{ dept.name }}
+                                </span>
+                            {% empty %}
+                                <span class="text-gray-400 text-sm">No departments assigned</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% if subject.description %}
+                    <div class="flex items-start">
+                        <i class="bi bi-card-text text-red-500 text-xl mr-3 mt-1"></i>
+                        <div>
+                            <p class="text-xs text-gray-500">Description</p>
+                            <p class="text-gray-700">{{ subject.description }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
+
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-lg">
+                <div class="flex items-start">
+                    <i class="bi bi-exclamation-triangle-fill text-red-600 text-2xl mr-3 mt-1"></i>
+                    <div>
+                        <p class="font-bold text-red-800 mb-1">Warning: This action cannot be undone!</p>
+                        <p class="text-sm text-red-700">Deleting this subject may affect associated questionnaires.</p>
+                    </div>
+                </div>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="flex space-x-3">
+                    <button 
+                        type="submit" 
+                        class="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 px-6 rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-lg"
+                    >
+                        <i class="bi bi-trash3 mr-2"></i> Yes, Delete Subject
+                    </button>
+                    <a 
+                        href="{% url 'accounts:manage_subjects' %}" 
+                        class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center"
+                    >
+                        <i class="bi bi-x-circle mr-2"></i> Cancel
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .card {
-        border-radius: 12px;
-        overflow: hidden;
-    }
-    
-    .card-header {
-        border: none;
-        padding: 1.25rem 1.5rem;
-    }
-    
-    .card-body {
-        padding: 1.5rem;
-    }
-    
-    .subject-details {
-        border-left: 4px solid #4361ee;
-    }
-    
-    .badge {
-        font-size: 0.75rem;
-        padding: 0.35em 0.65em;
-    }
-    
-    .alert-warning {
-        border-left: 4px solid #ffc107;
-        background: #fffbf0;
-        border-color: #ffeaa7;
-    }
-    
-    .btn {
-        border-radius: 8px;
-        padding: 0.75rem 1.5rem;
-        font-weight: 500;
-        transition: all 0.3s ease;
-    }
-    
-    .btn-danger:hover {
-        background: #dc3545;
-        transform: translateY(-1px);
-    }
-    
-    @media (max-width: 768px) {
-        .dashboard-title {
-            font-size: 1.5rem;
-        }
-        
-        .card-body {
-            padding: 1.25rem;
-        }
-        
-        .d-flex.gap-2 {
-            flex-direction: column;
-        }
-        
-        .btn {
-            width: 100%;
-            margin-bottom: 0.5rem;
-        }
-    }
-</style>
 {% endblock %}

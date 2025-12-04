@@ -5,71 +5,122 @@ FILE: templates/admin_dashboard/edit_teacher.html
 
 {% block title %}Edit Teacher - Admin{% endblock %}
 
-{% block content %}
-<h1 class="mb-4"><i class="bi bi-pencil"></i> Edit Teacher</h1>
+{% block header_title %}Edit Teacher{% endblock %}
+{% block header_subtitle %}Update teacher information{% endblock %}
 
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">First Name *</label>
-                            <input type="text" class="form-control" name="first_name" value="{{ form.first_name.value }}" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Last Name *</label>
-                            <input type="text" class="form-control" name="last_name" value="{{ form.last_name.value }}" required>
-                        </div>
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-person-badge text-2xl mr-3"></i>
+                Edit {{ teacher.user.get_full_name }}
+            </h2>
+        </div>
+        <div class="p-8">
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+                
+                <!-- Name Fields -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-person text-green-500 mr-1"></i>
+                            First Name *
+                        </label>
+                        <input 
+                            type="text" 
+                            name="first_name" 
+                            value="{{ form.first_name.value }}"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 transition-colors"
+                            required
+                        >
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Email *</label>
-                        <input type="email" class="form-control" name="email" value="{{ form.email.value }}" required>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-person text-green-500 mr-1"></i>
+                            Last Name *
+                        </label>
+                        <input 
+                            type="text" 
+                            name="last_name" 
+                            value="{{ form.last_name.value }}"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 transition-colors"
+                            required
+                        >
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Employee ID *</label>
+                </div>
+
+                <!-- Email -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-envelope text-green-500 mr-1"></i>
+                        Email *
+                    </label>
+                    <input 
+                        type="email" 
+                        name="email" 
+                        value="{{ form.email.value }}"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 transition-colors"
+                        required
+                    >
+                </div>
+
+                <!-- Employee ID and Department -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-badge-tm text-green-500 mr-1"></i>
+                            Employee ID *
+                        </label>
                         {{ form.employee_id }}
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Department *</label>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-building text-green-500 mr-1"></i>
+                            Department *
+                        </label>
                         {{ form.department }}
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Phone</label>
-                        {{ form.phone }}
-                    </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            {{ form.is_active }}
-                            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
-                                Active
-                            </label>
-                        </div>
-                    </div>
+                </div>
 
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle"></i> Update Teacher
-                        </button>
-                        <a href="{% url 'accounts:manage_teachers' %}" class="btn btn-secondary">
-                            <i class="bi bi-x-circle"></i> Cancel
-                        </a>
-                    </div>
-                </form>
-            </div>
+                <!-- Phone -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-telephone text-green-500 mr-1"></i>
+                        Phone
+                    </label>
+                    {{ form.phone }}
+                </div>
+
+                <!-- Active Status -->
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <label class="flex items-center cursor-pointer">
+                        {{ form.is_active }}
+                        <span class="ml-3 text-sm font-semibold text-gray-700">
+                            <i class="bi bi-check-circle text-green-500 mr-1"></i>
+                            Active Status
+                        </span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1 ml-7">Uncheck to deactivate this teacher account</p>
+                </div>
+
+                <div class="flex space-x-3 pt-4">
+                    <button 
+                        type="submit" 
+                        class="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg"
+                    >
+                        <i class="bi bi-check-circle mr-2"></i> Update Teacher
+                    </button>
+                    <a 
+                        href="{% url 'accounts:manage_teachers' %}" 
+                        class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center"
+                    >
+                        <i class="bi bi-x-circle mr-2"></i> Cancel
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .form-control, select {
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-    }
-</style>
 {% endblock %}

@@ -5,79 +5,100 @@ FILE: templates/admin_dashboard/edit_subject.html
 
 {% block title %}Edit Subject - Admin{% endblock %}
 
+{% block header_title %}Edit Subject{% endblock %}
+{% block header_subtitle %}Update subject information{% endblock %}
+
 {% block content %}
-<div class="dashboard-header">
-    <div class="container">
-        <h1 class="dashboard-title">
-            <i class="bi bi-pencil me-3"></i>Edit Subject
-        </h1>
-        <p class="dashboard-subtitle">Update subject information</p>
-    </div>
-</div>
-
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="bi bi-book me-2"></i>Edit {{ subject.name }}
-                    </h5>
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-pencil-square text-2xl mr-3"></i>
+                Edit {{ subject.name }}
+            </h2>
+        </div>
+        <div class="p-8">
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+                
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-buildings text-purple-500 mr-1"></i>
+                        Departments
+                    </label>
+                    <small class="text-gray-500 text-xs block mb-2">Select all departments that offer this subject</small>
+                    <div class="border-2 border-gray-300 rounded-lg p-4 bg-gray-50 max-h-48 overflow-y-auto">
+                        {{ form.departments }}
+                    </div>
+                    {% if form.departments.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.departments.errors.0 }}</p>
+                    {% endif %}
                 </div>
-                <div class="card-body">
-                    <form method="post">
-                        {% csrf_token %}
-                        
-                        <!-- Departments Field (Multiple Selection) -->
-                        <div class="mb-4">
-                            <label class="form-label fw-semibold">Departments</label>
-                            <small class="text-muted d-block mb-2">Select all departments that offer this subject</small>
-                            <div class="departments-checkbox border rounded p-3 bg-light">
-                                {{ form.departments }}
-                            </div>
-                            {% if form.departments.errors %}
-                                <div class="text-danger small mt-2">{{ form.departments.errors }}</div>
-                            {% endif %}
-                        </div>
 
-                        <!-- Code Field -->
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Subject Code</label>
-                            {{ form.code }}
-                            {% if form.code.errors %}
-                                <div class="text-danger small mt-2">{{ form.code.errors }}</div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Name Field -->
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Subject Name</label>
-                            {{ form.name }}
-                            {% if form.name.errors %}
-                                <div class="text-danger small mt-2">{{ form.name.errors }}</div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Description Field -->
-                        <div class="mb-4">
-                            <label class="form-label fw-semibold">Description</label>
-                            {{ form.description }}
-                            {% if form.description.errors %}
-                                <div class="text-danger small mt-2">{{ form.description.errors }}</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary px-4">
-                                <i class="bi bi-check-circle me-2"></i>Update Subject
-                            </button>
-                            <a href="{% url 'accounts:manage_subjects' %}" class="btn btn-outline-secondary">
-                                <i class="bi bi-x-circle me-2"></i>Cancel
-                            </a>
-                        </div>
-                    </form>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-hash text-purple-500 mr-1"></i>
+                        Subject Code
+                    </label>
+                    <input 
+                        type="text" 
+                        name="code" 
+                        value="{{ form.code.value }}"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors uppercase"
+                        required
+                    >
+                    {% if form.code.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.code.errors.0 }}</p>
+                    {% endif %}
                 </div>
-            </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-book text-purple-500 mr-1"></i>
+                        Subject Name
+                    </label>
+                    <input 
+                        type="text" 
+                        name="name" 
+                        value="{{ form.name.value }}"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
+                        required
+                    >
+                    {% if form.name.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-card-text text-purple-500 mr-1"></i>
+                        Description
+                    </label>
+                    <textarea 
+                        name="description" 
+                        rows="4"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors resize-none"
+                    >{{ form.description.value }}</textarea>
+                    {% if form.description.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.description.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="flex space-x-3 pt-4">
+                    <button 
+                        type="submit" 
+                        class="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg"
+                    >
+                        <i class="bi bi-check-circle mr-2"></i> Update Subject
+                    </button>
+                    <a 
+                        href="{% url 'accounts:manage_subjects' %}" 
+                        class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center"
+                    >
+                        <i class="bi bi-x-circle mr-2"></i> Cancel
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -85,80 +106,10 @@ FILE: templates/admin_dashboard/edit_subject.html
 
 {% block extra_css %}
 <style>
-    /* Form Styling */
-    .form-control, .form-select, textarea {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 0.75rem;
-        font-size: 0.9rem;
-        transition: all 0.3s ease;
-        width: 100%;
-    }
-
-    .form-control:focus, .form-select:focus, textarea:focus {
-        border-color: #4361ee;
-        box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
-    }
-
-    /* Departments Checkbox Styling */
-    .departments-checkbox {
-        max-height: 200px;
-        overflow-y: auto;
-        background: white !important;
-    }
-
-    .departments-checkbox ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-    }
-
-    .departments-checkbox li {
-        margin-bottom: 0.5rem;
-        padding: 0.25rem 0;
-        border-bottom: 1px solid #f8f9fa;
-    }
-
-    .departments-checkbox li:last-child {
-        border-bottom: none;
-    }
-
-    .departments-checkbox input[type="checkbox"] {
-        margin-right: 0.75rem;
-        transform: scale(1.1);
-        cursor: pointer;
-    }
-
-    .departments-checkbox label {
-        margin-bottom: 0;
-        cursor: pointer;
-        font-size: 0.9rem;
-        display: flex;
-        align-items: center;
-        padding: 0.25rem 0;
-        width: 100%;
-    }
-
-    /* Button Styling */
-    .btn {
-        border-radius: 8px;
-        padding: 0.75rem 1.5rem;
-        font-weight: 500;
-    }
-
-    /* Responsive Design */
-    @media (max-width: 768px) {
-        .dashboard-title {
-            font-size: 1.5rem;
-        }
-        
-        .card-body {
-            padding: 1.25rem;
-        }
-        
-        .btn {
-            padding: 0.75rem 1rem;
-        }
+    input[type="checkbox"] {
+        margin-right: 8px;
+        width: 16px;
+        height: 16px;
     }
 </style>
 {% endblock %}

@@ -5,58 +5,87 @@ FILE: templates/admin_dashboard/edit_department.html
 
 {% block title %}Edit Department - Admin{% endblock %}
 
-{% block content %}
-<h1 class="mb-4"><i class="bi bi-pencil"></i> Edit Department</h1>
+{% block header_title %}Edit Department{% endblock %}
+{% block header_subtitle %}Update department information{% endblock %}
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label">Department Name</label>
-                        {{ form.name }}
-                        {% if form.name.errors %}
-                            <div class="text-danger">{{ form.name.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Department Code</label>
-                        {{ form.code }}
-                        {% if form.code.errors %}
-                            <div class="text-danger">{{ form.code.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        {{ form.description }}
-                        {% if form.description.errors %}
-                            <div class="text-danger">{{ form.description.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle"></i> Update Department
-                        </button>
-                        <a href="{% url 'accounts:manage_departments' %}" class="btn btn-secondary">
-                            <i class="bi bi-x-circle"></i> Cancel
-                        </a>
-                    </div>
-                </form>
-            </div>
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-pencil-square text-2xl mr-3"></i>
+                Edit {{ department.name }}
+            </h2>
+        </div>
+        <div class="p-8">
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+                
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-building text-blue-500 mr-1"></i>
+                        Department Name
+                    </label>
+                    <input 
+                        type="text" 
+                        name="name" 
+                        value="{{ form.name.value }}"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+                        required
+                    >
+                    {% if form.name.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-hash text-blue-500 mr-1"></i>
+                        Department Code
+                    </label>
+                    <input 
+                        type="text" 
+                        name="code" 
+                        value="{{ form.code.value }}"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors uppercase"
+                        required
+                    >
+                    {% if form.code.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.code.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-card-text text-blue-500 mr-1"></i>
+                        Description
+                    </label>
+                    <textarea 
+                        name="description" 
+                        rows="4"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                    >{{ form.description.value }}</textarea>
+                    {% if form.description.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.description.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="flex space-x-3 pt-4">
+                    <button 
+                        type="submit" 
+                        class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg"
+                    >
+                        <i class="bi bi-check-circle mr-2"></i> Update Department
+                    </button>
+                    <a 
+                        href="{% url 'accounts:manage_departments' %}" 
+                        class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center"
+                    >
+                        <i class="bi bi-x-circle mr-2"></i> Cancel
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    form input, form select, form textarea {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-    }
-</style>
 {% endblock %}
