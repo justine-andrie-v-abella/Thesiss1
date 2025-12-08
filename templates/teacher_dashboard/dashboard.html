@@ -5,179 +5,200 @@ FILE: templates/teacher_dashboard/dashboard.html
 
 {% block title %}Teacher Dashboard - Test Banking System{% endblock %}
 
+{% block header_title %}Welcome, {{ teacher.user.get_full_name }}!{% endblock %}
+{% block header_subtitle %}Your personal teaching hub for managing questionnaires{% endblock %}
+
 {% block content %}
-<div class="dashboard-header mb-4">
-    <h1 class="h3 mb-1"><i class="bi bi-speedometer2 me-2"></i>Teacher Dashboard</h1>
-    <p class="text-muted">Welcome back, {{ teacher.user.get_full_name }}</p>
+<!-- Stats Overview -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <!-- My Uploads Card -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-file-earmark-text text-white text-3xl"></i>
+                </div>
+                <span class="text-xs font-semibold text-blue-600 bg-blue-100 px-3 py-1 rounded-full">UPLOADS</span>
+            </div>
+            <div class="text-4xl font-bold text-gray-800 mb-1">{{ my_uploads }}</div>
+            <div class="text-sm text-gray-500 font-medium">My Questionnaires</div>
+        </div>
+        <div class="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-3">
+            <div class="flex items-center text-xs text-blue-700">
+                <i class="bi bi-upload mr-1"></i>
+                <span>Total uploaded files</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Department Card -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-building text-white text-3xl"></i>
+                </div>
+                <span class="text-xs font-semibold text-purple-600 bg-purple-100 px-3 py-1 rounded-full">DEPT</span>
+            </div>
+            <div class="text-3xl font-bold text-gray-800 mb-1">{{ teacher.department.code }}</div>
+            <div class="text-sm text-gray-500 font-medium">{{ teacher.department.name }}</div>
+        </div>
+        <div class="bg-gradient-to-r from-purple-50 to-purple-100 px-6 py-3">
+            <div class="flex items-center text-xs text-purple-700">
+                <i class="bi bi-buildings mr-1"></i>
+                <span>Your department</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Card -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-person-check text-white text-3xl"></i>
+                </div>
+                <span class="text-xs font-semibold {% if teacher.is_active %}text-green-600 bg-green-100{% else %}text-red-600 bg-red-100{% endif %} px-3 py-1 rounded-full">
+                    {% if teacher.is_active %}ACTIVE{% else %}INACTIVE{% endif %}
+                </span>
+            </div>
+            <div class="text-3xl font-bold {% if teacher.is_active %}text-green-600{% else %}text-red-600{% endif %} mb-1">
+                {% if teacher.is_active %}Active{% else %}Inactive{% endif %}
+            </div>
+            <div class="text-sm text-gray-500 font-medium">Account Status</div>
+        </div>
+        <div class="bg-gradient-to-r {% if teacher.is_active %}from-green-50 to-green-100{% else %}from-red-50 to-red-100{% endif %} px-6 py-3">
+            <div class="flex items-center text-xs {% if teacher.is_active %}text-green-700{% else %}text-red-700{% endif %}">
+                <i class="bi bi-shield-check mr-1"></i>
+                <span>Your account is {% if teacher.is_active %}active{% else %}inactive{% endif %}</span>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card stat-card border-0 shadow-sm">
-            <div class="card-body p-4 text-center">
-                <div class="stat-icon mb-3">
-                    <i class="bi bi-file-earmark-text fs-1"></i>
-                </div>
-                <h2 class="display-5 fw-bold mb-1">{{ my_uploads }}</h2>
-                <p class="mb-0 text-muted">My Uploads</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card stat-card border-0 shadow-sm">
-            <div class="card-body p-4 text-center">
-                <div class="stat-icon mb-3">
-                    <i class="bi bi-building fs-1"></i>
-                </div>
-                <h2 class="display-5 fw-bold mb-1">{{ teacher.department.code }}</h2>
-                <p class="mb-0 text-muted">Department</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card stat-card border-0 shadow-sm">
-            <div class="card-body p-4 text-center">
-                <div class="stat-icon mb-3">
-                    <i class="bi bi-person-check fs-1"></i>
-                </div>
-                <h2 class="display-5 fw-bold mb-1">
-                    {% if teacher.is_active %}
-                        <span class="text-success">Active</span>
-                    {% else %}
-                        <span class="text-danger">Inactive</span>
-                    {% endif %}
-                </h2>
-                <p class="mb-0 text-muted">Account Status</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row g-3 ">
-    <div class="col-lg-8">
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-header bg-white border-0 py-3">
-                <h5 class="mb-0"><i class="bi bi-lightning me-2"></i>Quick Actions</h5>
-            </div>
-            <div class="card-body p-4">
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <a href="{% url 'questionnaires:upload_questionnaire' %}" class="action-card card border-0 text-center text-decoration-none h-100">
-                            <div class="card-body p-4">
-                                <div class="action-icon mb-3">
-                                    <i class="bi bi-upload fs-2 text-primary"></i>
-                                </div>
-                                <h6 class="fw-bold mb-1">Upload Questionnaire</h6>
-                                <p class="small text-muted mb-0">Add new questionnaire</p>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-md-4">
-                        <a href="{% url 'questionnaires:my_uploads' %}" class="action-card card border-0 text-center text-decoration-none h-100">
-                            <div class="card-body p-4">
-                                <div class="action-icon mb-3">
-                                    <i class="bi bi-file-person fs-2 text-success"></i>
-                                </div>
-                                <h6 class="fw-bold mb-1">My Uploads</h6>
-                                <p class="small text-muted mb-0">View your uploads</p>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-md-4">
-                        <a href="{% url 'questionnaires:browse_questionnaires' %}" class="action-card card border-0 text-center text-decoration-none h-100">
-                            <div class="card-body p-4">
-                                <div class="action-icon mb-3">
-                                    <i class="bi bi-search fs-2 text-info"></i>
-                                </div>
-                                <h6 class="fw-bold mb-1">Browse</h6>
-                                <p class="small text-muted mb-0">Find questionnaires</p>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+<!-- Quick Actions -->
+<div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+    <div class="flex items-center mb-6">
+        <i class="bi bi-lightning-fill text-yellow-500 text-3xl mr-3"></i>
+        <h2 class="text-2xl font-bold text-gray-800">Quick Actions</h2>
     </div>
     
-    {% comment %} <div class="col-lg-4">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white border-0 py-3">
-                <h5 class="mb-0"><i class="bi bi-person me-2"></i>My Information</h5>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Upload Questionnaire -->
+        <a href="{% url 'questionnaires:upload_questionnaire' %}" class="group bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-blue-500">
+            <div class="flex flex-col items-center text-center">
+                <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
+                    <i class="bi bi-upload text-white text-4xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600 transition-colors">Upload Questionnaire</h3>
+                <p class="text-sm text-gray-600">Add new questionnaire to the system</p>
             </div>
-            <div class="card-body p-0">
-                <div class="list-group list-group-flush">
-                    <div class="list-group-item border-0 py-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-medium">Name</span>
-                            <span class="text-end">{{ teacher.user.get_full_name }}</span>
-                        </div>
-                    </div>
-                    <div class="list-group-item border-0 py-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-medium">Email</span>
-                            <span class="text-end">{{ teacher.user.email }}</span>
-                        </div>
-                    </div>
-                    <div class="list-group-item border-0 py-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-medium">Employee ID</span>
-                            <span class="text-end">{{ teacher.employee_id }}</span>
-                        </div>
-                    </div>
-                    <div class="list-group-item border-0 py-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-medium">Department</span>
-                            <span class="text-end">{{ teacher.department.name }}</span>
-                        </div>
-                    </div>
-                    <div class="list-group-item border-0 py-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-medium">Phone</span>
-                            <span class="text-end">{{ teacher.phone|default:"N/A" }}</span>
-                        </div>
-                    </div>
+        </a>
+
+        <!-- My Uploads -->
+        <a href="{% url 'questionnaires:my_uploads' %}" class="group bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-green-500">
+            <div class="flex flex-col items-center text-center">
+                <div class="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
+                    <i class="bi bi-file-person text-white text-4xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2 group-hover:text-green-600 transition-colors">My Uploads</h3>
+                <p class="text-sm text-gray-600">View and manage your questionnaires</p>
+            </div>
+        </a>
+
+        <!-- Browse -->
+        <a href="{% url 'questionnaires:browse_questionnaires' %}" class="group bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-purple-500">
+            <div class="flex flex-col items-center text-center">
+                <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
+                    <i class="bi bi-search text-white text-4xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2 group-hover:text-purple-600 transition-colors">Browse</h3>
+                <p class="text-sm text-gray-600">Find questionnaires from colleagues</p>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Profile Information Card -->
+<div class="bg-white rounded-xl shadow-lg overflow-hidden">
+    <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+        <h2 class="text-xl font-bold text-gray-800 flex items-center">
+            <i class="bi bi-person-circle text-2xl text-indigo-500 mr-3"></i>
+            My Profile Information
+        </h2>
+    </div>
+    <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Name -->
+            <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                    <i class="bi bi-person-badge text-blue-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 font-medium">Full Name</p>
+                    <p class="text-gray-800 font-semibold">{{ teacher.user.get_full_name }}</p>
+                </div>
+            </div>
+
+            <!-- Email -->
+            <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
+                    <i class="bi bi-envelope text-green-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 font-medium">Email Address</p>
+                    <p class="text-gray-800 font-semibold">{{ teacher.user.email }}</p>
+                </div>
+            </div>
+
+            <!-- Employee ID -->
+            <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
+                    <i class="bi bi-badge-tm text-purple-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 font-medium">Employee ID</p>
+                    <p class="text-gray-800 font-semibold">{{ teacher.employee_id }}</p>
+                </div>
+            </div>
+
+            <!-- Department -->
+            <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mr-4">
+                    <i class="bi bi-building text-orange-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 font-medium">Department</p>
+                    <p class="text-gray-800 font-semibold">{{ teacher.department.name }}</p>
+                </div>
+            </div>
+
+            <!-- Phone -->
+            <div class="flex items-center p-4 bg-gray-50 rounded-lg md:col-span-2">
+                <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center mr-4">
+                    <i class="bi bi-telephone text-pink-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 font-medium">Phone Number</p>
+                    <p class="text-gray-800 font-semibold">{{ teacher.phone|default:"Not provided" }}</p>
                 </div>
             </div>
         </div>
-    </div> {% endcomment %}
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_css %}
 <style>
-.dashboard-header {
-    border-bottom: 1px solid #e9ecef;
-    padding-bottom: 1rem;
-}
-
-.stat-card {
-    transition: transform 0.2s;
-}
-
-.stat-card:hover {
-    transform: translateY(-5px);
-}
-
-.action-card {
-    transition: all 0.2s;
-    border: 1px solid #e9ecef !important;
-}
-
-.action-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
-    border-color: #667eea !important;
-}
-
-.list-group-item {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-}
-
-@media (max-width: 768px) {
-    .display-5 {
-        font-size: 2rem;
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
     }
-}
+    
+    .group:hover .bi-upload,
+    .group:hover .bi-file-person,
+    .group:hover .bi-search {
+        animation: float 2s ease-in-out infinite;
+    }
 </style>
 {% endblock %}
