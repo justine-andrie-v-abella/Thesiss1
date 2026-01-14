@@ -205,27 +205,6 @@ FILE: templates/admin_dashboard/manage_subjects.html
     {% endif %}
 </div>
 
-<!-- Success/Error Messages Toast -->
-{% if messages %}
-<div class="fixed top-20 right-6 z-50 space-y-3">
-    {% for message in messages %}
-    <div class="bg-white rounded-lg shadow-2xl border-l-4 {% if message.tags == 'success' %}border-green-500{% elif message.tags == 'error' %}border-red-500{% else %}border-purple-500{% endif %} p-4 flex items-center animate-slide-in">
-        <div class="flex-shrink-0 mr-3">
-            {% if message.tags == 'success' %}
-                <i class="bi bi-check-circle-fill text-green-500 text-2xl"></i>
-            {% elif message.tags == 'error' %}
-                <i class="bi bi-exclamation-circle-fill text-red-500 text-2xl"></i>
-            {% else %}
-                <i class="bi bi-info-circle-fill text-purple-500 text-2xl"></i>
-            {% endif %}
-        </div>
-        <div>
-            <p class="font-semibold text-gray-800">{{ message }}</p>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% endif %}
 {% endblock %}
 
 {% block extra_css %}

@@ -610,180 +610,254 @@ def get_department_chart_data():
         'labels': labels,
         'values': values
     }
-    
+# ============================================================================
+# CLEANED UP DEPARTMENT AND SUBJECT VIEWS WITH ACTIVITY LOGGING
+# Replace the duplicate department/subject functions in your views.py with these
+# ============================================================================
+
+# ============================================================================
+# DEPARTMENT VIEWS (Remove all duplicate department functions and use these)
+# ============================================================================
+
 @login_required
+@user_passes_test(is_admin)
+def add_department(request):
+    """View to add a new department (separate page)"""
+    if request.method == 'POST':
+        form = DepartmentForm(request.POST)
+        if form.is_valid():
+            department = form.save()
+            
+            # LOG ACTIVITY
+            ActivityLog.objects.create(
+                activity_type='department_created',
+                user=request.user,
+                description=f"Department {department.name} ({department.code}) was created"
+            )
+            
+            messages.success(request, f'Department "{department.name}" has been added successfully!')
+            return redirect('accounts:manage_departments')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+    else:
+        form = DepartmentForm()
+    
+    context = {'form': form}
+    return render(request, 'admin_dashboard/add_department.html', context)
+
+
+@login_required
+@user_passes_test(is_admin)
 def manage_departments(request):
     """View to list all departments"""
-    if not request.user.is_staff:
-        messages.error(request, "You don't have permission to access this page.")
-        return redirect('accounts:login')
-    
     departments = Department.objects.all().order_by('name')
+    
+    if request.method == 'POST':
+        form = DepartmentForm(request.POST)
+        if form.is_valid():
+            department = form.save()
+            
+            # LOG ACTIVITY
+            ActivityLog.objects.create(
+                activity_type='department_created',
+                user=request.user,
+                description=f"Department {department.name} ({department.code}) was created"
+            )
+            
+            messages.success(request, f'Department "{department.name}" has been added successfully!')
+            return redirect('accounts:manage_departments')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+    else:
+        form = DepartmentForm()
     
     context = {
         'departments': departments,
+        'form': form
     }
     return render(request, 'admin_dashboard/manage_departments.html', context)
 
 
 @login_required
-def add_department(request):
-    """View to add a new department"""
-    if not request.user.is_staff:
-        messages.error(request, "You don't have permission to access this page.")
-        return redirect('accounts:login')
-    
-    if request.method == 'POST':
-        form = DepartmentForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Department added successfully!')
-            return redirect('accounts:manage_departments')
-        else:
-            messages.error(request, 'Please correct the errors below.')
-    else:
-        form = DepartmentForm()
-    
-    context = {
-        'form': form,
-    }
-    return render(request, 'admin_dashboard/add_department.html', context)
-
-
-@login_required
+@user_passes_test(is_admin)
 def edit_department(request, pk):
     """View to edit a department"""
-    if not request.user.is_staff:
-        messages.error(request, "You don't have permission to access this page.")
-        return redirect('accounts:login')
-    
     department = get_object_or_404(Department, pk=pk)
+    old_name = department.name
+    old_code = department.code
     
     if request.method == 'POST':
         form = DepartmentForm(request.POST, instance=department)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Department updated successfully!')
+            updated_department = form.save()
+            
+            # LOG ACTIVITY
+            ActivityLog.objects.create(
+                activity_type='department_updated',
+                user=request.user,
+                description=f"Department {old_name} ({old_code}) was updated to {updated_department.name} ({updated_department.code})"
+            )
+            
+            messages.success(request, f'Department "{updated_department.name}" has been updated successfully!')
             return redirect('accounts:manage_departments')
         else:
-            messages.error(request, 'Please correct the errors below.')
+            messages.error(request, 'Please correct the errors in the form.')
     else:
         form = DepartmentForm(instance=department)
     
     context = {
         'form': form,
-        'department': department,
+        'department': department
     }
     return render(request, 'admin_dashboard/edit_department.html', context)
 
 
 @login_required
+@user_passes_test(is_admin)
 def delete_department(request, pk):
     """View to delete a department"""
-    if not request.user.is_staff:
-        messages.error(request, "You don't have permission to access this page.")
-        return redirect('accounts:login')
-    
     department = get_object_or_404(Department, pk=pk)
     
     if request.method == 'POST':
         department_name = department.name
+        department_code = department.code
+        
+        # LOG ACTIVITY BEFORE DELETING
+        ActivityLog.objects.create(
+            activity_type='department_deleted',
+            user=request.user,
+            description=f"Department {department_name} ({department_code}) was deleted"
+        )
+        
         department.delete()
-        messages.success(request, f'Department "{department_name}" deleted successfully!')
+        messages.success(request, f'Department "{department_name}" has been deleted successfully!')
         return redirect('accounts:manage_departments')
     
     context = {
-        'department': department,
+        'department': department
     }
     return render(request, 'admin_dashboard/delete_department.html', context)
 
 
 # ============================================================================
-# SUBJECT VIEWS
+# SUBJECT VIEWS (Remove all duplicate subject functions and use these)
 # ============================================================================
 
 @login_required
+@user_passes_test(is_admin)
+def add_subject(request):
+    """View to add a new subject (separate page)"""
+    if request.method == 'POST':
+        form = SubjectForm(request.POST)
+        if form.is_valid():
+            subject = form.save()
+            
+            # LOG ACTIVITY
+            ActivityLog.objects.create(
+                activity_type='subject_created',
+                user=request.user,
+                description=f"Subject {subject.name} ({subject.code}) was created"
+            )
+            
+            messages.success(request, f'Subject "{subject.name}" ({subject.code}) has been added successfully!')
+            return redirect('accounts:manage_subjects')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+    else:
+        form = SubjectForm()
+    
+    context = {'form': form}
+    return render(request, 'admin_dashboard/add_subject.html', context)
+
+
+@login_required
+@user_passes_test(is_admin)
 def manage_subjects(request):
     """View to list all subjects"""
-    if not request.user.is_staff:
-        messages.error(request, "You don't have permission to access this page.")
-        return redirect('accounts:login')
+    subjects = Subject.objects.prefetch_related('departments').all().order_by('name')
     
-    subjects = Subject.objects.all().order_by('name')
+    if request.method == 'POST':
+        form = SubjectForm(request.POST)
+        if form.is_valid():
+            subject = form.save()
+            
+            # LOG ACTIVITY
+            ActivityLog.objects.create(
+                activity_type='subject_created',
+                user=request.user,
+                description=f"Subject {subject.name} ({subject.code}) was created"
+            )
+            
+            messages.success(request, f'Subject "{subject.name}" ({subject.code}) has been added successfully!')
+            return redirect('accounts:manage_subjects')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+    else:
+        form = SubjectForm()
     
     context = {
         'subjects': subjects,
+        'form': form
     }
     return render(request, 'admin_dashboard/manage_subjects.html', context)
 
 
 @login_required
-def add_subject(request):
-    """View to add a new subject"""
-    if not request.user.is_staff:
-        messages.error(request, "You don't have permission to access this page.")
-        return redirect('accounts:login')
-    
-    if request.method == 'POST':
-        form = SubjectForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Subject added successfully!')
-            return redirect('accounts:manage_subjects')
-        else:
-            messages.error(request, 'Please correct the errors below.')
-    else:
-        form = SubjectForm()
-    
-    context = {
-        'form': form,
-    }
-    return render(request, 'admin_dashboard/add_subject.html', context)
-
-
-@login_required
+@user_passes_test(is_admin)
 def edit_subject(request, pk):
     """View to edit a subject"""
-    if not request.user.is_staff:
-        messages.error(request, "You don't have permission to access this page.")
-        return redirect('accounts:login')
-    
     subject = get_object_or_404(Subject, pk=pk)
+    old_name = subject.name
+    old_code = subject.code
     
     if request.method == 'POST':
         form = SubjectForm(request.POST, instance=subject)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Subject updated successfully!')
+            updated_subject = form.save()
+            
+            # LOG ACTIVITY
+            ActivityLog.objects.create(
+                activity_type='subject_updated',
+                user=request.user,
+                description=f"Subject {old_name} ({old_code}) was updated to {updated_subject.name} ({updated_subject.code})"
+            )
+            
+            messages.success(request, f'Subject "{updated_subject.name}" ({updated_subject.code}) has been updated successfully!')
             return redirect('accounts:manage_subjects')
         else:
-            messages.error(request, 'Please correct the errors below.')
+            messages.error(request, 'Please correct the errors in the form.')
     else:
         form = SubjectForm(instance=subject)
     
     context = {
         'form': form,
-        'subject': subject,
+        'subject': subject
     }
     return render(request, 'admin_dashboard/edit_subject.html', context)
 
 
 @login_required
+@user_passes_test(is_admin)
 def delete_subject(request, pk):
     """View to delete a subject"""
-    if not request.user.is_staff:
-        messages.error(request, "You don't have permission to access this page.")
-        return redirect('accounts:login')
-    
     subject = get_object_or_404(Subject, pk=pk)
     
     if request.method == 'POST':
         subject_name = subject.name
+        subject_code = subject.code
+        
+        # LOG ACTIVITY BEFORE DELETING
+        ActivityLog.objects.create(
+            activity_type='subject_deleted',
+            user=request.user,
+            description=f"Subject {subject_name} ({subject_code}) was deleted"
+        )
+        
         subject.delete()
-        messages.success(request, f'Subject "{subject_name}" deleted successfully!')
+        messages.success(request, f'Subject "{subject_name}" ({subject_code}) has been deleted successfully!')
         return redirect('accounts:manage_subjects')
     
     context = {
-        'subject': subject,
+        'subject': subject
     }
     return render(request, 'admin_dashboard/delete_subject.html', context)
