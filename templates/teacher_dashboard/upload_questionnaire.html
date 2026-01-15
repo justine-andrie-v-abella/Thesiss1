@@ -9,204 +9,213 @@ FILE: templates/teacher_dashboard/upload_questionnaire.html
 {% block header_subtitle %}Add a new questionnaire to the test bank system{% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<div class="max-w-4xl mx-auto">
     <!-- Upload Form -->
-    <div class="lg:col-span-2">
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
-                <h2 class="text-xl font-bold text-white flex items-center">
-                    <i class="bi bi-cloud-upload text-2xl mr-3"></i>
-                    Upload New Questionnaire
-                </h2>
-            </div>
-            <div class="p-8">
-                <form method="post" enctype="multipart/form-data" class="space-y-6">
-                    {% csrf_token %}
-                    
-                    <!-- Title -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex items-center justify-between">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-cloud-upload text-2xl mr-3"></i>
+                Upload New Questionnaire
+            </h2>
+            <button 
+                type="button"
+                id="guidelinesBtn"
+                class="bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 transition-all transform hover:scale-110"
+                title="View Upload Guidelines"
+            >
+                <i class="bi bi-exclamation-circle text-2xl"></i>
+            </button>
+        </div>
+        <div class="p-8">
+            <form method="post" enctype="multipart/form-data" class="space-y-6">
+                {% csrf_token %}
+                
+                <!-- Title -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-card-heading text-blue-500 mr-1"></i>
+                        Title *
+                    </label>
+                    <input 
+                        type="text" 
+                        name="title" 
+                        value="{{ form.title.value|default:'' }}"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+                        placeholder="e.g., Final Exam - Introduction to Programming"
+                        required
+                    >
+                    {% if form.title.errors %}
+                        <p class="text-red-500 text-sm mt-1 flex items-center">
+                            <i class="bi bi-exclamation-circle mr-1"></i>
+                            {{ form.title.errors.0 }}
+                        </p>
+                    {% endif %}
+                </div>
+
+                <!-- Description -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-card-text text-blue-500 mr-1"></i>
+                        Description
+                    </label>
+                    <textarea 
+                        name="description" 
+                        rows="4"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                        placeholder="Provide a brief description of the questionnaire..."
+                    >{{ form.description.value|default:'' }}</textarea>
+                    {% if form.description.errors %}
+                        <p class="text-red-500 text-sm mt-1 flex items-center">
+                            <i class="bi bi-exclamation-circle mr-1"></i>
+                            {{ form.description.errors.0 }}
+                        </p>
+                    {% endif %}
+                </div>
+
+                <!-- Department and Subject -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Department -->
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="bi bi-card-heading text-blue-500 mr-1"></i>
-                            Title *
+                        <label for="id_department" class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-building text-blue-500 mr-1"></i>
+                            Department *
                         </label>
+                        {{ form.department }}
+                        {% if form.department.errors %}
+                            <p class="text-red-500 text-sm mt-1 flex items-center">
+                                <i class="bi bi-exclamation-circle mr-1"></i>
+                                {{ form.department.errors.0 }}
+                            </p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Subject -->
+                    <div>
+                        <label for="id_subject" class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-book text-purple-500 mr-1"></i>
+                            Subject *
+                        </label>
+                        {{ form.subject }}
+                        {% if form.subject.errors %}
+                            <p class="text-red-500 text-sm mt-1 flex items-center">
+                                <i class="bi bi-exclamation-circle mr-1"></i>
+                                {{ form.subject.errors.0 }}
+                            </p>
+                        {% endif %}
+                        <p class="text-xs text-gray-500 mt-1">Subjects available for the selected department</p>
+                    </div>
+                </div>
+
+                <!-- File Upload -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-file-earmark-arrow-up text-green-500 mr-1"></i>
+                        File *
+                    </label>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                        <i class="bi bi-cloud-upload text-5xl text-gray-400 mb-3 block"></i>
                         <input 
-                            type="text" 
-                            name="title" 
-                            value="{{ form.title.value|default:'' }}"
-                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
-                            placeholder="e.g., Final Exam - Introduction to Programming"
+                            type="file" 
+                            name="file" 
+                            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                             required
                         >
-                        {% if form.title.errors %}
-                            <p class="text-red-500 text-sm mt-1 flex items-center">
-                                <i class="bi bi-exclamation-circle mr-1"></i>
-                                {{ form.title.errors.0 }}
-                            </p>
-                        {% endif %}
                     </div>
-
-                    <!-- Description -->
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="bi bi-card-text text-blue-500 mr-1"></i>
-                            Description
-                        </label>
-                        <textarea 
-                            name="description" 
-                            rows="4"
-                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors resize-none"
-                            placeholder="Provide a brief description of the questionnaire..."
-                        >{{ form.description.value|default:'' }}</textarea>
-                        {% if form.description.errors %}
-                            <p class="text-red-500 text-sm mt-1 flex items-center">
-                                <i class="bi bi-exclamation-circle mr-1"></i>
-                                {{ form.description.errors.0 }}
-                            </p>
-                        {% endif %}
-                    </div>
-
-                    <!-- Department and Subject -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Department -->
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="bi bi-building text-blue-500 mr-1"></i>
-                                Department *
-                            </label>
-                            <select 
-                                name="department" 
-                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
-                                required
-                            >
-                                <option value="">Select Department</option>
-                                {{ form.department }}
-                            </select>
-                            {% if form.department.errors %}
-                                <p class="text-red-500 text-sm mt-1 flex items-center">
-                                    <i class="bi bi-exclamation-circle mr-1"></i>
-                                    {{ form.department.errors.0 }}
-                                </p>
-                            {% endif %}
-                        </div>
-
-                        <!-- Subject -->
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="bi bi-book text-purple-500 mr-1"></i>
-                                Subject *
-                            </label>
-                            <select 
-                                name="subject" 
-                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
-                                required
-                            >
-                                <option value="">Select Subject</option>
-                                {{ form.subject }}
-                            </select>
-                            {% if form.subject.errors %}
-                                <p class="text-red-500 text-sm mt-1 flex items-center">
-                                    <i class="bi bi-exclamation-circle mr-1"></i>
-                                    {{ form.subject.errors.0 }}
-                                </p>
-                            {% endif %}
-                            <p class="text-xs text-gray-500 mt-1">Subjects available for the selected department</p>
-                        </div>
-                    </div>
-
-                    <!-- File Upload -->
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="bi bi-file-earmark-arrow-up text-green-500 mr-1"></i>
-                            File *
-                        </label>
-                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
-                            <i class="bi bi-cloud-upload text-5xl text-gray-400 mb-3 block"></i>
-                            <input 
-                                type="file" 
-                                name="file" 
-                                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                                required
-                            >
-                        </div>
-                        {% if form.file.errors %}
-                            <p class="text-red-500 text-sm mt-1 flex items-center">
-                                <i class="bi bi-exclamation-circle mr-1"></i>
-                                {{ form.file.errors.0 }}
-                            </p>
-                        {% endif %}
-                        <p class="text-xs text-gray-500 mt-2">
-                            <i class="bi bi-info-circle mr-1"></i>
-                            Allowed formats: PDF, DOCX, XLSX, XLS, TXT (Max 10MB)
+                    {% if form.file.errors %}
+                        <p class="text-red-500 text-sm mt-1 flex items-center">
+                            <i class="bi bi-exclamation-circle mr-1"></i>
+                            {{ form.file.errors.0 }}
                         </p>
-                    </div>
+                    {% endif %}
+                    <p class="text-xs text-gray-500 mt-2">
+                        <i class="bi bi-info-circle mr-1"></i>
+                        Allowed formats: PDF, DOCX, XLSX, XLS, TXT (Max 10MB)
+                    </p>
+                </div>
 
-                    <!-- Buttons -->
-                    <div class="flex space-x-3 pt-4">
-                        <button 
-                            type="submit" 
-                            class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg flex items-center justify-center"
-                        >
-                            <i class="bi bi-upload mr-2"></i> Upload Questionnaire
-                        </button>
-                        <a 
-                            href="{% url 'accounts:teacher_dashboard' %}" 
-                            class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center"
-                        >
-                            <i class="bi bi-x-circle mr-2"></i> Cancel
-                        </a>
-                    </div>
-                </form>
-            </div>
+                <!-- Buttons -->
+                <div class="flex space-x-3 pt-4">
+                    <button 
+                        type="submit" 
+                        class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg flex items-center justify-center"
+                    >
+                        <i class="bi bi-upload mr-2"></i> Upload Questionnaire
+                    </button>
+                    <a 
+                        href="{% url 'accounts:teacher_dashboard' %}" 
+                        class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center"
+                    >
+                        <i class="bi bi-x-circle mr-2"></i> Cancel
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
+</div>
 
-    <!-- Guidelines Sidebar -->
-    <div class="lg:col-span-1">
-        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-lg p-6 sticky top-6">
-            <div class="flex items-center mb-4">
-                <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-                    <i class="bi bi-info-circle text-white text-2xl"></i>
+<!-- Guidelines Modal -->
+<div id="guidelinesModal" style="display: none;" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full transform transition-all">
+        <div class="bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-4 flex items-center justify-between rounded-t-xl">
+            <div class="flex items-center">
+                <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3">
+                    <i class="bi bi-info-circle text-white text-xl"></i>
                 </div>
-                <h3 class="text-lg font-bold text-gray-800">Upload Guidelines</h3>
+                <h3 class="text-lg font-bold text-white">Upload Guidelines</h3>
             </div>
+            <button type="button" id="closeModal" class="text-white hover:bg-white/20 rounded-lg p-1 transition-colors">
+                <i class="bi bi-x-lg text-xl"></i>
+            </button>
+        </div>
+        <div class="p-6">
             <ul class="space-y-3 text-sm text-gray-700">
                 <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5"></i>
+                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
                     <span>Provide a clear, descriptive title</span>
                 </li>
                 <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5"></i>
+                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
                     <span>Add a brief description of the questionnaire</span>
                 </li>
                 <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5"></i>
+                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
                     <span>Select the correct department and subject</span>
                 </li>
                 <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5"></i>
+                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
                     <span>Ensure file is in an acceptable format</span>
                 </li>
                 <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5"></i>
+                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
                     <span>Maximum file size is 10MB</span>
                 </li>
                 <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5"></i>
+                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
                     <span>Files are organized by department and subject</span>
                 </li>
             </ul>
         </div>
+        <div class="px-6 pb-6">
+            <button type="button" id="closeModalBtn" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all">
+                Got it!
+            </button>
+        </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const departmentSelect = document.querySelector('select[name="department"]');
-    const subjectSelect = document.querySelector('select[name="subject"]');
+(function() {
+    console.log('Upload questionnaire script loaded');
+    
+    // Department/Subject functionality
+    const departmentSelect = document.getElementById('id_department');
+    const subjectSelect = document.getElementById('id_subject');
     
     if (departmentSelect && subjectSelect) {
+        // Add styling classes to Django-generated selects with border outline
+        departmentSelect.className = 'w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors';
+        subjectSelect.className = 'w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors';
+        
         departmentSelect.addEventListener('change', function() {
             const departmentId = this.value;
             
@@ -228,6 +237,75 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-});
+
+    // Guidelines Modal functionality
+    const guidelinesBtn = document.getElementById('guidelinesBtn');
+    const guidelinesModal = document.getElementById('guidelinesModal');
+    const closeModal = document.getElementById('closeModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+
+    console.log('Modal elements found:', {
+        guidelinesBtn: !!guidelinesBtn,
+        guidelinesModal: !!guidelinesModal,
+        closeModal: !!closeModal,
+        closeModalBtn: !!closeModalBtn
+    });
+
+    function openModal() {
+        console.log('Opening modal');
+        if (guidelinesModal) {
+            guidelinesModal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function closeModalFunc() {
+        console.log('Closing modal');
+        if (guidelinesModal) {
+            guidelinesModal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+    }
+
+    if (guidelinesBtn) {
+        guidelinesBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openModal();
+        });
+    }
+
+    if (closeModal) {
+        closeModal.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeModalFunc();
+        });
+    }
+
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeModalFunc();
+        });
+    }
+
+    // Close modal when clicking outside
+    if (guidelinesModal) {
+        guidelinesModal.addEventListener('click', function(e) {
+            if (e.target === guidelinesModal) {
+                closeModalFunc();
+            }
+        });
+    }
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && guidelinesModal && guidelinesModal.style.display === 'flex') {
+            closeModalFunc();
+        }
+    });
+})();
 </script>
 {% endblock %}
