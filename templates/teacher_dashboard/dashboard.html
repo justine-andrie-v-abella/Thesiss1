@@ -10,7 +10,7 @@ FILE: templates/teacher_dashboard/dashboard.html
 
 {% block content %}
 <!-- Stats Overview -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
     <!-- My Uploads Card -->
     <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
         <div class="p-6">
@@ -27,6 +27,26 @@ FILE: templates/teacher_dashboard/dashboard.html
             <div class="flex items-center text-xs text-blue-700">
                 <i class="bi bi-upload mr-1"></i>
                 <span>Total uploaded files</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Downloads Card -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-download text-white text-3xl"></i>
+                </div>
+                <span class="text-xs font-semibold text-green-600 bg-green-100 px-3 py-1 rounded-full">DOWNLOADS</span>
+            </div>
+            <div class="text-4xl font-bold text-gray-800 mb-1">{{ total_downloads|default:0 }}</div>
+            <div class="text-sm text-gray-500 font-medium">Total Downloads</div>
+        </div>
+        <div class="bg-gradient-to-r from-green-50 to-green-100 px-6 py-3">
+            <div class="flex items-center text-xs text-green-700">
+                <i class="bi bi-arrow-down-circle mr-1"></i>
+                <span>By colleagues</span>
             </div>
         </div>
     </div>
@@ -55,22 +75,145 @@ FILE: templates/teacher_dashboard/dashboard.html
     <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
         <div class="p-6">
             <div class="flex items-center justify-between mb-4">
-                <div class="w-14 h-14 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center">
-                    <i class="bi bi-person-check text-white text-3xl"></i>
+                <div class="w-14 h-14 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-graph-up text-white text-3xl"></i>
                 </div>
-                <span class="text-xs font-semibold {% if teacher.is_active %}text-green-600 bg-green-100{% else %}text-red-600 bg-red-100{% endif %} px-3 py-1 rounded-full">
-                    {% if teacher.is_active %}ACTIVE{% else %}INACTIVE{% endif %}
-                </span>
+                <span class="text-xs font-semibold text-orange-600 bg-orange-100 px-3 py-1 rounded-full">THIS MONTH</span>
             </div>
-            <div class="text-3xl font-bold {% if teacher.is_active %}text-green-600{% else %}text-red-600{% endif %} mb-1">
-                {% if teacher.is_active %}Active{% else %}Inactive{% endif %}
-            </div>
-            <div class="text-sm text-gray-500 font-medium">Account Status</div>
+            <div class="text-4xl font-bold text-gray-800 mb-1">{{ uploads_this_month|default:0 }}</div>
+            <div class="text-sm text-gray-500 font-medium">New Uploads</div>
         </div>
-        <div class="bg-gradient-to-r {% if teacher.is_active %}from-green-50 to-green-100{% else %}from-red-50 to-red-100{% endif %} px-6 py-3">
-            <div class="flex items-center text-xs {% if teacher.is_active %}text-green-700{% else %}text-red-700{% endif %}">
-                <i class="bi bi-shield-check mr-1"></i>
-                <span>Your account is {% if teacher.is_active %}active{% else %}inactive{% endif %}</span>
+        <div class="bg-gradient-to-r from-orange-50 to-orange-100 px-6 py-3">
+            <div class="flex items-center text-xs text-orange-700">
+                <i class="bi bi-calendar-event mr-1"></i>
+                <span>Current month activity</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Analytics & Recent Activity Row -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+    <!-- Analytics Card - Takes 2 columns -->
+    <div class="lg:col-span-2 bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-bar-chart-line text-2xl mr-3"></i>
+                Analytics & Insights
+            </h2>
+        </div>
+        <div class="p-6">
+            <!-- Upload Trend Chart -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                    <i class="bi bi-graph-up text-indigo-500 mr-2"></i>
+                    Upload Activity (Last 6 Months)
+                </h3>
+                <div class="h-48 flex items-end justify-between space-x-2">
+                    {% for month in upload_stats %}
+                    <div class="flex-1 flex flex-col items-center">
+                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg hover:from-indigo-600 hover:to-indigo-500 transition-all cursor-pointer relative group" 
+                             style="height: {{ month.percentage }}%;">
+                            <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                {{ month.count }} upload{{ month.count|pluralize }}
+                            </div>
+                        </div>
+                        <span class="text-xs text-gray-600 mt-2 font-medium">{{ month.label }}</span>
+                    </div>
+                    {% empty %}
+                    <div class="flex-1 flex flex-col items-center">
+                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 20%;"></div>
+                        <span class="text-xs text-gray-600 mt-2">Jan</span>
+                    </div>
+                    <div class="flex-1 flex flex-col items-center">
+                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 40%;"></div>
+                        <span class="text-xs text-gray-600 mt-2">Feb</span>
+                    </div>
+                    <div class="flex-1 flex flex-col items-center">
+                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 60%;"></div>
+                        <span class="text-xs text-gray-600 mt-2">Mar</span>
+                    </div>
+                    <div class="flex-1 flex flex-col items-center">
+                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 35%;"></div>
+                        <span class="text-xs text-gray-600 mt-2">Apr</span>
+                    </div>
+                    <div class="flex-1 flex flex-col items-center">
+                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 80%;"></div>
+                        <span class="text-xs text-gray-600 mt-2">May</span>
+                    </div>
+                    <div class="flex-1 flex flex-col items-center">
+                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 50%;"></div>
+                        <span class="text-xs text-gray-600 mt-2">Jun</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Top Performing Files -->
+            <div class="border-t border-gray-200 pt-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                    <i class="bi bi-trophy text-yellow-500 mr-2"></i>
+                    Most Downloaded Questionnaires
+                </h3>
+                <div class="space-y-3">
+                    {% for quest in top_downloads %}
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div class="flex items-center flex-1 min-w-0">
+                            <div class="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                                <span class="text-white font-bold text-sm">{{ forloop.counter }}</span>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold text-gray-800 truncate">{{ quest.title }}</p>
+                                <p class="text-xs text-gray-500">{{ quest.subject.code }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center ml-4">
+                            <i class="bi bi-download text-green-500 mr-2"></i>
+                            <span class="font-bold text-gray-700">{{ quest.download_count|default:0 }}</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="bi bi-inbox text-4xl mb-2"></i>
+                        <p>No download data available yet</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity Feed - Takes 1 column -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-pink-500 to-rose-600 px-6 py-4">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-activity text-2xl mr-3"></i>
+                Recent Activity
+            </h2>
+        </div>
+        <div class="p-6 max-h-[600px] overflow-y-auto">
+            <div class="space-y-4">
+                {% for activity in recent_activities %}
+                <div class="flex items-start pb-4 border-b border-gray-200 last:border-0">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center mr-3 flex-shrink-0
+                        {% if activity.type == 'upload' %}bg-blue-100{% elif activity.type == 'download' %}bg-green-100{% else %}bg-purple-100{% endif %}">
+                        <i class="bi 
+                            {% if activity.type == 'upload' %}bi-upload text-blue-600
+                            {% elif activity.type == 'download' %}bi-download text-green-600
+                            {% else %}bi-bell text-purple-600{% endif %}">
+                        </i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-gray-800 font-medium">{{ activity.message }}</p>
+                        <p class="text-xs text-gray-500 mt-1">{{ activity.timestamp|timesince }} ago</p>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-8 text-gray-500">
+                    <i class="bi bi-clock-history text-4xl mb-2"></i>
+                    <p>No recent activity</p>
+                </div>
+                {% endfor %}
             </div>
         </div>
     </div>
@@ -199,6 +342,25 @@ FILE: templates/teacher_dashboard/dashboard.html
     .group:hover .bi-file-person,
     .group:hover .bi-search {
         animation: float 2s ease-in-out infinite;
+    }
+
+    /* Custom scrollbar for activity feed */
+    .overflow-y-auto::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .overflow-y-auto::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    
+    .overflow-y-auto::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+    }
+    
+    .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
     }
 </style>
 {% endblock %}

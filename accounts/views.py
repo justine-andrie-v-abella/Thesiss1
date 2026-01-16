@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Q, Count
 from .models import ActivityLog, TeacherProfile, Department, Subject
 from .forms import TeacherCreationForm, TeacherEditForm, DepartmentForm, SubjectForm
 from django.http import JsonResponse
@@ -494,13 +494,156 @@ def teacher_dashboard(request):
         return redirect('accounts:admin_dashboard')
     
     teacher = get_object_or_404(TeacherProfile, user=request.user)
+    
+    # Import here to avoid circular imports
+    from questionnaires.models import Questionnaire, Download
+    
+    # Basic stats
     my_uploads = teacher.questionnaires.count()
+    
+    # Calculate total downloads of teacher's questionnaires
+    total_downloads = Download.objects.filter(
+        questionnaire__uploader=teacher
+    ).count()
+    
+    # Calculate uploads this month
+    current_month = timezone.now().month
+    current_year = timezone.now().year
+    uploads_this_month = teacher.questionnaires.filter(
+        uploaded_at__month=current_month,
+        uploaded_at__year=current_year
+    ).count()
+    
+    # Get upload statistics for last 6 months
+    upload_stats = get_teacher_upload_stats(teacher)
+    
+    # Get top 3 most downloaded questionnaires
+    top_downloads = Questionnaire.objects.filter(
+        uploader=teacher
+    ).annotate(
+        download_count=Count('downloads')
+    ).order_by('-download_count')[:3]
+    
+    # Get recent activities (last 15)
+    recent_activities = get_teacher_recent_activities(teacher)[:15]
     
     context = {
         'teacher': teacher,
         'my_uploads': my_uploads,
+        'total_downloads': total_downloads,
+        'uploads_this_month': uploads_this_month,
+        'upload_stats': upload_stats,
+        'top_downloads': top_downloads,
+        'recent_activities': recent_activities,
     }
     return render(request, 'teacher_dashboard/dashboard.html', context)
+
+
+def get_teacher_upload_stats(teacher):
+    """
+    Get upload statistics for the last 6 months
+    Returns a list of dictionaries with month labels and upload counts
+    """
+    from questionnaires.models import Questionnaire
+    
+    stats = []
+    today = timezone.now()
+    
+    for i in range(5, -1, -1):  # Last 6 months
+        # Calculate the month and year
+        month_date = today - timedelta(days=30 * i)
+        month = month_date.month
+        year = month_date.year
+        
+        # Count uploads for this month
+        count = Questionnaire.objects.filter(
+            uploader=teacher,
+            uploaded_at__month=month,
+            uploaded_at__year=year
+        ).count()
+        
+        # Get month label (e.g., "Jan", "Feb")
+        month_label = month_date.strftime('%b')
+        
+        stats.append({
+            'label': month_label,
+            'count': count,
+            'percentage': 0  # Will calculate after getting all counts
+        })
+    
+    # Calculate percentages based on max count
+    max_count = max([s['count'] for s in stats]) if stats else 1
+    if max_count == 0:
+        max_count = 1  # Prevent division by zero
+    
+    for stat in stats:
+        stat['percentage'] = int((stat['count'] / max_count) * 100) if stat['count'] > 0 else 10
+    
+    return stats
+
+
+def get_teacher_recent_activities(teacher):
+    """
+    Get recent activities related to the teacher
+    Returns a list of activity dictionaries
+    """
+    from questionnaires.models import Questionnaire, Download
+    
+    activities = []
+    
+    # Get teacher's recent uploads (last 5)
+    recent_uploads = Questionnaire.objects.filter(
+        uploader=teacher
+    ).order_by('-uploaded_at')[:5]
+    
+    for quest in recent_uploads:
+        activities.append({
+            'type': 'upload',
+            'message': f'You uploaded "{quest.title}"',
+            'timestamp': quest.uploaded_at,
+        })
+    
+    # Get recent downloads of teacher's questionnaires (last 5)
+    recent_downloads = Download.objects.filter(
+        questionnaire__uploader=teacher
+    ).select_related('user', 'questionnaire').order_by('-downloaded_at')[:5]
+    
+    for download in recent_downloads:
+        # Handle case where user might be None or teacher themselves
+        if download.user:
+            if download.user == teacher.user:
+                downloader_name = "You"
+            else:
+                downloader_name = download.user.get_full_name()
+        else:
+            downloader_name = "Someone"
+        
+        # Only show if it's not the teacher downloading their own file
+        if download.user != teacher.user:
+            activities.append({
+                'type': 'download',
+                'message': f'{downloader_name} downloaded your "{download.questionnaire.title}"',
+                'timestamp': download.downloaded_at,
+            })
+    
+    # Get system activity logs related to the teacher (exclude login activities)
+    activity_logs = ActivityLog.objects.filter(
+        user=teacher.user
+    ).exclude(
+        activity_type='user_login'  # Exclude login activities from feed
+    ).order_by('-created_at')[:5]
+    
+    for log in activity_logs:
+        activities.append({
+            'type': 'system',
+            'message': log.description,
+            'timestamp': log.created_at,
+        })
+    
+    # Sort all activities by timestamp (most recent first)
+    activities.sort(key=lambda x: x['timestamp'], reverse=True)
+    
+    return activities
 
 @login_required
 @user_passes_test(is_admin)
