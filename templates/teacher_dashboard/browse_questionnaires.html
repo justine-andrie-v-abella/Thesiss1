@@ -177,7 +177,7 @@ FILE: templates/teacher_dashboard/browse_questionnaires.html
     <nav class="flex items-center space-x-2">
         {% if page_obj.has_previous %}
             <a 
-                href="?page={{ page_obj.previous_page_number }}&department={{ selected_department }}&subject={{ selected_subject }}&search={{ search_query }}"
+                href="?page={{ page_obj.previous_page_number }}{% if selected_department and selected_department != 'None' %}&department={{ selected_department }}{% endif %}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
                 class="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors font-semibold text-gray-700"
             >
                 <i class="bi bi-chevron-left"></i> Previous
@@ -191,7 +191,7 @@ FILE: templates/teacher_dashboard/browse_questionnaires.html
                 </span>
             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                 <a 
-                    href="?page={{ num }}&department={{ selected_department }}&subject={{ selected_subject }}&search={{ search_query }}"
+                    href="?page={{ num }}{% if selected_department and selected_department != 'None' %}&department={{ selected_department }}{% endif %}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
                     class="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors font-semibold text-gray-700"
                 >
                     {{ num }}
@@ -201,7 +201,7 @@ FILE: templates/teacher_dashboard/browse_questionnaires.html
         
         {% if page_obj.has_next %}
             <a 
-                href="?page={{ page_obj.next_page_number }}&department={{ selected_department }}&subject={{ selected_subject }}&search={{ search_query }}"
+                href="?page={{ page_obj.next_page_number }}{% if selected_department and selected_department != 'None' %}&department={{ selected_department }}{% endif %}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
                 class="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors font-semibold text-gray-700"
             >
                 Next <i class="bi bi-chevron-right"></i>
