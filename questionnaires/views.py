@@ -13,6 +13,23 @@ from .models import Questionnaire, ExtractedQuestion, QuestionType
 from .forms import QuestionnaireUploadForm, QuestionnaireEditForm, QuestionnaireFilterForm
 from accounts.models import TeacherProfile, Department, Subject, ActivityLog  # ← ADDED ActivityLog
 from .services import QuestionnaireExtractor
+from django.conf import settings
+
+def get_extractor():
+    """Get the appropriate AI extractor based on available API keys"""
+    
+    # Try Gemini first (best free option)
+    if hasattr(settings, 'GEMINI_API_KEY') and settings.GEMINI_API_KEY:
+        from .services.gemini_extraction_service import GeminiQuestionnaireExtractor
+        return GeminiQuestionnaireExtractor()
+    
+    # Fallback to Anthropic if available
+    elif hasattr(settings, 'ANTHROPIC_API_KEY') and settings.ANTHROPIC_API_KEY:
+        from .services.extraction_service import QuestionnaireExtractor
+        return QuestionnaireExtractor()
+    
+    else:
+        raise ValueError("No AI API key configured. Please add GEMINI_API_KEY to your .env file.")
 
 def is_admin(user):
     return user.is_authenticated and user.is_staff
@@ -103,7 +120,7 @@ def generate_questionnaire(request):
                 type_names = [qt.name for qt in question_types]
                 
                 # Extract questions using AI
-                extractor = QuestionnaireExtractor()
+                extractor = get_extractor()
                 created_questions = extractor.process_questionnaire(
                     questionnaire, 
                     type_names
@@ -261,7 +278,7 @@ def retry_extraction(request, pk):
             type_names = [qt.name for qt in question_types]
             
             # Extract questions
-            extractor = QuestionnaireExtractor()
+            extractor = get_extractor()
             created_questions = extractor.process_questionnaire(questionnaire, type_names)
             
             questionnaire.extraction_status = 'completed'

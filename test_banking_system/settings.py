@@ -87,6 +87,9 @@ LOGOUT_REDIRECT_URL = 'home'
 # Anthropic API Configuration (reads from .env file)
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 
+# Google Gemini API Configuration (FREE)
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB

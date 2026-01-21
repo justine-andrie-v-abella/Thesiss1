@@ -4,7 +4,7 @@ print("\n" + "="*60)
 print("Testing .env Configuration")
 print("="*60)
 
-api_key = config('ANTHROPIC_API_KEY', default='')
+api_key = config('GEMINI_API_KEY', default='')
 secret_key = config('SECRET_KEY', default='')
 debug = config('DEBUG', default=True, cast=bool)
 
