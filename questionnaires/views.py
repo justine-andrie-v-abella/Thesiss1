@@ -39,42 +39,76 @@ def is_teacher(user):
 
 @login_required
 def upload_questionnaire(request):
-    """Upload module/questionnaire WITHOUT AI extraction"""
+    """Upload file and auto-extract questions with AI in one step"""
     if request.user.is_staff:
         messages.error(request, 'Admins cannot upload questionnaires')
         return redirect('accounts:admin_dashboard')
-    
+
     teacher = get_object_or_404(TeacherProfile, user=request.user)
-    
+
     if request.method == 'POST':
         form = QuestionnaireUploadForm(request.POST, request.FILES, user=request.user)
-        
+
         if form.is_valid():
             questionnaire = form.save(commit=False)
             questionnaire.uploader = teacher
             questionnaire.save()
-            
-            # ============================================================================
-            # ADD ACTIVITY LOG FOR QUESTIONNAIRE UPLOAD
-            # ============================================================================
+
             ActivityLog.objects.create(
                 activity_type='questionnaire_uploaded',
                 user=request.user,
                 description=f'You uploaded "{questionnaire.title}" for {questionnaire.subject.code}'
             )
-            # ============================================================================
-            
-            messages.success(request, 'Module uploaded successfully!')
-            return redirect('questionnaires:my_uploads')
+
+            # Always run AI extraction — extract ALL active question types
+            try:
+                questionnaire.extraction_status = 'processing'
+                questionnaire.save()
+
+                type_names = list(
+                    QuestionType.objects.filter(is_active=True).values_list('name', flat=True)
+                )
+
+                extractor = get_extractor()
+                created_questions = extractor.process_questionnaire(questionnaire, type_names, mode='extract')
+
+                questionnaire.extraction_status = 'completed'
+                questionnaire.is_extracted = True
+                questionnaire.save()
+
+                ActivityLog.objects.create(
+                    activity_type='questions_extracted',
+                    user=request.user,
+                    description=f'Extracted {len(created_questions)} questions from "{questionnaire.title}"'
+                )
+
+                messages.success(
+                    request,
+                    f'Extracted {len(created_questions)} questions! Now select the ones you want to keep.'
+                )
+
+                # Go straight to the review/select page
+                return redirect('questionnaires:review_extracted', pk=questionnaire.pk)
+
+            except Exception as e:
+                questionnaire.extraction_status = 'failed'
+                questionnaire.extraction_error = str(e)
+                questionnaire.save()
+
+                ActivityLog.objects.create(
+                    activity_type='extraction_failed',
+                    user=request.user,
+                    description=f'Extraction failed for "{questionnaire.title}"'
+                )
+
+                messages.error(request, f'AI extraction failed: {str(e)}. Please try again.')
+                return render(request, 'teacher_dashboard/upload_questionnaire.html', {'form': form})
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
         form = QuestionnaireUploadForm(user=request.user)
-    
-    return render(request, 'teacher_dashboard/upload_questionnaire.html', {
-        'form': form
-    })
 
+    return render(request, 'teacher_dashboard/upload_questionnaire.html', {'form': form})
 
 @login_required
 def generate_questionnaire(request):
@@ -82,100 +116,85 @@ def generate_questionnaire(request):
     if request.user.is_staff:
         messages.error(request, 'Admins cannot generate questionnaires')
         return redirect('accounts:admin_dashboard')
-    
+
     teacher = get_object_or_404(TeacherProfile, user=request.user)
-    
+
     if request.method == 'POST':
         form = QuestionnaireUploadForm(request.POST, request.FILES, user=request.user)
-        
+
         if form.is_valid():
             questionnaire = form.save(commit=False)
             questionnaire.uploader = teacher
             questionnaire.save()
-            
-            # ============================================================================
-            # ADD ACTIVITY LOG FOR QUESTIONNAIRE UPLOAD
-            # ============================================================================
+
             ActivityLog.objects.create(
                 activity_type='questionnaire_uploaded',
                 user=request.user,
-                description=f'You uploaded "{questionnaire.title}" for AI generation'
+                description=f'You uploaded "{questionnaire.title}" for AI extraction'
             )
-            # ============================================================================
-            
-            # Get selected question types (required for generation)
-            question_types = form.cleaned_data.get('question_types')
-            
-            if not question_types:
-                messages.error(request, 'Please select at least one question type.')
-                return render(request, 'teacher_dashboard/generate_questionnaire.html', {
-                    'form': form
-                })
-            
+
             try:
                 questionnaire.extraction_status = 'processing'
                 questionnaire.save()
-                
-                # Get selected question types
-                type_names = [qt.name for qt in question_types]
-                
+
+                # Use selected question types if provided, otherwise extract ALL active types
+                question_types = form.cleaned_data.get('question_types')
+                if question_types:
+                    type_names = [qt.name for qt in question_types]
+                else:
+                    type_names = list(
+                        QuestionType.objects.filter(is_active=True).values_list('name', flat=True)
+                    )
+
                 # Extract questions using AI
                 extractor = get_extractor()
                 created_questions = extractor.process_questionnaire(
-                    questionnaire, 
+                    questionnaire,
                     type_names
                 )
-                
+
                 questionnaire.extraction_status = 'completed'
                 questionnaire.is_extracted = True
                 questionnaire.save()
-                
-                # ============================================================================
-                # ADD ACTIVITY LOG FOR SUCCESSFUL EXTRACTION
-                # ============================================================================
+
                 ActivityLog.objects.create(
                     activity_type='questions_extracted',
                     user=request.user,
                     description=f'Successfully extracted {len(created_questions)} questions from "{questionnaire.title}"'
                 )
-                # ============================================================================
-                
+
                 messages.success(
-                    request, 
-                    f'Successfully generated {len(created_questions)} questions using AI!'
+                    request,
+                    f'Successfully extracted {len(created_questions)} questions!'
                 )
-                
-                # Redirect to review extracted questions
+
                 return redirect('questionnaires:review_extracted', pk=questionnaire.pk)
-            
+
             except Exception as e:
                 questionnaire.extraction_status = 'failed'
                 questionnaire.extraction_error = str(e)
                 questionnaire.save()
-                
-                # ============================================================================
-                # ADD ACTIVITY LOG FOR FAILED EXTRACTION
-                # ============================================================================
+
                 ActivityLog.objects.create(
                     activity_type='extraction_failed',
                     user=request.user,
-                    description=f'Question generation failed for "{questionnaire.title}"'
+                    description=f'Question extraction failed for "{questionnaire.title}"'
                 )
-                # ============================================================================
-                
+
                 messages.error(
                     request,
-                    f'AI generation failed: {str(e)}. Please try again or contact support.'
+                    f'AI extraction failed: {str(e)}. Please try again.'
                 )
-                return render(request, 'teacher_dashboard/generate_questionnaire.html', {
+                return render(request, 'teacher_dashboard/upload_questionnaire.html', {
                     'form': form
                 })
         else:
             messages.error(request, 'Please correct the errors below.')
+
     else:
         form = QuestionnaireUploadForm(user=request.user)
-    
-    return render(request, 'teacher_dashboard/generate_questionnaire.html', {
+
+    return render(request, 'teacher_dashboard/upload_questionnaire.html', {
         'form': form
     })
 
@@ -183,7 +202,7 @@ def generate_questionnaire(request):
 def review_extracted_questions(request, pk):
     """Review and edit extracted questions before finalizing"""
     questionnaire = get_object_or_404(Questionnaire, pk=pk)
-    
+
     # Check permissions
     if request.user.is_staff:
         can_view = True
@@ -191,53 +210,85 @@ def review_extracted_questions(request, pk):
         can_view = questionnaire.uploader == request.user.teacher_profile
     else:
         can_view = False
-    
+
     if not can_view:
         messages.error(request, 'You do not have permission to view this.')
         return redirect('questionnaires:browse_questionnaires')
-    
+
     extracted_questions = questionnaire.extracted_questions.select_related('question_type').all()
-    
+
     if request.method == 'POST':
         action = request.POST.get('action')
-        
-        if action == 'approve_all':
-            extracted_questions.update(is_approved=True)
-            
-            # ============================================================================
-            # ADD ACTIVITY LOG FOR APPROVING QUESTIONS
-            # ============================================================================
+
+        # ── Save only the selected questions ─────────────────────────────────
+        if action == 'save_selected':
+            selected_ids = request.POST.getlist('selected_questions')
+
+            if not selected_ids:
+                messages.error(request, 'Please select at least one question.')
+                return redirect('questionnaires:review_extracted', pk=pk)
+
+            # Mark selected as approved, deselect the rest
+            extracted_questions.filter(id__in=selected_ids).update(is_approved=True)
+            extracted_questions.exclude(id__in=selected_ids).update(is_approved=False)
+
+            # Update questionnaire title if changed
+            final_title = request.POST.get('final_title', '').strip()
+            if final_title:
+                questionnaire.title = final_title
+                questionnaire.save()
+
             ActivityLog.objects.create(
                 activity_type='questions_approved',
                 user=request.user,
-                description=f'Approved {extracted_questions.count()} questions for "{questionnaire.title}"'
+                description=f'Saved {len(selected_ids)} selected questions for "{questionnaire.title}"'
             )
-            # ============================================================================
-            
-            messages.success(request, 'All questions approved!')
+
+            # Check if user also wants to download
+            download_format = request.POST.get('download_format', 'none')
+
+            if download_format != 'none':
+                from django.urls import reverse
+                download_url = reverse('questionnaires:download_questionnaire', args=[questionnaire.pk])
+                return redirect(f"{download_url}?type=generated&format={download_format}")
+
+            messages.success(request, f'Saved {len(selected_ids)} question(s) successfully!')
             return redirect('questionnaires:my_uploads')
-        
+
+        # ── Delete a single question ──────────────────────────────────────────
         elif action == 'delete_question':
             question_id = request.POST.get('question_id')
             ExtractedQuestion.objects.filter(id=question_id, questionnaire=questionnaire).delete()
             messages.info(request, 'Question deleted.')
             return redirect('questionnaires:review_extracted', pk=pk)
-        
+
+        # ── Approve all ───────────────────────────────────────────────────────
+        elif action == 'approve_all':
+            extracted_questions.update(is_approved=True)
+            ActivityLog.objects.create(
+                activity_type='questions_approved',
+                user=request.user,
+                description=f'Approved all {extracted_questions.count()} questions for "{questionnaire.title}"'
+            )
+            messages.success(request, 'All questions approved!')
+            return redirect('questionnaires:my_uploads')
+
         elif action == 'retry_extraction':
-            # Allow retry extraction
             return redirect('questionnaires:retry_extraction', pk=pk)
-    
-    # Calculate statistics
-    total_points = sum(q.points for q in extracted_questions)
-    question_types_count = extracted_questions.values('question_type').distinct().count()
-    
+
+    # Pass question_types for the filter dropdowns in the template
+    from .models import QuestionType
+    question_types = QuestionType.objects.filter(
+        id__in=extracted_questions.values_list('question_type', flat=True).distinct()
+    )
+
     context = {
-        'questionnaire': questionnaire,
-        'questions': extracted_questions,
-        'total_points': total_points,
-        'question_types_count': question_types_count,
+        'questionnaire':  questionnaire,
+        'questions':      extracted_questions,
+        'question_types': question_types,
+        'total_points':   sum(q.points for q in extracted_questions),
     }
-    
+
     return render(request, 'teacher_dashboard/review_extracted.html', context)
 
 
@@ -570,3 +621,135 @@ def get_subjects_ajax(request):
         return JsonResponse({'subjects': list(subjects)})
     
     return JsonResponse({'subjects': []})
+
+@login_required
+def get_questions_json(request, pk):
+    """
+    Returns extracted questions as JSON for the browse page review modal.
+    Read-only — does NOT save any changes.
+    """
+    questionnaire = get_object_or_404(Questionnaire, pk=pk)
+
+    questions_data = []
+    for q in questionnaire.extracted_questions.select_related('question_type').order_by('created_at'):
+        question_dict = {
+            'id':             q.id,
+            'question_text':  q.question_text,
+            'type':           q.question_type.name,
+            'type_display':   q.question_type.get_name_display(),
+            'difficulty':     q.difficulty,
+            'points':         q.points,
+            'correct_answer': q.correct_answer,
+            'explanation':    q.explanation or '',
+        }
+        if q.question_type.name == 'multiple_choice':
+            question_dict['options'] = [
+                q.option_a or '',
+                q.option_b or '',
+                q.option_c or '',
+                q.option_d or '',
+            ]
+        questions_data.append(question_dict)
+
+    return JsonResponse({
+        'questionnaire_id':    questionnaire.pk,
+        'questionnaire_title': questionnaire.title,
+        'total':               len(questions_data),
+        'questions':           questions_data,
+    })
+
+
+# ============================================================================
+# ALSO REPLACE your existing download_questionnaire with this version
+# so the browse page review modal's ?questions= param works correctly.
+# All existing behaviour (original file, BISU format) is unchanged.
+# ============================================================================
+
+@login_required
+def download_questionnaire(request, pk):
+    from .models import Download
+    from .generators import generate_bisu_questionnaire
+    import os
+
+    questionnaire = get_object_or_404(Questionnaire, pk=pk)
+
+    # Track download record (unchanged)
+    Download.objects.create(
+        questionnaire=questionnaire,
+        user=request.user if request.user.is_authenticated else None,
+        ip_address=get_client_ip(request)
+    )
+
+    # Activity log for other teachers downloading your file (unchanged)
+    if hasattr(request.user, 'teacher_profile'):
+        if questionnaire.uploader != request.user.teacher_profile:
+            ActivityLog.objects.create(
+                activity_type='questionnaire_downloaded',
+                user=questionnaire.uploader.user,
+                description=f'{request.user.get_full_name()} downloaded your "{questionnaire.title}"'
+            )
+
+    download_type = request.GET.get('type', 'original')
+
+    # ── Original file (default, existing behaviour) ──────────────────────────
+    if download_type == 'original':
+        try:
+            return FileResponse(
+                questionnaire.file.open('rb'),
+                as_attachment=True,
+                filename=questionnaire.file.name.split('/')[-1]
+            )
+        except FileNotFoundError:
+            raise Http404("File not found")
+
+    # ── BISU-formatted generated file ────────────────────────────────────────
+    elif download_type == 'generated':
+
+        # Optional: specific question IDs from browse page review modal
+        question_ids_param = request.GET.get('questions', '')
+
+        if question_ids_param:
+            # Browse modal sent specific IDs — use only those
+            try:
+                question_ids = [int(i) for i in question_ids_param.split(',') if i.strip().isdigit()]
+                selected_questions = questionnaire.extracted_questions.filter(
+                    id__in=question_ids
+                ).select_related('question_type').order_by('question_type__name', 'created_at')
+            except (ValueError, TypeError):
+                selected_questions = questionnaire.extracted_questions.filter(
+                    is_approved=True
+                ).select_related('question_type').order_by('question_type__name', 'created_at')
+        else:
+            # No IDs — use all approved questions (my_uploads dropdown default path)
+            selected_questions = questionnaire.extracted_questions.filter(
+                is_approved=True
+            ).select_related('question_type').order_by('question_type__name', 'created_at')
+
+        if not selected_questions.exists():
+            messages.warning(request, 'No questions available to generate the document.')
+            return redirect('questionnaires:review_extracted', pk=pk)
+
+        try:
+            file_format = request.GET.get('format', 'docx').lower()
+            docx_path, pdf_path = generate_bisu_questionnaire(questionnaire, selected_questions)
+
+            if file_format == 'pdf' and pdf_path and os.path.exists(pdf_path):
+                filepath     = pdf_path
+                content_type = 'application/pdf'
+                filename     = os.path.basename(pdf_path)
+            else:
+                filepath     = docx_path
+                content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                filename     = os.path.basename(docx_path)
+
+            file_handle = open(filepath, 'rb')
+            response    = FileResponse(file_handle, content_type=content_type)
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+
+        except Exception as e:
+            messages.error(request, f'Failed to generate questionnaire: {str(e)}')
+            return redirect('questionnaires:review_extracted', pk=pk)
+
+    else:
+        raise Http404("Invalid download type")

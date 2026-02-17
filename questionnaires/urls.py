@@ -17,22 +17,12 @@ urlpatterns = [
     path('edit/<int:pk>/', views.edit_questionnaire, name='edit_questionnaire'),
     path('delete/<int:pk>/', views.delete_questionnaire, name='delete_questionnaire'),
     path('download/<int:pk>/', views.download_questionnaire, name='download_questionnaire'),
-    
+
     # AI Extraction
     path('review-extracted/<int:pk>/', views.review_extracted_questions, name='review_extracted'),
     path('retry-extraction/<int:pk>/', views.retry_extraction, name='retry_extraction'),
-    
+
     # AJAX
     path('get-subjects/', views.get_subjects_ajax, name='get_subjects'),
-    
-    # Download questionnaire
-    path('download/<int:pk>/', views.download_questionnaire, name='download_questionnaire'),
-    
-    # Preview questionnaire (optional)
-    path('preview/<int:pk>/', views.preview_questionnaire, name='preview_questionnaire'),
-    
     path('get-questions/<int:pk>/', views.get_questions_json, name='get_questions_json'),
-    path('download/<int:pk>/', views.download_questionnaire, name='download_questionnaire'),
-
-
 ]

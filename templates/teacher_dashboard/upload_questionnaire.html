@@ -2,13 +2,14 @@
 
 {% block title %}Upload Questionnaire - Teacher{% endblock %}
 {% block header_title %}Upload Questionnaire{% endblock %}
-{% block header_subtitle %}Upload materials and auto-extract questions with AI{% endblock %}
+{% block header_subtitle %}Upload your material and AI will extract selectable questions{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
 
-    <!-- STEP 1: Upload Form (shown by default) -->
-    <div id="step1" class="bg-white rounded-xl shadow-lg overflow-hidden">
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+
+        <!-- Header -->
         <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex items-center justify-between">
             <h2 class="text-xl font-bold text-white flex items-center">
                 <i class="bi bi-cloud-upload text-2xl mr-3"></i>
@@ -32,7 +33,8 @@
         </div>
 
         <div class="p-8">
-            <form method="post" enctype="multipart/form-data" class="space-y-6" id="uploadForm">
+            <form method="post" enctype="multipart/form-data" class="space-y-6" id="uploadForm"
+                  action="{% url 'questionnaires:upload_questionnaire' %}">
                 {% csrf_token %}
 
                 <!-- Title -->
@@ -86,9 +88,9 @@
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         <i class="bi bi-file-earmark-arrow-up text-green-500 mr-1"></i> File *
                     </label>
-                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors" id="dropZone">
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer" id="dropZone">
                         <i class="bi bi-cloud-upload text-5xl text-gray-400 mb-3 block" id="fileIcon"></i>
-                        <p id="fileName" class="text-sm text-gray-500 mb-2">No file selected</p>
+                        <p id="fileName" class="text-sm text-gray-500 mb-2">Click to browse or drag & drop your file here</p>
                         <input type="file" name="file" id="id_file"
                             class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                             required accept=".pdf,.docx,.doc,.xlsx,.xls,.txt">
@@ -98,119 +100,24 @@
                     {% endif %}
                     <p class="text-xs text-gray-500 mt-2">
                         <i class="bi bi-info-circle mr-1"></i>
-                        Allowed formats: PDF, DOCX, XLSX, XLS, TXT (Max 10MB)
+                        Allowed: PDF, DOCX, XLSX, XLS, TXT &nbsp;·&nbsp; Max 10MB
                     </p>
                 </div>
 
-                <!-- AI Extraction Options -->
-                <div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 border-2 border-purple-200">
-                    <div class="flex items-center mb-5">
-                        <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center mr-3 shadow">
-                            <i class="bi bi-robot text-white text-2xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-800">AI-Powered Question Extraction</h3>
-                            <p class="text-sm text-gray-600">AI will extract all question types from your content automatically</p>
-                        </div>
+                <!-- What happens next — info box -->
+                <div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-5 border-2 border-purple-200 flex items-start gap-4">
+                    <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow">
+                        <i class="bi bi-robot text-white text-2xl"></i>
                     </div>
-
-                    <!-- Question Type Filter (Optional) -->
-                    <div class="mb-5">
-                        <div class="flex items-center justify-between mb-2">
-                            <label class="text-sm font-semibold text-gray-700">
-                                <i class="bi bi-funnel text-purple-500 mr-1"></i>
-                                Filter Question Types
-                                <span class="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">Optional</span>
-                            </label>
-                            <button type="button" id="toggleTypeFilter"
-                                class="text-xs text-purple-600 hover:text-purple-800 font-medium underline">
-                                Show filters
-                            </button>
-                        </div>
-                        <p class="text-xs text-gray-500 mb-3">
-                            By default, AI extracts <strong>all question types</strong>. You can optionally filter to specific types only.
+                    <div>
+                        <h3 class="text-base font-bold text-gray-800 mb-1">What happens after upload?</h3>
+                        <p class="text-sm text-gray-600">
+                            AI will automatically extract all questions from your file.
+                            You'll then be taken to a <strong>review page</strong> where you can
+                            <strong>select which questions to keep</strong> before saving.
                         </p>
-
-                        <!-- Type filter checkboxes (hidden by default) -->
-                        <div id="typeFilterContainer" style="display:none;">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {% for question_type in form.question_types %}
-                                    <label class="flex items-center p-3 bg-white rounded-lg border-2 border-gray-200 hover:border-purple-400 cursor-pointer transition-all">
-                                        {{ question_type.tag }}
-                                        <span class="ml-3 text-sm font-medium text-gray-700">{{ question_type.choice_label }}</span>
-                                    </label>
-                                {% endfor %}
-                            </div>
-                            <p class="text-xs text-gray-500 mt-2">
-                                <i class="bi bi-info-circle mr-1"></i>
-                                If none selected, all question types will be extracted.
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- AI Selection Mode -->
-                    <div class="border-t border-purple-200 pt-5">
-                        <label class="text-sm font-semibold text-gray-700 mb-3 block">
-                            <i class="bi bi-stars text-purple-500 mr-1"></i>
-                            After Extraction, How Would You Like to Select Questions?
-                        </label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-
-                            <!-- Manual Selection (Default) -->
-                            <label class="flex items-start p-4 bg-white rounded-lg border-2 border-blue-400 cursor-pointer transition-all hover:border-blue-500" id="manualLabel">
-                                <input type="radio" name="selection_mode" value="manual" checked
-                                    class="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500"
-                                    onchange="toggleSelectionMode(this)">
-                                <div class="ml-3">
-                                    <span class="text-sm font-semibold text-gray-800 block">
-                                        <i class="bi bi-hand-index text-blue-500 mr-1"></i> I'll Choose Manually
-                                    </span>
-                                    <span class="text-xs text-gray-500 mt-1 block">
-                                        Review all extracted questions and pick the ones you want to keep.
-                                    </span>
-                                    <span class="mt-1 inline-block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">Default</span>
-                                </div>
-                            </label>
-
-                            <!-- AI Pick -->
-                            <label class="flex items-start p-4 bg-white rounded-lg border-2 border-gray-200 cursor-pointer transition-all hover:border-purple-400" id="aiLabel">
-                                <input type="radio" name="selection_mode" value="ai_pick"
-                                    class="mt-1 w-4 h-4 text-purple-600 focus:ring-purple-500"
-                                    onchange="toggleSelectionMode(this)">
-                                <div class="ml-3">
-                                    <span class="text-sm font-semibold text-gray-800 block">
-                                        <i class="bi bi-magic text-purple-500 mr-1"></i> Let AI Pick for Me
-                                    </span>
-                                    <span class="text-xs text-gray-500 mt-1 block">
-                                        AI will randomly select the best questions for you.
-                                    </span>
-                                    <span class="mt-1 inline-block px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">Optional</span>
-                                </div>
-                            </label>
-                        </div>
-
-                        <!-- AI Pick Options (hidden by default) -->
-                        <div id="aiPickOptions" style="display:none;" class="mt-4 bg-purple-50 rounded-lg p-4 border border-purple-200">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="bi bi-hash text-purple-500 mr-1"></i>
-                                How many questions should AI pick?
-                            </label>
-                            <div class="flex items-center gap-4">
-                                <input type="number" name="ai_pick_count" id="ai_pick_count"
-                                    value="10" min="1" max="50"
-                                    class="w-32 px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 text-center font-bold text-lg">
-                                <span class="text-sm text-gray-600">questions (max 50)</span>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-2">
-                                <i class="bi bi-shuffle text-purple-500 mr-1"></i>
-                                AI will pick a balanced mix across difficulty levels and question types.
-                            </p>
-                        </div>
                     </div>
                 </div>
-
-                <!-- Hidden field to pass selection mode -->
-                <input type="hidden" name="auto_extract" value="true">
 
                 {% if form.non_field_errors %}
                     <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
@@ -220,11 +127,12 @@
                     </div>
                 {% endif %}
 
-                <!-- Submit Button -->
-                <div class="flex space-x-3 pt-4">
+                <!-- Submit -->
+                <div class="flex space-x-3 pt-2">
                     <button type="submit" id="submitBtn"
                         class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg flex items-center justify-center">
-                        <i class="bi bi-upload mr-2"></i> Upload & Extract Questions
+                        <i class="bi bi-upload mr-2" id="submitIcon"></i>
+                        <span id="submitText">Upload & Extract Questions</span>
                     </button>
                     <a href="{% url 'accounts:teacher_dashboard' %}"
                         class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center flex items-center justify-center">
@@ -245,8 +153,8 @@
                 <i class="bi bi-robot text-purple-600 text-2xl"></i>
             </div>
         </div>
-        <h3 class="text-xl font-bold text-gray-800 mb-2">AI is Working...</h3>
-        <p class="text-gray-500 text-sm mb-4">Analyzing your file and extracting questions. This may take a moment.</p>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">AI is Extracting Questions...</h3>
+        <p class="text-gray-500 text-sm mb-4">Analyzing your file. This may take a moment.</p>
         <div class="flex items-center justify-center gap-1">
             <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
             <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay:0.15s"></div>
@@ -277,15 +185,11 @@
                 </li>
                 <li class="flex items-start">
                     <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
-                    <span><strong>Step 2:</strong> AI extracts questions - review and select the ones you want</span>
+                    <span><strong>Step 2:</strong> AI extracts all questions — review and select which ones to keep</span>
                 </li>
                 <li class="flex items-start">
                     <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
-                    <span><strong>Step 3:</strong> Save & download your final questionnaire file</span>
-                </li>
-                <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
-                    <span>Select multiple question types for variety</span>
+                    <span><strong>Step 3:</strong> Save your selection & download as BISU format</span>
                 </li>
                 <li class="flex items-start">
                     <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
@@ -303,105 +207,76 @@
 </div>
 
 <script>
-(function() {
+(function () {
+
     // Department/Subject AJAX
-    const deptSelect = document.getElementById('id_department');
-    const subjSelect = document.getElementById('id_subject');
+    var deptSelect = document.getElementById('id_department');
+    var subjSelect = document.getElementById('id_subject');
     if (deptSelect && subjSelect) {
         deptSelect.className = 'w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors';
         subjSelect.className = 'w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors';
-        deptSelect.addEventListener('change', function() {
-            const id = this.value;
+        deptSelect.addEventListener('change', function () {
+            var id = this.value;
+            subjSelect.innerHTML = '<option value="">Select Subject</option>';
             if (id) {
-                fetch(`/questionnaires/get-subjects/?department=${id}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        subjSelect.innerHTML = '<option value="">Select Subject</option>';
-                        data.subjects.forEach(s => {
-                            const o = document.createElement('option');
+                fetch('/questionnaires/get-subjects/?department=' + id)
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        data.subjects.forEach(function (s) {
+                            var o = document.createElement('option');
                             o.value = s.id;
-                            o.textContent = `${s.code} - ${s.name}`;
+                            o.textContent = s.code + ' - ' + s.name;
                             subjSelect.appendChild(o);
                         });
                     });
-            } else {
-                subjSelect.innerHTML = '<option value="">Select Subject</option>';
             }
         });
     }
 
     // File name preview
-    const fileInput = document.getElementById('id_file');
-    const fileNameEl = document.getElementById('fileName');
-    if (fileInput && fileNameEl) {
-        fileInput.addEventListener('change', function() {
+    var fileInput  = document.getElementById('id_file');
+    var fileNameEl = document.getElementById('fileName');
+    var fileIcon   = document.getElementById('fileIcon');
+    if (fileInput) {
+        fileInput.addEventListener('change', function () {
             if (this.files.length > 0) {
                 fileNameEl.textContent = this.files[0].name;
-                fileNameEl.className = 'text-sm text-blue-600 font-medium mb-2';
-                document.getElementById('fileIcon').className = 'bi bi-file-earmark-check text-5xl text-green-500 mb-3 block';
+                fileNameEl.className   = 'text-sm text-blue-600 font-medium mb-2';
+                fileIcon.className     = 'bi bi-file-earmark-check text-5xl text-green-500 mb-3 block';
             } else {
-                fileNameEl.textContent = 'No file selected';
-                fileNameEl.className = 'text-sm text-gray-500 mb-2';
-                document.getElementById('fileIcon').className = 'bi bi-cloud-upload text-5xl text-gray-400 mb-3 block';
+                fileNameEl.textContent = 'Click to browse or drag & drop your file here';
+                fileNameEl.className   = 'text-sm text-gray-500 mb-2';
+                fileIcon.className     = 'bi bi-cloud-upload text-5xl text-gray-400 mb-3 block';
             }
-        });
-    }
-
-    // Toggle type filter visibility
-    const toggleBtn = document.getElementById('toggleTypeFilter');
-    const typeFilterContainer = document.getElementById('typeFilterContainer');
-    if (toggleBtn && typeFilterContainer) {
-        toggleBtn.addEventListener('click', function() {
-            const isHidden = typeFilterContainer.style.display === 'none';
-            typeFilterContainer.style.display = isHidden ? 'block' : 'none';
-            this.textContent = isHidden ? 'Hide filters' : 'Show filters';
         });
     }
 
     // Show loading overlay on submit
-    const form = document.getElementById('uploadForm');
-    const loading = document.getElementById('loadingOverlay');
-    const submitBtn = document.getElementById('submitBtn');
+    var form      = document.getElementById('uploadForm');
+    var loading   = document.getElementById('loadingOverlay');
+    var submitBtn = document.getElementById('submitBtn');
     if (form && loading) {
-        form.addEventListener('submit', function() {
-            const autoEx = document.getElementById('id_auto_extract');
-            if (autoEx && autoEx.checked) {
-                loading.style.display = 'flex';
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="bi bi-hourglass-split mr-2"></i> Extracting Questions...';
-            }
+        form.addEventListener('submit', function () {
+            loading.style.display = 'flex';
+            submitBtn.disabled    = true;
+            submitBtn.innerHTML   = '<div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div> Extracting Questions...';
         });
     }
 
     // Guidelines Modal
-    const guidelinesBtn = document.getElementById('guidelinesBtn');
-    const modal = document.getElementById('guidelinesModal');
-    const closeModal = document.getElementById('closeModal');
-    const closeModalBtn = document.getElementById('closeModalBtn');
+    var guidelinesBtn = document.getElementById('guidelinesBtn');
+    var modal         = document.getElementById('guidelinesModal');
+    var closeModal    = document.getElementById('closeModal');
+    var closeModalBtn = document.getElementById('closeModalBtn');
     function openModal() { modal.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
-    function closeM() { modal.style.display = 'none'; document.body.style.overflow = 'auto'; }
-    if (guidelinesBtn) guidelinesBtn.addEventListener('click', e => { e.preventDefault(); openModal(); });
-    if (closeModal) closeModal.addEventListener('click', closeM);
+    function closeM()    { modal.style.display = 'none';  document.body.style.overflow = 'auto'; }
+    if (guidelinesBtn) guidelinesBtn.addEventListener('click', function (e) { e.preventDefault(); openModal(); });
+    if (closeModal)    closeModal.addEventListener('click', closeM);
     if (closeModalBtn) closeModalBtn.addEventListener('click', closeM);
-    if (modal) modal.addEventListener('click', e => { if (e.target === modal) closeM(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.style.display === 'flex') closeM(); });
+    if (modal)         modal.addEventListener('click', function (e) { if (e.target === modal) closeM(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeM(); });
+
 })();
-
-// Selection mode toggle (outside IIFE so it's accessible by inline onchange)
-function toggleSelectionMode(radio) {
-    const aiOptions = document.getElementById('aiPickOptions');
-    const manualLabel = document.getElementById('manualLabel');
-    const aiLabel = document.getElementById('aiLabel');
-
-    if (radio.value === 'ai_pick') {
-        aiOptions.style.display = 'block';
-        aiLabel.className = aiLabel.className.replace('border-gray-200', 'border-purple-400');
-        manualLabel.className = manualLabel.className.replace('border-blue-400', 'border-gray-200');
-    } else {
-        aiOptions.style.display = 'none';
-        manualLabel.className = manualLabel.className.replace('border-gray-200', 'border-blue-400');
-        aiLabel.className = aiLabel.className.replace('border-purple-400', 'border-gray-200');
-    }
-}
 </script>
+
 {% endblock %}

@@ -1,153 +1,602 @@
 {% extends 'base.html' %}
 
-{% block title %}Review Extracted Questions{% endblock %}
+{% block title %}Review & Select Questions{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto p-6">
-    <div class="mb-6">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Review Extracted Questions</h1>
-        <p class="text-gray-600">{{ questionnaire.title }}</p>
+<div class="max-w-7xl mx-auto p-6">
+
+    <!-- Header -->
+    <div class="mb-6 flex items-center justify-between">
+        <div>
+            <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                <span class="w-6 h-6 rounded-full bg-green-500 text-white font-bold flex items-center justify-center text-xs">✓</span>
+                <span class="text-green-600 font-medium">Upload Complete</span>
+                <span class="text-gray-400">→</span>
+                <span class="w-6 h-6 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs">2</span>
+                <span class="text-blue-600 font-bold">Review & Select</span>
+                <span class="text-gray-400">→</span>
+                <span class="w-6 h-6 rounded-full bg-gray-300 text-white font-bold flex items-center justify-center text-xs">3</span>
+                <span class="text-gray-400">Save & Download</span>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800">Review Extracted Questions</h1>
+            <p class="text-gray-600 mt-1">{{ questionnaire.title }}</p>
+        </div>
     </div>
 
-    <!-- Summary Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
             <div class="text-3xl font-bold">{{ questions.count }}</div>
-            <div class="text-sm opacity-90">Total Questions</div>
+            <div class="text-sm opacity-90">Total Extracted</div>
         </div>
         <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
-            <div class="text-3xl font-bold">{{ questions.count }}</div>
-            <div class="text-sm opacity-90">Ready to Use</div>
+            <div class="text-3xl font-bold" id="selectedCount">0</div>
+            <div class="text-sm opacity-90">Selected</div>
         </div>
         <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-4 text-white">
-            <div class="text-3xl font-bold">{{ question_types_count }}</div>
+            <div class="text-3xl font-bold" id="typesCount">0</div>
             <div class="text-sm opacity-90">Question Types</div>
         </div>
         <div class="bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg p-4 text-white">
-            <div class="text-3xl font-bold">{{ total_points }}</div>
-            <div class="text-sm opacity-90">Total Points</div>
+            <div class="text-3xl font-bold" id="selectedPoints">0</div>
+            <div class="text-sm opacity-90">Selected Points</div>
         </div>
     </div>
 
-    <!-- Questions List -->
-    <div class="space-y-4">
-        {% for question in questions %}
-        <div class="bg-white rounded-lg shadow-md overflow-hidden border-l-4 {% if question.difficulty == 'easy' %}border-green-500{% elif question.difficulty == 'hard' %}border-red-500{% else %}border-yellow-500{% endif %}">
-            <div class="p-6">
-                <div class="flex items-start justify-between mb-4">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
-                                {{ question.question_type.get_name_display }}
-                            </span>
-                            <span class="px-3 py-1 {% if question.difficulty == 'easy' %}bg-green-100 text-green-800{% elif question.difficulty == 'hard' %}bg-red-100 text-red-800{% else %}bg-yellow-100 text-yellow-800{% endif %} text-xs font-semibold rounded-full">
-                                {{ question.difficulty|title }}
-                            </span>
-                            <span class="px-3 py-1 bg-gray-100 text-gray-800 text-xs font-semibold rounded-full">
-                                {{ question.points }} point{{ question.points|pluralize }}
-                            </span>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-800 mb-3">{{ question.question_text }}</h3>
-                        
-                        {% if question.question_type.name == 'multiple_choice' %}
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
-                            <div class="flex items-center p-2 rounded {% if question.correct_answer == 'a' %}bg-green-50 border-2 border-green-500 text-green-800 font-semibold{% else %}bg-gray-50{% endif %}">
-                                <span class="mr-2 font-bold">A.</span> {{ question.option_a }}
-                                {% if question.correct_answer == 'a' %}<i class="bi bi-check-circle-fill ml-2 text-green-600"></i>{% endif %}
-                            </div>
-                            <div class="flex items-center p-2 rounded {% if question.correct_answer == 'b' %}bg-green-50 border-2 border-green-500 text-green-800 font-semibold{% else %}bg-gray-50{% endif %}">
-                                <span class="mr-2 font-bold">B.</span> {{ question.option_b }}
-                                {% if question.correct_answer == 'b' %}<i class="bi bi-check-circle-fill ml-2 text-green-600"></i>{% endif %}
-                            </div>
-                            <div class="flex items-center p-2 rounded {% if question.correct_answer == 'c' %}bg-green-50 border-2 border-green-500 text-green-800 font-semibold{% else %}bg-gray-50{% endif %}">
-                                <span class="mr-2 font-bold">C.</span> {{ question.option_c }}
-                                {% if question.correct_answer == 'c' %}<i class="bi bi-check-circle-fill ml-2 text-green-600"></i>{% endif %}
-                            </div>
-                            <div class="flex items-center p-2 rounded {% if question.correct_answer == 'd' %}bg-green-50 border-2 border-green-500 text-green-800 font-semibold{% else %}bg-gray-50{% endif %}">
-                                <span class="mr-2 font-bold">D.</span> {{ question.option_d }}
-                                {% if question.correct_answer == 'd' %}<i class="bi bi-check-circle-fill ml-2 text-green-600"></i>{% endif %}
-                            </div>
-                        </div>
-                        {% else %}
-                        <div class="bg-green-50 border-l-4 border-green-500 p-3 rounded">
-                            <div class="text-sm text-gray-600 mb-1">Correct Answer:</div>
-                            <div class="font-semibold text-green-800">{{ question.correct_answer }}</div>
-                        </div>
-                        {% endif %}
-                        
-                        {% if question.explanation %}
-                        <div class="mt-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
-                            <div class="text-xs font-semibold text-blue-800 mb-1 flex items-center">
-                                <i class="bi bi-lightbulb-fill mr-1"></i> EXPLANATION
-                            </div>
-                            <div class="text-sm text-gray-700">{{ question.explanation }}</div>
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="flex flex-col gap-2 ml-4">
-                        <button 
-                            onclick="editQuestion({{ question.id }})"
-                            class="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition-colors text-sm flex items-center justify-center"
-                            title="Edit Question"
-                        >
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <form method="post" onsubmit="return confirm('Delete this question?');">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="delete_question">
-                            <input type="hidden" name="question_id" value="{{ question.id }}">
-                            <button 
-                                type="submit"
-                                class="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 transition-colors text-sm w-full flex items-center justify-center"
-                                title="Delete Question"
-                            >
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
+    <!-- Filter & Bulk Actions Bar -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6 flex flex-wrap items-end gap-4">
+        <div class="flex-1 min-w-[180px]">
+            <label class="block text-xs font-semibold text-gray-600 mb-1">
+                <i class="bi bi-funnel text-blue-500 mr-1"></i> Filter by Type
+            </label>
+            <select id="filterType" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm">
+                <option value="all">All Types</option>
+                {% for qt in question_types %}
+                    <option value="{{ qt.name }}">{{ qt.get_name_display }}</option>
+                {% endfor %}
+            </select>
         </div>
-        {% empty %}
-        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded-lg">
-            <div class="flex items-center">
-                <i class="bi bi-exclamation-triangle text-yellow-600 text-2xl mr-3"></i>
-                <div>
-                    <h3 class="font-semibold text-yellow-800">No Questions Extracted</h3>
-                    <p class="text-yellow-700 text-sm mt-1">No questions were extracted from the uploaded file. Try uploading a different file with more educational content.</p>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
 
-    <!-- Action Buttons -->
-    <div class="mt-8 flex gap-4">
-        <form method="post" class="flex-1">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="approve_all">
-            <button 
-                type="submit"
-                class="w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-lg flex items-center justify-center"
-            >
-                <i class="bi bi-check-circle mr-2"></i> Approve All Questions
+        <div class="flex-1 min-w-[180px]">
+            <label class="block text-xs font-semibold text-gray-600 mb-1">
+                <i class="bi bi-bar-chart text-blue-500 mr-1"></i> Filter by Difficulty
+            </label>
+            <select id="filterDifficulty" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm">
+                <option value="all">All Difficulties</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+        </div>
+
+        <div class="flex gap-2">
+            <button type="button" id="selectAllBtn"
+                class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-semibold transition-colors">
+                <i class="bi bi-check-all mr-1"></i> Select All
             </button>
-        </form>
-        <a 
-            href="{% url 'questionnaires:my_uploads' %}"
-            class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center flex items-center justify-center"
-        >
-            <i class="bi bi-arrow-left mr-2"></i> Back to My Uploads
-        </a>
+            <button type="button" id="deselectAllBtn"
+                class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm font-semibold transition-colors">
+                <i class="bi bi-x-lg mr-1"></i> Deselect All
+            </button>
+        </div>
+    </div>
+
+    <!-- Questions Form -->
+    <form method="post" id="questionsForm">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_selected">
+
+        <div class="space-y-4" id="questionsList">
+            {% for question in questions %}
+            <div class="question-card bg-white rounded-lg shadow-md overflow-hidden border-l-4 transition-all
+                {% if question.difficulty == 'easy' %}border-green-500
+                {% elif question.difficulty == 'hard' %}border-red-500
+                {% else %}border-yellow-500{% endif %}"
+                data-type="{{ question.question_type.name }}"
+                data-difficulty="{{ question.difficulty }}"
+                data-points="{{ question.points }}">
+                <div class="p-5">
+                    <div class="flex items-start gap-4">
+
+                        <div class="flex-shrink-0 pt-1">
+                            <input type="checkbox" name="selected_questions" value="{{ question.id }}"
+                                class="question-checkbox w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                {% if question.is_approved %}checked{% endif %}>
+                        </div>
+
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-wrap gap-2 mb-2">
+                                <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
+                                    {{ question.question_type.get_name_display }}
+                                </span>
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full
+                                    {% if question.difficulty == 'easy' %}bg-green-100 text-green-800
+                                    {% elif question.difficulty == 'hard' %}bg-red-100 text-red-800
+                                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                    {{ question.difficulty|title }}
+                                </span>
+                                <span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                                    {{ question.points }} pt{{ question.points|pluralize }}
+                                </span>
+                            </div>
+
+                            <p class="text-gray-800 font-medium mb-3">{{ question.question_text }}</p>
+
+                            {% if question.question_type.name == 'multiple_choice' %}
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-2">
+                                {% for letter, option in question.options_list %}
+                                <div class="flex items-center p-2 rounded text-sm
+                                    {% if question.correct_answer == letter|upper or question.correct_answer == letter %}
+                                        bg-green-50 border-2 border-green-400 font-semibold text-green-800
+                                    {% else %}bg-gray-50 text-gray-700{% endif %}">
+                                    <span class="font-bold mr-2">{{ letter|upper }}.</span>{{ option }}
+                                    {% if question.correct_answer == letter|upper or question.correct_answer == letter %}
+                                        <i class="bi bi-check-circle-fill ml-auto text-green-600"></i>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="bg-green-50 border-l-4 border-green-400 p-3 rounded text-sm">
+                                <span class="text-gray-500 font-medium">Answer: </span>
+                                <span class="text-green-800 font-semibold">{{ question.correct_answer }}</span>
+                            </div>
+                            {% endif %}
+
+                            {% if question.explanation %}
+                            <div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300">
+                                <i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>{{ question.explanation }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <button type="button"
+                            class="delete-btn flex-shrink-0 bg-red-100 text-red-600 hover:bg-red-500 hover:text-white px-3 py-2 rounded transition-colors text-sm"
+                            data-question-id="{{ question.id }}"
+                            title="Remove Question">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded-lg flex items-center">
+                <i class="bi bi-exclamation-triangle text-yellow-600 text-2xl mr-3"></i>
+                <span class="text-yellow-800 font-semibold">No questions were extracted. Try uploading a different file.</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Save & Download Section -->
+        <div class="mt-8 bg-white rounded-xl shadow-lg p-6 border-t-4 border-blue-500">
+            <div class="flex items-center mb-5">
+                <span class="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm mr-3">3</span>
+                <h3 class="text-xl font-bold text-gray-800">Save & Download Questionnaire</h3>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-pencil text-blue-500 mr-1"></i> Final Title
+                    </label>
+                    <input type="text" name="final_title" value="{{ questionnaire.title }}"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+
+                <!-- Questionnaire Type — auto-detected, read only display -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-tag text-blue-500 mr-1"></i> Questionnaire Type
+                        <span class="ml-1 text-xs text-purple-600 font-normal">(auto-detected)</span>
+                    </label>
+                    <!-- visible display -->
+                    <div id="typeDisplay"
+                        class="w-full px-4 py-3 border-2 border-purple-300 rounded-lg bg-purple-50 text-gray-700 text-sm font-medium">
+                        Select questions above to auto-detect type
+                    </div>
+                    <!-- hidden field that actually gets submitted -->
+                    <input type="hidden" name="questionnaire_type" id="questionnaireType" value="">
+                    <p class="text-xs text-gray-500 mt-1">
+                        <i class="bi bi-magic text-purple-500 mr-1"></i>
+                        Automatically set based on your selection
+                    </p>
+                </div>
+
+                <!-- Download Toggle -->
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">
+                        <i class="bi bi-file-earmark-arrow-down text-green-500 mr-1"></i> Save Options
+                    </label>
+                    <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border-2 border-gray-200">
+                        <span class="text-sm font-medium text-gray-700">Save Only</span>
+
+                        <button type="button" id="downloadToggle"
+                            class="relative w-14 h-7 rounded-full transition-colors duration-300 bg-gray-300 focus:outline-none"
+                            role="switch" aria-checked="false">
+                            <span id="toggleKnob"
+                                class="absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform duration-300"></span>
+                        </button>
+
+                        <span class="text-sm font-medium text-gray-700">Also Download</span>
+
+                        <div id="formatOptions" class="hidden gap-3 ml-4">
+                            <label class="flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-400 transition-colors text-sm font-medium">
+                                <input type="radio" name="download_format" value="docx" checked class="text-blue-600">
+                                <i class="bi bi-file-word text-blue-600"></i> DOCX
+                            </label>
+                            <label class="flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-gray-200 rounded-lg cursor-pointer hover:border-red-400 transition-colors text-sm font-medium">
+                                <input type="radio" name="download_format" value="pdf" class="text-blue-600">
+                                <i class="bi bi-file-pdf text-red-500"></i> PDF
+                            </label>
+                            <label class="flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-gray-200 rounded-lg cursor-pointer hover:border-gray-400 transition-colors text-sm font-medium">
+                                <input type="radio" name="download_format" value="txt" class="text-blue-600">
+                                <i class="bi bi-file-text text-gray-500"></i> TXT
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="bg-blue-50 rounded-lg p-4 mb-5 border border-blue-200">
+                <h4 class="text-sm font-bold text-blue-800 mb-2">Selection Summary</h4>
+                <div class="flex flex-wrap gap-4 text-sm text-blue-700">
+                    <span><i class="bi bi-check-circle mr-1"></i> <strong id="summarySelected">0</strong> questions selected</span>
+                    <span><i class="bi bi-star mr-1"></i> <strong id="summaryPoints">0</strong> total points</span>
+                    <span id="summaryTypes" class="text-purple-600 font-medium"></span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-4">
+                <button type="submit" id="saveBtn"
+                    class="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-lg flex items-center justify-center">
+                    <i class="bi bi-check-circle mr-2" id="saveBtnIcon"></i>
+                    <span id="saveBtnText">Save Questions</span>
+                </button>
+                <a href="{% url 'questionnaires:my_uploads' %}"
+                    class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center flex items-center justify-center">
+                    <i class="bi bi-arrow-left mr-2"></i> Back
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- SUCCESS MODAL -->
+<div id="successModal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden items-center justify-center">
+    <div class="bg-white rounded-2xl p-10 max-w-sm w-full mx-4 text-center shadow-2xl">
+        <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
+            <i class="bi bi-check-circle-fill text-green-500 text-5xl"></i>
+        </div>
+        <h3 class="text-2xl font-bold text-gray-800 mb-2">All Done!</h3>
+        <p class="text-gray-600 mb-1" id="modalMessage">Your questions have been saved successfully.</p>
+        <p class="text-sm text-gray-500 mb-6" id="modalSubMessage"></p>
+        <button type="button" id="modalOkBtn"
+            class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg">
+            <i class="bi bi-arrow-left mr-2"></i> OK — Go to My Uploads
+        </button>
     </div>
 </div>
 
+<!-- LOADING MODAL -->
+<div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden items-center justify-center">
+    <div class="bg-white rounded-2xl p-10 max-w-sm w-full mx-4 text-center shadow-2xl">
+        <div class="relative inline-block mb-6">
+            <div class="w-20 h-20 border-4 border-blue-200 rounded-full border-t-blue-600" id="spinner"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <i class="bi bi-file-earmark-check text-blue-600 text-2xl"></i>
+            </div>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Processing...</h3>
+        <p class="text-gray-500 text-sm" id="loadingMessage">Saving your questions...</p>
+    </div>
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+#spinner { animation: spin 1s linear infinite; }
+</style>
+
 <script>
-function editQuestion(questionId) {
-    // Placeholder for edit functionality
-    alert('Edit functionality coming soon for question ID: ' + questionId);
-    // TODO: Implement edit modal or redirect to edit page
-}
+(function () {
+
+    // ================================================================
+    // CORE: update stats + auto-detect questionnaire type
+    // ================================================================
+    function updateStats() {
+        var checked = document.querySelectorAll('.question-checkbox:checked');
+        var pts   = 0;
+        var types = new Set();
+
+        checked.forEach(function (cb) {
+            var card = cb.closest('.question-card');
+            if (card) {
+                pts += parseInt(card.dataset.points || 1);
+                if (card.dataset.type) types.add(card.dataset.type);
+            }
+        });
+
+        var cnt = checked.length;
+        document.getElementById('selectedCount').textContent  = cnt;
+        document.getElementById('selectedPoints').textContent = pts;
+        document.getElementById('summarySelected').textContent = cnt;
+        document.getElementById('summaryPoints').textContent   = pts;
+        document.getElementById('typesCount').textContent      = types.size;
+
+        // ── Auto-detect questionnaire type ───────────────────────────
+        var typeHidden  = document.getElementById('questionnaireType');  // hidden input
+        var typeDisplay = document.getElementById('typeDisplay');         // visible div
+
+        if (cnt === 0) {
+            typeHidden.value        = '';
+            typeDisplay.textContent = 'Select questions above to auto-detect type';
+            typeDisplay.className   = typeDisplay.className.replace('border-green-400', 'border-purple-300');
+            document.getElementById('summaryTypes').textContent = '';
+
+        } else if (types.size === 1) {
+            var singleType          = Array.from(types)[0];
+            typeHidden.value        = singleType;
+            // Make the display label friendly e.g. "multiple_choice" → "Multiple Choice Only"
+            typeDisplay.textContent = singleType.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); }) + ' Only';
+            document.getElementById('summaryTypes').textContent = 'Type: ' + typeDisplay.textContent;
+
+        } else {
+            typeHidden.value        = 'mixed';
+            typeDisplay.textContent = 'Mixed (' + Array.from(types).map(function(t){
+                return t.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+            }).join(', ') + ')';
+            document.getElementById('summaryTypes').textContent = typeDisplay.textContent;
+        }
+
+        updateSaveButtonText();
+    }
+
+    // Run on every checkbox change
+    document.querySelectorAll('.question-checkbox').forEach(function (cb) {
+        cb.addEventListener('change', updateStats);
+    });
+
+    // ================================================================
+    // FILTER — auto-applies on change, selects visible / deselects hidden
+    // ================================================================
+    function applyFilters() {
+        var type = document.getElementById('filterType').value;
+        var diff = document.getElementById('filterDifficulty').value;
+
+        document.querySelectorAll('.question-card').forEach(function (card) {
+            var visible = (type === 'all' || card.dataset.type === type) &&
+                          (diff === 'all' || card.dataset.difficulty === diff);
+
+            card.style.display = visible ? 'block' : 'none';
+            var cb = card.querySelector('.question-checkbox');
+            if (cb) cb.checked = visible;
+        });
+
+        updateStats();
+    }
+
+    document.getElementById('filterType').addEventListener('change', applyFilters);
+    document.getElementById('filterDifficulty').addEventListener('change', applyFilters);
+
+    // ================================================================
+    // SELECT ALL / DESELECT ALL
+    // ================================================================
+    document.getElementById('selectAllBtn').addEventListener('click', function () {
+        document.querySelectorAll('.question-card').forEach(function (card) {
+            if (card.style.display !== 'none') {
+                card.querySelector('.question-checkbox').checked = true;
+            }
+        });
+        updateStats();
+    });
+
+    document.getElementById('deselectAllBtn').addEventListener('click', function () {
+        document.querySelectorAll('.question-checkbox').forEach(function (cb) {
+            cb.checked = false;
+        });
+        updateStats();
+    });
+
+    // ================================================================
+    // DELETE QUESTION
+    // ================================================================
+    document.querySelectorAll('.delete-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (!confirm('Remove this question?')) return;
+
+            var questionId = btn.getAttribute('data-question-id');
+            var card       = btn.closest('.question-card');
+            var csrf       = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            var fd = new FormData();
+            fd.append('csrfmiddlewaretoken', csrf);
+            fd.append('action', 'delete_question');
+            fd.append('question_id', questionId);
+
+            fetch(window.location.href, { method: 'POST', body: fd })
+                .then(function (r) {
+                    if (r.ok) {
+                        card.style.transition = 'opacity 0.3s, transform 0.3s';
+                        card.style.opacity    = '0';
+                        card.style.transform  = 'translateX(-10px)';
+                        setTimeout(function () { card.remove(); updateStats(); }, 300);
+                    } else {
+                        alert('Failed to delete question.');
+                    }
+                });
+        });
+    });
+
+    // ================================================================
+    // DOWNLOAD TOGGLE
+    // ================================================================
+    var downloadEnabled = false;
+
+    document.getElementById('downloadToggle').addEventListener('click', function () {
+        downloadEnabled = !downloadEnabled;
+        var toggle      = document.getElementById('downloadToggle');
+        var knob        = document.getElementById('toggleKnob');
+        var fmtOptions  = document.getElementById('formatOptions');
+
+        if (downloadEnabled) {
+            toggle.classList.replace('bg-gray-300', 'bg-green-500');
+            knob.style.transform = 'translateX(28px)';
+            toggle.setAttribute('aria-checked', 'true');
+            fmtOptions.classList.remove('hidden');
+            fmtOptions.classList.add('flex');
+        } else {
+            toggle.classList.replace('bg-green-500', 'bg-gray-300');
+            knob.style.transform = 'translateX(0)';
+            toggle.setAttribute('aria-checked', 'false');
+            fmtOptions.classList.add('hidden');
+            fmtOptions.classList.remove('flex');
+        }
+
+        updateSaveButtonText();
+    });
+
+    function updateSaveButtonText() {
+        var btnText = document.getElementById('saveBtnText');
+        var btnIcon = document.getElementById('saveBtnIcon');
+        if (downloadEnabled) {
+            btnText.textContent = 'Save & Download';
+            btnIcon.className   = 'bi bi-download mr-2';
+        } else {
+            btnText.textContent = 'Save Questions';
+            btnIcon.className   = 'bi bi-check-circle mr-2';
+        }
+    }
+
+    // ================================================================
+    // FORM SUBMIT
+    // ================================================================
+    document.getElementById('questionsForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        var checkedBoxes = document.querySelectorAll('.question-checkbox:checked');
+
+        // ── Validation ───────────────────────────────────────────────
+        if (checkedBoxes.length === 0) {
+            alert('Please select at least one question to save.');
+            return;
+        }
+
+        var typeVal = document.getElementById('questionnaireType').value;
+        if (!typeVal) {
+            // Shouldn't happen since updateStats sets it, but just in case
+            alert('Could not detect questionnaire type. Please select at least one question.');
+            return;
+        }
+
+        // ── Determine download format ─────────────────────────────────
+        var format = 'none';
+        if (downloadEnabled) {
+            var checkedRadio = document.querySelector('input[name="download_format"]:checked');
+            if (checkedRadio) format = checkedRadio.value;
+        }
+
+        // ── Build clean FormData with ONLY checked IDs ────────────────
+        var formData = new FormData();
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+        formData.append('action', 'save_selected');
+        formData.append('final_title', document.querySelector('[name=final_title]').value);
+        formData.append('questionnaire_type', typeVal);
+        formData.append('download_format', format);
+
+        checkedBoxes.forEach(function (cb) {
+            formData.append('selected_questions', cb.value);
+        });
+
+        // ── Show loading modal ────────────────────────────────────────
+        var loadingModal = document.getElementById('loadingModal');
+        document.getElementById('loadingMessage').textContent = downloadEnabled
+            ? 'Saving ' + checkedBoxes.length + ' question(s) and generating file...'
+            : 'Saving ' + checkedBoxes.length + ' question(s)...';
+        loadingModal.classList.remove('hidden');
+        loadingModal.classList.add('flex');
+
+        // ── Save only — build a real form and POST so Django can redirect
+        if (!downloadEnabled) {
+            var tmpForm = document.createElement('form');
+            tmpForm.method = 'POST';
+            tmpForm.action = window.location.href;
+            document.body.appendChild(tmpForm);
+
+            formData.forEach(function (value, key) {
+                var input   = document.createElement('input');
+                input.type  = 'hidden';
+                input.name  = key;
+                input.value = value;
+                tmpForm.appendChild(input);
+            });
+
+            tmpForm.submit();
+            return;
+        }
+
+        // ── Save + Download — use fetch to get file blob ──────────────
+        fetch(window.location.href, { method: 'POST', body: formData })
+            .then(function (response) {
+                var ct = response.headers.get('content-type') || '';
+
+                if (ct.includes('application/') || ct.includes('text/plain')) {
+                    return response.blob().then(function (blob) {
+                        var disposition = response.headers.get('content-disposition') || '';
+                        var filename    = 'questionnaire.' + format;
+                        var match       = disposition.match(/filename="?([^"]+)"?/);
+                        if (match) filename = match[1];
+
+                        var url = URL.createObjectURL(blob);
+                        var a   = document.createElement('a');
+                        a.href     = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+
+                        showSuccess(checkedBoxes.length, format);
+                    });
+                } else {
+                    showSuccess(checkedBoxes.length, 'none');
+                }
+            })
+            .catch(function () {
+                loadingModal.classList.add('hidden');
+                loadingModal.classList.remove('flex');
+                alert('Something went wrong. Please try again.');
+            });
+    });
+
+    // ================================================================
+    // SUCCESS MODAL
+    // ================================================================
+    function showSuccess(count, format) {
+        document.getElementById('loadingModal').classList.add('hidden');
+        document.getElementById('loadingModal').classList.remove('flex');
+
+        document.getElementById('modalMessage').textContent = count + ' question(s) saved successfully!';
+        document.getElementById('modalSubMessage').textContent = format !== 'none'
+            ? 'Your ' + format.toUpperCase() + ' file has been downloaded.'
+            : 'Your questions are saved. You can download anytime from My Uploads.';
+
+        var sm = document.getElementById('successModal');
+        sm.classList.remove('hidden');
+        sm.classList.add('flex');
+    }
+
+    document.getElementById('modalOkBtn').addEventListener('click', function () {
+        window.location.href = "{% url 'questionnaires:my_uploads' %}";
+    });
+
+    // ================================================================
+    // INIT — run on page load
+    // ================================================================
+    updateStats();
+
+})();
 </script>
+
 {% endblock %}
