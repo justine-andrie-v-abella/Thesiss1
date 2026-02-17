@@ -136,6 +136,16 @@ class ExtractedQuestion(models.Model):
     
     def __str__(self):
         return f"{self.question_type} - {self.question_text[:50]}"
+    
+    @property
+    def options_list(self):
+        """Returns list of (letter, option) tuples for multiple choice"""
+        return [
+            ('a', self.option_a),
+            ('b', self.option_b),
+            ('c', self.option_c),
+            ('d', self.option_d),
+        ]
 
 
 class GeneratedTest(models.Model):

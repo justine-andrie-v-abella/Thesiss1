@@ -21,20 +21,19 @@ class QuestionnaireUploadForm(forms.ModelForm):
         label="Subject"
     )
     
-    # AI Extraction fields
+    # Optional type filter - if empty, extracts ALL types
     question_types = forms.ModelMultipleChoiceField(
         queryset=QuestionType.objects.filter(is_active=True),
         widget=forms.CheckboxSelectMultiple,
-        required=False,
-        label="Question Types to Extract",
-        help_text="Select the types of questions to extract from the uploaded file"
+        required=False,  # Optional - empty means extract all types
+        label="Filter Question Types (Optional)",
+        help_text="Leave empty to extract all question types"
     )
     
     auto_extract = forms.BooleanField(
         required=False,
         initial=True,
         label="Enable AI extraction",
-        help_text="Automatically analyze and extract questions from the uploaded file"
     )
     
     class Meta:
@@ -78,16 +77,9 @@ class QuestionnaireUploadForm(forms.ModelForm):
         return file
     
     def clean(self):
-        cleaned_data = super().clean()
-        auto_extract = cleaned_data.get('auto_extract')
-        question_types = cleaned_data.get('question_types')
-        
-        if auto_extract and not question_types:
-            raise forms.ValidationError(
-                'Please select at least one question type to extract, or disable AI extraction.'
-            )
-        
-        return cleaned_data
+        # No validation needed - question_types is optional
+        # Empty = extract all types
+        return super().clean()
 
 
 class QuestionnaireEditForm(forms.ModelForm):

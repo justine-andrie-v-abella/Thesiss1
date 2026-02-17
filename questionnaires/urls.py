@@ -24,4 +24,15 @@ urlpatterns = [
     
     # AJAX
     path('get-subjects/', views.get_subjects_ajax, name='get_subjects'),
+    
+    # Download questionnaire
+    path('download/<int:pk>/', views.download_questionnaire, name='download_questionnaire'),
+    
+    # Preview questionnaire (optional)
+    path('preview/<int:pk>/', views.preview_questionnaire, name='preview_questionnaire'),
+    
+    path('get-questions/<int:pk>/', views.get_questions_json, name='get_questions_json'),
+    path('download/<int:pk>/', views.download_questionnaire, name='download_questionnaire'),
+
+
 ]
