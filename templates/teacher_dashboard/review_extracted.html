@@ -26,7 +26,7 @@
     <!-- Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
-            <div class="text-3xl font-bold">{{ questions.count }}</div>
+            <div class="text-3xl font-bold" id="totalCount">{{ questions.count }}</div>
             <div class="text-sm opacity-90">Total Extracted</div>
         </div>
         <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
@@ -167,6 +167,189 @@
             {% endfor %}
         </div>
 
+        <!-- ============================================================ -->
+        <!-- MANUAL ADD QUESTION PANEL                                     -->
+        <!-- ============================================================ -->
+        <div class="mt-6 bg-white rounded-xl shadow-lg border-l-4 border-indigo-500 overflow-hidden" id="manualAddPanel">
+            <div class="p-5 flex items-center justify-between cursor-pointer select-none"
+                 id="manualAddToggle">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow">
+                        <i class="bi bi-pencil-plus text-lg"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800">Add Your Own Question</h3>
+                        <p class="text-xs text-gray-500">Manually craft and append a question to this questionnaire</p>
+                    </div>
+                </div>
+                <span id="manualAddChevron" class="text-indigo-500 text-xl transition-transform duration-300">
+                    <i class="bi bi-chevron-down"></i>
+                </span>
+            </div>
+
+            <div id="manualAddBody" class="hidden border-t border-gray-100">
+                <div class="p-6 space-y-5">
+
+                    <!-- Question Text -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">
+                            <i class="bi bi-chat-left-text text-indigo-500 mr-1"></i>
+                            Question Text <span class="text-red-500">*</span>
+                        </label>
+                        <textarea id="manualQuestionText" rows="3"
+                            placeholder="Type your question here…"
+                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 resize-none text-sm transition-colors"></textarea>
+                    </div>
+
+                    <!-- Type / Difficulty / Points -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">
+                                <i class="bi bi-tag text-indigo-400 mr-1"></i> Question Type
+                            </label>
+                            <select id="manualType"
+                                class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
+                                <option value="multiple_choice">Multiple Choice</option>
+                                <option value="true_false">True / False</option>
+                                <option value="identification">Identification</option>
+                                <option value="essay">Essay</option>
+                                <option value="fill_in_the_blank">Fill in the Blank</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">
+                                <i class="bi bi-bar-chart text-indigo-400 mr-1"></i> Difficulty
+                            </label>
+                            <select id="manualDifficulty"
+                                class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
+                                <option value="easy">Easy</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="hard">Hard</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">
+                                <i class="bi bi-star text-indigo-400 mr-1"></i> Points
+                            </label>
+                            <input type="number" id="manualPoints" value="1" min="1" max="100"
+                                class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Answer Section -->
+                    <div id="manualAnswerSection">
+
+                        <!-- Multiple Choice -->
+                        <div id="mcSection">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="bi bi-list-ul text-indigo-500 mr-1"></i> Answer Choices
+                                <span class="text-xs text-gray-400 font-normal ml-1">— click the radio button to mark the correct answer</span>
+                            </label>
+                            <div class="space-y-2" id="mcOptions">
+                                <div class="flex items-center gap-2 mc-option-row">
+                                    <span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">A</span>
+                                    <input type="text" placeholder="Option A" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">
+                                    <label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                                        <input type="radio" name="manualCorrect" value="A" class="w-4 h-4 text-indigo-600 cursor-pointer">
+                                        Correct
+                                    </label>
+                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1" title="Remove option">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="flex items-center gap-2 mc-option-row">
+                                    <span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">B</span>
+                                    <input type="text" placeholder="Option B" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">
+                                    <label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                                        <input type="radio" name="manualCorrect" value="B" class="w-4 h-4 text-indigo-600 cursor-pointer">
+                                        Correct
+                                    </label>
+                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1" title="Remove option">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="flex items-center gap-2 mc-option-row">
+                                    <span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">C</span>
+                                    <input type="text" placeholder="Option C" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">
+                                    <label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                                        <input type="radio" name="manualCorrect" value="C" class="w-4 h-4 text-indigo-600 cursor-pointer">
+                                        Correct
+                                    </label>
+                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1" title="Remove option">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="flex items-center gap-2 mc-option-row">
+                                    <span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">D</span>
+                                    <input type="text" placeholder="Option D" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">
+                                    <label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                                        <input type="radio" name="manualCorrect" value="D" class="w-4 h-4 text-indigo-600 cursor-pointer">
+                                        Correct
+                                    </label>
+                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1" title="Remove option">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="button" id="addOptionBtn"
+                                class="mt-2 text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1 transition-colors">
+                                <i class="bi bi-plus-circle"></i> Add another option
+                            </button>
+                        </div>
+
+                        <!-- True / False -->
+                        <div id="tfSection" class="hidden">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="bi bi-toggle-on text-indigo-500 mr-1"></i> Correct Answer
+                            </label>
+                            <div class="flex gap-4">
+                                <label class="flex items-center gap-2 px-5 py-2.5 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-indigo-400 text-sm font-medium transition-colors">
+                                    <input type="radio" name="tfAnswer" value="True" class="text-indigo-600"> True
+                                </label>
+                                <label class="flex items-center gap-2 px-5 py-2.5 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-indigo-400 text-sm font-medium transition-colors">
+                                    <input type="radio" name="tfAnswer" value="False" class="text-indigo-600"> False
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Short / Essay Answer -->
+                        <div id="shortAnswerSection" class="hidden">
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">
+                                <i class="bi bi-check2-circle text-indigo-500 mr-1"></i> Correct Answer / Model Answer
+                            </label>
+                            <input type="text" id="manualShortAnswer"
+                                placeholder="Enter the expected answer…"
+                                class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
+                        </div>
+                    </div>
+
+                    <!-- Explanation (optional) -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">
+                            <i class="bi bi-lightbulb text-yellow-500 mr-1"></i> Explanation
+                            <span class="text-xs text-gray-400 font-normal ml-1">(optional)</span>
+                        </label>
+                        <input type="text" id="manualExplanation"
+                            placeholder="Why is this the correct answer?"
+                            class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                        <button type="button" id="clearManualBtn"
+                            class="px-5 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                            <i class="bi bi-x mr-1"></i> Clear
+                        </button>
+                        <button type="button" id="addManualQuestionBtn"
+                            class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white text-sm font-bold rounded-lg hover:from-indigo-600 hover:to-indigo-700 shadow transition-all flex items-center gap-2">
+                            <i class="bi bi-plus-lg"></i> Add Question to List
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- /MANUAL ADD QUESTION PANEL -->
+
         <!-- Save & Download Section -->
         <div class="mt-8 bg-white rounded-xl shadow-lg p-6 border-t-4 border-blue-500">
             <div class="flex items-center mb-5">
@@ -190,12 +373,10 @@
                         <i class="bi bi-tag text-blue-500 mr-1"></i> Questionnaire Type
                         <span class="ml-1 text-xs text-purple-600 font-normal">(auto-detected)</span>
                     </label>
-                    <!-- visible display -->
                     <div id="typeDisplay"
                         class="w-full px-4 py-3 border-2 border-purple-300 rounded-lg bg-purple-50 text-gray-700 text-sm font-medium">
                         Select questions above to auto-detect type
                     </div>
-                    <!-- hidden field that actually gets submitted -->
                     <input type="hidden" name="questionnaire_type" id="questionnaireType" value="">
                     <p class="text-xs text-gray-500 mt-1">
                         <i class="bi bi-magic text-purple-500 mr-1"></i>
@@ -297,6 +478,33 @@
 <style>
 @keyframes spin { to { transform: rotate(360deg); } }
 #spinner { animation: spin 1s linear infinite; }
+
+/* Manual panel slide-open animation */
+#manualAddBody {
+    transition: none;
+}
+#manualAddBody.open {
+    display: block;
+}
+
+/* Pulse badge for newly added manual questions */
+@keyframes badgePop {
+    0%   { transform: scale(0.8); opacity: 0; }
+    70%  { transform: scale(1.1); }
+    100% { transform: scale(1);   opacity: 1; }
+}
+.manual-badge {
+    animation: badgePop 0.35s ease-out;
+}
+
+/* Slide-in for new question cards */
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.new-card-anim {
+    animation: slideIn 0.3s ease-out;
+}
 </style>
 
 <script>
@@ -326,22 +534,18 @@
         document.getElementById('typesCount').textContent      = types.size;
 
         // ── Auto-detect questionnaire type ───────────────────────────
-        var typeHidden  = document.getElementById('questionnaireType');  // hidden input
-        var typeDisplay = document.getElementById('typeDisplay');         // visible div
+        var typeHidden  = document.getElementById('questionnaireType');
+        var typeDisplay = document.getElementById('typeDisplay');
 
         if (cnt === 0) {
             typeHidden.value        = '';
             typeDisplay.textContent = 'Select questions above to auto-detect type';
-            typeDisplay.className   = typeDisplay.className.replace('border-green-400', 'border-purple-300');
             document.getElementById('summaryTypes').textContent = '';
-
         } else if (types.size === 1) {
             var singleType          = Array.from(types)[0];
             typeHidden.value        = singleType;
-            // Make the display label friendly e.g. "multiple_choice" → "Multiple Choice Only"
             typeDisplay.textContent = singleType.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); }) + ' Only';
             document.getElementById('summaryTypes').textContent = 'Type: ' + typeDisplay.textContent;
-
         } else {
             typeHidden.value        = 'mixed';
             typeDisplay.textContent = 'Mixed (' + Array.from(types).map(function(t){
@@ -350,16 +554,19 @@
             document.getElementById('summaryTypes').textContent = typeDisplay.textContent;
         }
 
+        // Update total count badge
+        var totalEl = document.getElementById('totalCount');
+        if (totalEl) totalEl.textContent = document.querySelectorAll('.question-card').length;
+
         updateSaveButtonText();
     }
 
-    // Run on every checkbox change
     document.querySelectorAll('.question-checkbox').forEach(function (cb) {
         cb.addEventListener('change', updateStats);
     });
 
     // ================================================================
-    // FILTER — auto-applies on change, selects visible / deselects hidden
+    // FILTER
     // ================================================================
     function applyFilters() {
         var type = document.getElementById('filterType').value;
@@ -402,15 +609,24 @@
     // ================================================================
     // DELETE QUESTION
     // ================================================================
-    document.querySelectorAll('.delete-btn').forEach(function (btn) {
+    function bindDeleteBtn(btn) {
         btn.addEventListener('click', function () {
             if (!confirm('Remove this question?')) return;
 
             var questionId = btn.getAttribute('data-question-id');
             var card       = btn.closest('.question-card');
-            var csrf       = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-            var fd = new FormData();
+            // Manual (client-only) question — just remove from DOM
+            if (!questionId || btn.getAttribute('data-manual') === 'true') {
+                card.style.transition = 'opacity 0.3s, transform 0.3s';
+                card.style.opacity    = '0';
+                card.style.transform  = 'translateX(-10px)';
+                setTimeout(function () { card.remove(); updateStats(); }, 300);
+                return;
+            }
+
+            var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            var fd   = new FormData();
             fd.append('csrfmiddlewaretoken', csrf);
             fd.append('action', 'delete_question');
             fd.append('question_id', questionId);
@@ -427,7 +643,297 @@
                     }
                 });
         });
+    }
+
+    document.querySelectorAll('.delete-btn').forEach(bindDeleteBtn);
+
+    // ================================================================
+    // MANUAL ADD — toggle panel
+    // ================================================================
+    var manualBodyEl    = document.getElementById('manualAddBody');
+    var manualChevronEl = document.getElementById('manualAddChevron');
+    var panelOpen       = false;
+
+    document.getElementById('manualAddToggle').addEventListener('click', function () {
+        panelOpen = !panelOpen;
+        if (panelOpen) {
+            manualBodyEl.classList.remove('hidden');
+            manualChevronEl.style.transform = 'rotate(180deg)';
+        } else {
+            manualBodyEl.classList.add('hidden');
+            manualChevronEl.style.transform = 'rotate(0deg)';
+        }
     });
+
+    // ================================================================
+    // MANUAL ADD — switch answer section by type
+    // ================================================================
+    var mcSection          = document.getElementById('mcSection');
+    var tfSection          = document.getElementById('tfSection');
+    var shortAnswerSection = document.getElementById('shortAnswerSection');
+
+    function showAnswerSection(type) {
+        mcSection.classList.add('hidden');
+        tfSection.classList.add('hidden');
+        shortAnswerSection.classList.add('hidden');
+
+        if (type === 'multiple_choice') {
+            mcSection.classList.remove('hidden');
+        } else if (type === 'true_false') {
+            tfSection.classList.remove('hidden');
+        } else {
+            shortAnswerSection.classList.remove('hidden');
+        }
+    }
+
+    document.getElementById('manualType').addEventListener('change', function () {
+        showAnswerSection(this.value);
+    });
+
+    // ================================================================
+    // MANUAL ADD — add more MC options (up to Z)
+    // ================================================================
+    var letters = ['A','B','C','D','E','F','G','H','I','J'];
+
+    document.getElementById('addOptionBtn').addEventListener('click', function () {
+        var rows  = document.querySelectorAll('#mcOptions .mc-option-row');
+        var idx   = rows.length;
+        if (idx >= letters.length) {
+            alert('Maximum 10 options allowed.');
+            return;
+        }
+        var letter = letters[idx];
+        var row    = document.createElement('div');
+        row.className = 'flex items-center gap-2 mc-option-row';
+        row.innerHTML =
+            '<span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">' + letter + '</span>' +
+            '<input type="text" placeholder="Option ' + letter + '" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">' +
+            '<label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">' +
+                '<input type="radio" name="manualCorrect" value="' + letter + '" class="w-4 h-4 text-indigo-600 cursor-pointer"> Correct' +
+            '</label>' +
+            '<button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 text-sm px-1" title="Remove option"><i class="bi bi-x-circle"></i></button>';
+
+        document.getElementById('mcOptions').appendChild(row);
+        row.querySelector('.remove-mc-opt').addEventListener('click', function () {
+            row.remove();
+            relabelOptions();
+        });
+    });
+
+    // Show remove buttons on initial rows (only when >2 rows)
+    function relabelOptions() {
+        var rows = document.querySelectorAll('#mcOptions .mc-option-row');
+        rows.forEach(function (r, i) {
+            var lbl = r.querySelector('span');
+            var inp = r.querySelector('input[type=radio]');
+            var rmv = r.querySelector('.remove-mc-opt');
+            if (lbl) lbl.textContent = letters[i];
+            if (inp) inp.value = letters[i];
+            if (rmv) {
+                if (rows.length > 2) rmv.classList.remove('hidden');
+                else rmv.classList.add('hidden');
+            }
+        });
+    }
+
+    document.querySelectorAll('.remove-mc-opt').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var rows = document.querySelectorAll('#mcOptions .mc-option-row');
+            if (rows.length <= 2) { alert('At least 2 options are required.'); return; }
+            btn.closest('.mc-option-row').remove();
+            relabelOptions();
+        });
+    });
+
+    // ================================================================
+    // MANUAL ADD — clear form
+    // ================================================================
+    function clearManualForm() {
+        document.getElementById('manualQuestionText').value = '';
+        document.getElementById('manualType').value         = 'multiple_choice';
+        document.getElementById('manualDifficulty').value   = 'medium';
+        document.getElementById('manualPoints').value       = '1';
+        document.getElementById('manualExplanation').value  = '';
+        document.getElementById('manualShortAnswer').value  = '';
+
+        // Reset MC options to A-D
+        var mcOpts = document.getElementById('mcOptions');
+        mcOpts.innerHTML = ['A','B','C','D'].map(function (l) {
+            return '<div class="flex items-center gap-2 mc-option-row">' +
+                '<span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">' + l + '</span>' +
+                '<input type="text" placeholder="Option ' + l + '" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">' +
+                '<label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">' +
+                    '<input type="radio" name="manualCorrect" value="' + l + '" class="w-4 h-4 text-indigo-600 cursor-pointer"> Correct' +
+                '</label>' +
+                '<button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1"><i class="bi bi-x-circle"></i></button>' +
+            '</div>';
+        }).join('');
+
+        document.querySelectorAll('input[name="tfAnswer"]').forEach(function (r) { r.checked = false; });
+        showAnswerSection('multiple_choice');
+    }
+
+    document.getElementById('clearManualBtn').addEventListener('click', clearManualForm);
+
+    // ================================================================
+    // MANUAL ADD — build and inject question card into the list
+    // ================================================================
+    var manualQuestionCounter = 0;
+
+    document.getElementById('addManualQuestionBtn').addEventListener('click', function () {
+        var qText   = document.getElementById('manualQuestionText').value.trim();
+        var qType   = document.getElementById('manualType').value;
+        var qDiff   = document.getElementById('manualDifficulty').value;
+        var qPts    = parseInt(document.getElementById('manualPoints').value) || 1;
+        var qExpl   = document.getElementById('manualExplanation').value.trim();
+        var correct = '';
+
+        // ── Validate ─────────────────────────────────────────────────
+        if (!qText) {
+            alert('Please enter the question text.');
+            document.getElementById('manualQuestionText').focus();
+            return;
+        }
+
+        var optionsHTML = '';
+
+        if (qType === 'multiple_choice') {
+            var rows    = document.querySelectorAll('#mcOptions .mc-option-row');
+            var options = [];
+            var correctRadio = document.querySelector('input[name="manualCorrect"]:checked');
+
+            rows.forEach(function (row, i) {
+                var val = row.querySelector('.mc-option-input').value.trim();
+                options.push({ letter: letters[i], text: val });
+            });
+
+            if (options.some(function (o) { return !o.text; })) {
+                alert('Please fill in all answer choices, or remove empty ones.');
+                return;
+            }
+            if (!correctRadio) {
+                alert('Please mark one option as the correct answer.');
+                return;
+            }
+
+            correct = correctRadio.value;
+
+            optionsHTML = '<div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-2 mt-2">' +
+                options.map(function (o) {
+                    var isCorrect = o.letter === correct;
+                    return '<div class="flex items-center p-2 rounded text-sm ' +
+                        (isCorrect ? 'bg-green-50 border-2 border-green-400 font-semibold text-green-800' : 'bg-gray-50 text-gray-700') + '">' +
+                        '<span class="font-bold mr-2">' + o.letter + '.</span>' + escapeHtml(o.text) +
+                        (isCorrect ? '<i class="bi bi-check-circle-fill ml-auto text-green-600"></i>' : '') +
+                        '</div>';
+                }).join('') +
+            '</div>';
+
+        } else if (qType === 'true_false') {
+            var tfRadio = document.querySelector('input[name="tfAnswer"]:checked');
+            if (!tfRadio) {
+                alert('Please select True or False as the correct answer.');
+                return;
+            }
+            correct = tfRadio.value;
+            optionsHTML = '<div class="bg-green-50 border-l-4 border-green-400 p-3 rounded text-sm mt-2">' +
+                '<span class="text-gray-500 font-medium">Answer: </span>' +
+                '<span class="text-green-800 font-semibold">' + correct + '</span></div>';
+
+        } else {
+            var shortAns = document.getElementById('manualShortAnswer').value.trim();
+            correct = shortAns || '(open-ended)';
+            optionsHTML = '<div class="bg-green-50 border-l-4 border-green-400 p-3 rounded text-sm mt-2">' +
+                '<span class="text-gray-500 font-medium">Answer: </span>' +
+                '<span class="text-green-800 font-semibold">' + escapeHtml(correct) + '</span></div>';
+        }
+
+        // ── Explanation ──────────────────────────────────────────────
+        var explHTML = qExpl
+            ? '<div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300">' +
+              '<i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>' + escapeHtml(qExpl) + '</div>'
+            : '';
+
+        // ── Difficulty border colour ─────────────────────────────────
+        var borderColor = qDiff === 'easy' ? 'border-green-500' : (qDiff === 'hard' ? 'border-red-500' : 'border-yellow-500');
+        var diffBadge   = qDiff === 'easy' ? 'bg-green-100 text-green-800' : (qDiff === 'hard' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800');
+
+        var typeLabel   = qType.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+
+        manualQuestionCounter++;
+        var uid = 'manual_' + manualQuestionCounter;
+
+        // ── Build card ───────────────────────────────────────────────
+        var card = document.createElement('div');
+        card.className = 'question-card bg-white rounded-lg shadow-md overflow-hidden border-l-4 ' + borderColor + ' new-card-anim transition-all';
+        card.dataset.type       = qType;
+        card.dataset.difficulty = qDiff;
+        card.dataset.points     = qPts;
+        card.dataset.manual     = 'true';
+        card.dataset.uid        = uid;
+
+        card.innerHTML =
+            '<div class="p-5">' +
+                '<div class="flex items-start gap-4">' +
+                    '<div class="flex-shrink-0 pt-1">' +
+                        '<input type="checkbox" name="manual_questions[]" value="' + uid + '" ' +
+                            'class="question-checkbox w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer" checked>' +
+                    '</div>' +
+                    '<div class="flex-1 min-w-0">' +
+                        '<div class="flex flex-wrap gap-2 mb-2">' +
+                            '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">' + typeLabel + '</span>' +
+                            '<span class="px-2 py-0.5 text-xs font-semibold rounded-full ' + diffBadge + '">' + capitalize(qDiff) + '</span>' +
+                            '<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">' + qPts + ' pt' + (qPts !== 1 ? 's' : '') + '</span>' +
+                            '<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full manual-badge">' +
+                                '<i class="bi bi-pencil-fill mr-1"></i>Manual</span>' +
+                        '</div>' +
+                        '<p class="text-gray-800 font-medium mb-1">' + escapeHtml(qText) + '</p>' +
+                        optionsHTML +
+                        explHTML +
+
+                        // Hidden fields that will travel with form submission
+                        '<input type="hidden" name="manual_question_text[]"   value="' + escapeAttr(qText)    + '">' +
+                        '<input type="hidden" name="manual_question_type[]"   value="' + escapeAttr(qType)    + '">' +
+                        '<input type="hidden" name="manual_difficulty[]"      value="' + escapeAttr(qDiff)    + '">' +
+                        '<input type="hidden" name="manual_points[]"          value="' + qPts                 + '">' +
+                        '<input type="hidden" name="manual_correct_answer[]"  value="' + escapeAttr(correct)  + '">' +
+                        '<input type="hidden" name="manual_explanation[]"     value="' + escapeAttr(qExpl)    + '">' +
+                        (qType === 'multiple_choice' ? buildMcHiddenInputs(qType, uid) : '') +
+                    '</div>' +
+                    '<button type="button" class="delete-btn flex-shrink-0 bg-red-100 text-red-600 hover:bg-red-500 hover:text-white px-3 py-2 rounded transition-colors text-sm" data-manual="true" title="Remove Question">' +
+                        '<i class="bi bi-trash"></i>' +
+                    '</button>' +
+                '</div>' +
+            '</div>';
+
+        document.getElementById('questionsList').prepend(card);
+
+        // Bind events
+        card.querySelector('.question-checkbox').addEventListener('change', updateStats);
+        bindDeleteBtn(card.querySelector('.delete-btn'));
+
+        updateStats();
+        clearManualForm();
+
+        // Collapse panel after adding
+        panelOpen = false;
+        manualBodyEl.classList.add('hidden');
+        manualChevronEl.style.transform = 'rotate(0deg)';
+
+        // Scroll to the new card
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    // Helper: build hidden option inputs for MC (used if backend needs individual options)
+    function buildMcHiddenInputs(type, uid) {
+        var rows   = document.querySelectorAll('#mcOptions .mc-option-row');
+        var fields = '';
+        rows.forEach(function (row, i) {
+            var val = row.querySelector('.mc-option-input').value.trim();
+            fields += '<input type="hidden" name="manual_option_' + letters[i] + '[]" value="' + escapeAttr(val) + '">';
+        });
+        return fields;
+    }
 
     // ================================================================
     // DOWNLOAD TOGGLE
@@ -436,9 +942,9 @@
 
     document.getElementById('downloadToggle').addEventListener('click', function () {
         downloadEnabled = !downloadEnabled;
-        var toggle      = document.getElementById('downloadToggle');
-        var knob        = document.getElementById('toggleKnob');
-        var fmtOptions  = document.getElementById('formatOptions');
+        var toggle     = document.getElementById('downloadToggle');
+        var knob       = document.getElementById('toggleKnob');
+        var fmtOptions = document.getElementById('formatOptions');
 
         if (downloadEnabled) {
             toggle.classList.replace('bg-gray-300', 'bg-green-500');
@@ -475,29 +981,36 @@
     document.getElementById('questionsForm').addEventListener('submit', function (e) {
         e.preventDefault();
 
+        // Count ALL checked checkboxes — both AI-extracted and manual cards
         var checkedBoxes = document.querySelectorAll('.question-checkbox:checked');
 
-        // ── Validation ───────────────────────────────────────────────
-        if (checkedBoxes.length === 0) {
+        // Also count checked manual cards separately for clarity
+        var checkedManualCards = Array.from(
+            document.querySelectorAll('.question-card[data-manual="true"]')
+        ).filter(function (card) {
+            var cb = card.querySelector('.question-checkbox');
+            return cb && cb.checked;
+        });
+
+        var totalSelected = checkedBoxes.length; // includes both AI + manual
+
+        if (totalSelected === 0) {
             alert('Please select at least one question to save.');
             return;
         }
 
         var typeVal = document.getElementById('questionnaireType').value;
         if (!typeVal) {
-            // Shouldn't happen since updateStats sets it, but just in case
             alert('Could not detect questionnaire type. Please select at least one question.');
             return;
         }
 
-        // ── Determine download format ─────────────────────────────────
         var format = 'none';
         if (downloadEnabled) {
             var checkedRadio = document.querySelector('input[name="download_format"]:checked');
             if (checkedRadio) format = checkedRadio.value;
         }
 
-        // ── Build clean FormData with ONLY checked IDs ────────────────
         var formData = new FormData();
         formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
         formData.append('action', 'save_selected');
@@ -505,19 +1018,31 @@
         formData.append('questionnaire_type', typeVal);
         formData.append('download_format', format);
 
-        checkedBoxes.forEach(function (cb) {
-            formData.append('selected_questions', cb.value);
+        // Append selected AI-extracted question IDs (skip manual cards)
+        document.querySelectorAll('.question-checkbox:checked').forEach(function (cb) {
+            var card = cb.closest('.question-card');
+            if (card && card.dataset.manual !== 'true') {
+                formData.append('selected_questions', cb.value);
+            }
         });
 
-        // ── Show loading modal ────────────────────────────────────────
+        // Append manual question data from every checked manual card
+        checkedManualCards.forEach(function (card) {
+            formData.append('manual_selected_uid[]', card.dataset.uid);
+            card.querySelectorAll('input[type="hidden"]').forEach(function (inp) {
+                formData.append(inp.name, inp.value);
+            });
+        });
+
+        // Loading modal
         var loadingModal = document.getElementById('loadingModal');
         document.getElementById('loadingMessage').textContent = downloadEnabled
-            ? 'Saving ' + checkedBoxes.length + ' question(s) and generating file...'
-            : 'Saving ' + checkedBoxes.length + ' question(s)...';
+            ? 'Saving ' + totalSelected + ' question(s) and generating file...'
+            : 'Saving ' + totalSelected + ' question(s)...';
         loadingModal.classList.remove('hidden');
         loadingModal.classList.add('flex');
 
-        // ── Save only — build a real form and POST so Django can redirect
+        // Save only — POST via real form
         if (!downloadEnabled) {
             var tmpForm = document.createElement('form');
             tmpForm.method = 'POST';
@@ -536,7 +1061,7 @@
             return;
         }
 
-        // ── Save + Download — use fetch to get file blob ──────────────
+        // Save + Download — fetch blob
         fetch(window.location.href, { method: 'POST', body: formData })
             .then(function (response) {
                 var ct = response.headers.get('content-type') || '';
@@ -557,10 +1082,10 @@
                         a.remove();
                         URL.revokeObjectURL(url);
 
-                        showSuccess(checkedBoxes.length, format);
+                        showSuccess(totalSelected, format);
                     });
                 } else {
-                    showSuccess(checkedBoxes.length, 'none');
+                    showSuccess(totalSelected, 'none');
                 }
             })
             .catch(function () {
@@ -592,7 +1117,22 @@
     });
 
     // ================================================================
-    // INIT — run on page load
+    // UTILS
+    // ================================================================
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+    function escapeAttr(str) {
+        return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function capitalize(str) {
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    // ================================================================
+    // INIT
     // ================================================================
     updateStats();
 
