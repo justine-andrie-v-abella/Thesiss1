@@ -47,6 +47,7 @@ def upload_questionnaire(request):
         if form.is_valid():
             questionnaire = form.save(commit=False)
             questionnaire.uploader = teacher
+            questionnaire.department = teacher.department
             questionnaire.save()
 
             ActivityLog.objects.create(
@@ -525,14 +526,16 @@ def browse_questionnaires(request):
     if request.user.is_staff:
         return redirect('questionnaires:all_questionnaires')
 
-    questionnaires = Questionnaire.objects.select_related('department', 'subject', 'uploader__user').all()
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
 
-    department_id = request.GET.get('department')
+    # Only show questionnaires from the teacher's own department
+    questionnaires = Questionnaire.objects.select_related(
+        'department', 'subject', 'uploader__user'
+    ).filter(department=teacher.department)
+
     subject_id = request.GET.get('subject')
     search_query = request.GET.get('search', '')
 
-    if department_id:
-        questionnaires = questionnaires.filter(department_id=department_id)
     if subject_id:
         questionnaires = questionnaires.filter(subject_id=subject_id)
     if search_query:
@@ -543,8 +546,8 @@ def browse_questionnaires(request):
             Q(subject__code__icontains=search_query)
         )
 
-    departments = Department.objects.annotate(count=Count('questionnaires'))
-    subjects = Subject.objects.all()
+    # Only show subjects that belong to the teacher's department
+    subjects = Subject.objects.filter(departments=teacher.department)
 
     paginator = Paginator(questionnaires, 12)
     page_number = request.GET.get('page')
@@ -552,9 +555,7 @@ def browse_questionnaires(request):
 
     context = {
         'page_obj': page_obj,
-        'departments': departments,
         'subjects': subjects,
-        'selected_department': department_id,
         'selected_subject': subject_id,
         'search_query': search_query,
     }
