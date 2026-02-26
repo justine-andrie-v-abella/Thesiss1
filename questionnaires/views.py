@@ -34,7 +34,6 @@ def is_teacher(user):
 
 @login_required
 def upload_questionnaire(request):
-    """Upload file and auto-extract questions with AI in one step"""
     if request.user.is_staff:
         messages.error(request, 'Admins cannot upload questionnaires')
         return redirect('accounts:admin_dashboard')
@@ -45,21 +44,14 @@ def upload_questionnaire(request):
         form = QuestionnaireUploadForm(request.POST, request.FILES, user=request.user)
 
         if form.is_valid():
+            # Save to DB temporarily so the file is accessible for extraction
             questionnaire = form.save(commit=False)
             questionnaire.uploader = teacher
             questionnaire.department = teacher.department
+            questionnaire.extraction_status = 'processing'
             questionnaire.save()
 
-            ActivityLog.objects.create(
-                activity_type='questionnaire_uploaded',
-                user=request.user,
-                description=f'You uploaded "{questionnaire.title}" for {questionnaire.subject.code}'
-            )
-
             try:
-                questionnaire.extraction_status = 'processing'
-                questionnaire.save()
-
                 type_names = list(
                     QuestionType.objects.filter(is_active=True).values_list('name', flat=True)
                 )
@@ -67,10 +59,23 @@ def upload_questionnaire(request):
                 extractor = get_extractor()
                 created_questions = extractor.process_questionnaire(questionnaire, type_names, mode='extract')
 
+                # If no questions were extracted, delete the record and reject
+                if not created_questions:
+                    questionnaire.file.delete(save=False)
+                    questionnaire.delete()
+                    messages.error(request, 'No questions were detected in your file. Please upload a file that contains questions.')
+                    return render(request, 'teacher_dashboard/upload_questionnaire.html', {'form': form})
+
+                # Success — finalize the record
                 questionnaire.extraction_status = 'completed'
                 questionnaire.is_extracted = True
                 questionnaire.save()
 
+                ActivityLog.objects.create(
+                    activity_type='questionnaire_uploaded',
+                    user=request.user,
+                    description=f'You uploaded "{questionnaire.title}" for {questionnaire.subject.code}'
+                )
                 ActivityLog.objects.create(
                     activity_type='questions_extracted',
                     user=request.user,
@@ -81,24 +86,24 @@ def upload_questionnaire(request):
                     request,
                     f'Extracted {len(created_questions)} questions! Now select the ones you want to keep.'
                 )
-
                 return redirect('questionnaires:review_extracted', pk=questionnaire.pk)
 
             except Exception as e:
-                questionnaire.extraction_status = 'failed'
-                questionnaire.extraction_error = str(e)
-                questionnaire.save()
+                # Extraction failed — delete the file and the DB record entirely
+                questionnaire.file.delete(save=False)
+                questionnaire.delete()
 
                 ActivityLog.objects.create(
                     activity_type='extraction_failed',
                     user=request.user,
-                    description=f'Extraction failed for "{questionnaire.title}"'
+                    description=f'Extraction failed — file was not saved.'
                 )
 
-                messages.error(request, f'AI extraction failed: {str(e)}. Please try again.')
+                messages.error(request, f'AI extraction failed: {str(e)}. Your file was not saved. Please try again.')
                 return render(request, 'teacher_dashboard/upload_questionnaire.html', {'form': form})
         else:
             messages.error(request, 'Please correct the errors below.')
+
     else:
         form = QuestionnaireUploadForm(user=request.user)
 
@@ -531,7 +536,7 @@ def browse_questionnaires(request):
     # Only show questionnaires from the teacher's own department
     questionnaires = Questionnaire.objects.select_related(
         'department', 'subject', 'uploader__user'
-    ).filter(department=teacher.department)
+    ).filter(subject__departments=teacher.department)
 
     subject_id = request.GET.get('subject')
     search_query = request.GET.get('search', '')

@@ -6,6 +6,7 @@ from django.db import models
 from accounts.models import TeacherProfile, Department, Subject
 from django.contrib.auth.models import User
 import os
+from django.db import migrations
 
 def questionnaire_upload_path(instance, filename):
     return f'questionnaires/{instance.department.code}/{instance.subject.code}/{filename}'
@@ -198,3 +199,31 @@ class Download(models.Model):
     
     def __str__(self):
         return f"{self.questionnaire.title} - {self.downloaded_at.strftime('%Y-%m-%d %H:%M')}"
+    
+def populate_question_types(apps, schema_editor):
+    QuestionType = apps.get_model('questionnaires', 'QuestionType')
+    question_types = [
+        'multiple_choice',
+        'true_false',
+        'essay',
+        'short_answer',
+        'fill_in_the_blank',
+        'matching',
+        'enumeration',
+    ]
+    for qt in question_types:
+        QuestionType.objects.get_or_create(name=qt)
+
+def reverse_question_types(apps, schema_editor):
+    QuestionType = apps.get_model('questionnaires', 'QuestionType')
+    QuestionType.objects.all().delete()
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('questionnaires', '0003_questiontype_questionnaire_extraction_error_and_more'),  # your last migration
+    ]
+
+    operations = [
+        migrations.RunPython(populate_question_types, reverse_question_types),
+    ]

@@ -235,29 +235,55 @@ JSON Structure:
 JSON:"""
 
     def process_questionnaire(self, questionnaire, question_types: List[str], mode: str = 'extract'):
-        """
-        Main method to process uploaded questionnaire.
-
-        mode='extract'  → copies questions already written in the file (default)
-        mode='generate' → creates new questions based on the file content
-        """
         from questionnaires.models import ExtractedQuestion, QuestionType
 
-        # Read the file
+        # Build a lookup map from DB (case-insensitive + common aliases)
+        type_map = {}
+        for qt in QuestionType.objects.filter(is_active=True):
+            type_map[qt.name.lower()] = qt
+            type_map[qt.name] = qt
+
+        # Common aliases the AI might return
+        aliases = {
+            'multiple_choice': 'multiple_choice',
+            'multiplechoice': 'multiple_choice',
+            'mcq': 'multiple_choice',
+            'true_false': 'true_false',
+            'truefalse': 'true_false',
+            'true/false': 'true_false',
+            'fill_in_the_blank': 'fill_blank',
+            'fill_blank': 'fill_blank',
+            'fill in the blank': 'fill_blank',
+            'identification': 'identification',
+            'essay': 'essay',
+            'matching': 'matching',
+            'enumeration': 'enumeration',
+            'short_answer': 'identification',
+        }
+
         file_path = questionnaire.file.path
         content = self.extract_text_from_file(file_path)
 
         if not content.strip():
             raise Exception("No text content could be extracted from the file")
 
-        # Process with AI using the correct mode
         extracted_data = self.extract_questions_with_ai(content, question_types, mode=mode)
 
-        # Save questions to database
         created_questions = []
         for q_data in extracted_data.get('questions', []):
             try:
-                question_type = QuestionType.objects.get(name=q_data['type'])
+                raw_type = q_data.get('type', '').strip().lower()
+
+                # Try direct match first, then alias lookup
+                resolved_name = aliases.get(raw_type, raw_type)
+                question_type = type_map.get(resolved_name) or type_map.get(raw_type)
+
+                if not question_type:
+                    print(f"Warning: Question type '{raw_type}' not found in database. Available: {list(type_map.keys())}")
+                    # Fallback to first active type instead of skipping
+                    question_type = QuestionType.objects.filter(is_active=True).first()
+                    if not question_type:
+                        continue
 
                 question = ExtractedQuestion.objects.create(
                     questionnaire=questionnaire,
@@ -273,9 +299,6 @@ JSON:"""
                     points=q_data.get('points', 1)
                 )
                 created_questions.append(question)
-            except QuestionType.DoesNotExist:
-                print(f"Warning: Question type '{q_data['type']}' not found in database")
-                continue
             except Exception as e:
                 print(f"Error creating question: {str(e)}")
                 continue

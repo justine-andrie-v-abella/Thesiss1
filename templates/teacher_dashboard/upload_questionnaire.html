@@ -85,13 +85,26 @@
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         <i class="bi bi-file-earmark-arrow-up text-green-500 mr-1"></i> File *
                     </label>
-                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer" id="dropZone">
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors" id="dropZone">
                         <i class="bi bi-cloud-upload text-5xl text-gray-400 mb-3 block" id="fileIcon"></i>
                         <p id="fileName" class="text-sm text-gray-500 mb-2">Click to browse or drag & drop your file here</p>
                         <input type="file" name="file" id="id_file"
                             class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                             required accept=".pdf,.docx,.doc,.xlsx,.xls,.txt">
                     </div>
+
+                    <!-- Chosen file preview with X button -->
+                    <div id="filePreview" style="display:none;" class="mt-3 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                        <i class="bi bi-file-earmark-check text-green-500 text-xl flex-shrink-0"></i>
+                        <span id="filePreviewName" class="text-sm font-semibold text-gray-800 flex-1 truncate"></span>
+                        <span id="filePreviewSize" class="text-xs text-gray-500 flex-shrink-0"></span>
+                        <button type="button" id="clearFileBtn"
+                            class="flex-shrink-0 w-7 h-7 bg-red-100 hover:bg-red-200 text-red-600 rounded-full flex items-center justify-center transition-colors"
+                            title="Remove file">
+                            <i class="bi bi-x-lg text-xs"></i>
+                        </button>
+                    </div>
+
                     {% if form.file.errors %}
                         <p class="text-red-500 text-sm mt-1">{{ form.file.errors.0 }}</p>
                     {% endif %}
@@ -210,28 +223,59 @@
 <script>
 (function () {
 
-    // Style the subject select to match form inputs
+    // Style subject select
     var subjSelect = document.getElementById('id_subject');
     if (subjSelect) {
         subjSelect.className = 'w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors';
     }
 
-    // File name preview
-    var fileInput  = document.getElementById('id_file');
-    var fileNameEl = document.getElementById('fileName');
-    var fileIcon   = document.getElementById('fileIcon');
+    // File input + preview + clear button
+    var fileInput      = document.getElementById('id_file');
+    var filePreview    = document.getElementById('filePreview');
+    var filePreviewName = document.getElementById('filePreviewName');
+    var filePreviewSize = document.getElementById('filePreviewSize');
+    var clearFileBtn   = document.getElementById('clearFileBtn');
+    var dropZone       = document.getElementById('dropZone');
+    var fileIcon       = document.getElementById('fileIcon');
+    var fileName       = document.getElementById('fileName');
+
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function showFilePreview(file) {
+        filePreviewName.textContent = file.name;
+        filePreviewSize.textContent = formatSize(file.size);
+        filePreview.style.display   = 'flex';
+        dropZone.style.display      = 'none';
+    }
+
+    function clearFile() {
+        // Reset the file input
+        fileInput.value = '';
+        filePreview.style.display = 'none';
+        dropZone.style.display    = 'block';
+        fileIcon.className  = 'bi bi-cloud-upload text-5xl text-gray-400 mb-3 block';
+        fileName.textContent = 'Click to browse or drag & drop your file here';
+        fileName.className   = 'text-sm text-gray-500 mb-2';
+        // Re-add required since resetting loses validation state
+        fileInput.setAttribute('required', '');
+    }
+
     if (fileInput) {
         fileInput.addEventListener('change', function () {
             if (this.files.length > 0) {
-                fileNameEl.textContent = this.files[0].name;
-                fileNameEl.className   = 'text-sm text-blue-600 font-medium mb-2';
-                fileIcon.className     = 'bi bi-file-earmark-check text-5xl text-green-500 mb-3 block';
+                showFilePreview(this.files[0]);
             } else {
-                fileNameEl.textContent = 'Click to browse or drag & drop your file here';
-                fileNameEl.className   = 'text-sm text-gray-500 mb-2';
-                fileIcon.className     = 'bi bi-cloud-upload text-5xl text-gray-400 mb-3 block';
+                clearFile();
             }
         });
+    }
+
+    if (clearFileBtn) {
+        clearFileBtn.addEventListener('click', clearFile);
     }
 
     // Show loading overlay on submit

@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import dj_database_url
 from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -54,10 +55,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'test_banking_system.wsgi.application'
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    "default": dj_database_url.parse(
+        "postgresql://postgres.fijiitislcpxpvbzhbfr:BISUtestbankingsystem@aws-1-ap-southeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+    )
+}
+
+DATABASES["default"]["CONN_MAX_AGE"] = 0
+DATABASES["default"]["OPTIONS"] = {
+    "sslmode": "require",
 }
 
 AUTH_PASSWORD_VALIDATORS = [
