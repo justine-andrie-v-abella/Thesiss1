@@ -1,6 +1,6 @@
 # ============================================================================
 # FILE: questionnaires/views.py
-# FIXED VERSION WITH MANUAL QUESTION SAVING + ACTIVITY LOGGING
+# FIXED VERSION WITH MANUAL QUESTION SAVING + ACTIVITY LOGGING + WORKSPACE
 # ============================================================================
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -207,8 +207,6 @@ def review_extracted_questions(request, pk):
             selected_ids = request.POST.getlist('selected_questions')  # AI-extracted IDs
 
             # ── Process manually-added questions ──────────────────────────────
-            # The frontend sends parallel lists, one entry per manual question.
-            # Only entries whose uid appears in manual_selected_uid[] were checked.
             manual_uids         = request.POST.getlist('manual_selected_uid[]')
             manual_texts        = request.POST.getlist('manual_question_text[]')
             manual_types        = request.POST.getlist('manual_question_type[]')
@@ -217,13 +215,11 @@ def review_extracted_questions(request, pk):
             manual_answers      = request.POST.getlist('manual_correct_answer[]')
             manual_explanations = request.POST.getlist('manual_explanation[]')
 
-            # MC option lists (one value per manual question that is MC type)
             manual_opts_a = request.POST.getlist('manual_option_A[]')
             manual_opts_b = request.POST.getlist('manual_option_B[]')
             manual_opts_c = request.POST.getlist('manual_option_C[]')
             manual_opts_d = request.POST.getlist('manual_option_D[]')
 
-            # Map frontend type names → model QuestionType.name values
             type_name_map = {
                 'fill_in_the_blank': 'fill_blank',
                 'multiple_choice':   'multiple_choice',
@@ -237,7 +233,6 @@ def review_extracted_questions(request, pk):
             newly_created_ids = []
 
             for i, uid in enumerate(manual_uids):
-                # Safely get each parallel field
                 q_text = manual_texts[i].strip()        if i < len(manual_texts)        else ''
                 q_type = manual_types[i].strip()        if i < len(manual_types)        else ''
                 q_diff = manual_difficulties[i].strip() if i < len(manual_difficulties) else 'medium'
@@ -245,28 +240,23 @@ def review_extracted_questions(request, pk):
                 q_ans  = manual_answers[i].strip()      if i < len(manual_answers)      else ''
                 q_expl = manual_explanations[i].strip() if i < len(manual_explanations) else ''
 
-                # Skip obviously broken entries
                 if not q_text or not q_type:
                     continue
 
-                # Safe int conversion for points
                 try:
                     q_pts = int(q_pts)
                 except (ValueError, TypeError):
                     q_pts = 1
 
-                # Resolve to model QuestionType name
                 resolved_type = type_name_map.get(q_type, q_type)
 
                 try:
                     question_type_obj = QuestionType.objects.get(name=resolved_type)
                 except QuestionType.DoesNotExist:
-                    # Fall back to first active type rather than silently dropping
                     question_type_obj = QuestionType.objects.filter(is_active=True).first()
                     if not question_type_obj:
                         continue
 
-                # Build MC options (only present if type is multiple_choice)
                 opt_a = manual_opts_a[i] if i < len(manual_opts_a) else None
                 opt_b = manual_opts_b[i] if i < len(manual_opts_b) else None
                 opt_c = manual_opts_c[i] if i < len(manual_opts_c) else None
@@ -280,7 +270,7 @@ def review_extracted_questions(request, pk):
                     explanation    = q_expl or None,
                     points         = q_pts,
                     difficulty     = q_diff,
-                    is_approved    = True,  # manual questions are always approved
+                    is_approved    = True,
                     option_a       = opt_a or None,
                     option_b       = opt_b or None,
                     option_c       = opt_c or None,
@@ -288,19 +278,15 @@ def review_extracted_questions(request, pk):
                 )
                 newly_created_ids.append(new_q.id)
 
-            # Combine AI-selected IDs + newly-saved manual IDs
             all_approved_ids = list(selected_ids) + [str(i) for i in newly_created_ids]
 
             if not all_approved_ids:
                 messages.error(request, 'Please select at least one question.')
                 return redirect('questionnaires:review_extracted', pk=pk)
 
-            # Approve selected AI questions; un-approve everything else
-            # (Newly created manual questions are already is_approved=True)
             extracted_questions.filter(id__in=selected_ids).update(is_approved=True)
             extracted_questions.exclude(id__in=all_approved_ids).update(is_approved=False)
 
-            # Update title if changed
             final_title = request.POST.get('final_title', '').strip()
             if final_title:
                 questionnaire.title = final_title
@@ -325,14 +311,12 @@ def review_extracted_questions(request, pk):
             messages.success(request, f'Saved {total_saved} question(s) successfully!')
             return redirect('questionnaires:my_uploads')
 
-        # ── Delete a single question ──────────────────────────────────────────
         elif action == 'delete_question':
             question_id = request.POST.get('question_id')
             ExtractedQuestion.objects.filter(id=question_id, questionnaire=questionnaire).delete()
             messages.info(request, 'Question deleted.')
             return redirect('questionnaires:review_extracted', pk=pk)
 
-        # ── Approve all ───────────────────────────────────────────────────────
         elif action == 'approve_all':
             extracted_questions.update(is_approved=True)
             ActivityLog.objects.create(
@@ -533,7 +517,6 @@ def browse_questionnaires(request):
 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
 
-    # Only show questionnaires from the teacher's own department
     questionnaires = Questionnaire.objects.select_related(
         'department', 'subject', 'uploader__user'
     ).filter(subject__departments=teacher.department)
@@ -551,7 +534,6 @@ def browse_questionnaires(request):
             Q(subject__code__icontains=search_query)
         )
 
-    # Only show subjects that belong to the teacher's department
     subjects = Subject.objects.filter(departments=teacher.department)
 
     paginator = Paginator(questionnaires, 12)
@@ -738,3 +720,153 @@ def get_questions_json(request, pk):
         'total':               len(questions_data),
         'questions':           questions_data,
     })
+
+
+# ============================================================================
+# WORKSPACE VIEWS
+# ============================================================================
+
+@login_required
+def workspace(request):
+    """
+    Render the teacher's workspace page.
+
+    The actual question data lives in the browser's localStorage (key:
+    'bisu_workspace_questions') so no server-side storage is needed.
+    We only pass lightweight context so the template can render correctly.
+    """
+    if request.user.is_staff:
+        # Admins have no use for the workspace — redirect them home
+        messages.info(request, 'The workspace feature is for teachers only.')
+        return redirect('accounts:admin_dashboard')
+
+    return render(request, 'teacher_dashboard/workspace.html')
+
+
+@login_required
+def download_workspace(request):
+    """
+    Download a combined BISU-format document built from questions that span
+    multiple questionnaires (the teacher's workspace selection).
+
+    Query-string parameters
+    -----------------------
+    type      : must be 'generated'
+    format    : 'docx' (default) | 'pdf'
+    questions : comma-separated ExtractedQuestion PKs
+                e.g. ?type=generated&format=docx&questions=3,7,12,45
+
+    The view looks up each question ID across ALL questionnaires (not just one),
+    so it works correctly when the teacher has mixed questions from different
+    subjects/questionnaires into their workspace.
+    """
+    import os
+    from .generators import generate_bisu_questionnaire
+
+    if request.user.is_staff:
+        messages.error(request, 'Admins cannot use the workspace download.')
+        return redirect('accounts:admin_dashboard')
+
+    # ── Parse & validate the question IDs ────────────────────────────────────
+    question_ids_param = request.GET.get('questions', '').strip()
+
+    if not question_ids_param:
+        messages.error(request, 'No questions specified for download.')
+        return redirect('questionnaires:workspace')
+
+    try:
+        question_ids = [
+            int(i) for i in question_ids_param.split(',')
+            if i.strip().isdigit()
+        ]
+    except (ValueError, TypeError):
+        messages.error(request, 'Invalid question selection.')
+        return redirect('questionnaires:workspace')
+
+    if not question_ids:
+        messages.error(request, 'No valid question IDs provided.')
+        return redirect('questionnaires:workspace')
+
+    # ── Fetch the questions (cross-questionnaire lookup) ─────────────────────
+    # We restrict to questionnaires visible to teachers in the same department
+    # so a teacher cannot download questions they're not meant to access.
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+
+    selected_questions = ExtractedQuestion.objects.filter(
+        id__in=question_ids,
+        questionnaire__subject__departments=teacher.department,   # access control
+    ).select_related(
+        'question_type',
+        'questionnaire',
+        'questionnaire__subject',
+        'questionnaire__department',
+    ).order_by(
+        'questionnaire__subject__code',   # group by subject in document
+        'question_type__name',
+        'created_at',
+    )
+
+    if not selected_questions.exists():
+        messages.error(
+            request,
+            'None of the selected questions could be found or you do not have access to them.'
+        )
+        return redirect('questionnaires:workspace')
+
+    # ── Build a lightweight proxy questionnaire object for the generator ──────
+    # generate_bisu_questionnaire() expects a single Questionnaire instance for
+    # header information.  When questions span multiple questionnaires we use a
+    # simple namespace object so we never have to touch the generator itself.
+    first_quest = selected_questions.first().questionnaire
+
+    class WorkspaceQuestionnaireProxy:
+        """Mimics the Questionnaire model fields used by generate_bisu_questionnaire."""
+        def __init__(self, base_questionnaire, questions):
+            self.pk          = None
+            self.title       = 'Workspace Selection'
+            self.description = (
+                f'Combined questionnaire — {questions.count()} question(s) '
+                f'from {questions.values("questionnaire__subject__code").distinct().count()} subject(s)'
+            )
+            # Use the first questionnaire's department/subject for the document header
+            self.department  = base_questionnaire.department
+            self.subject     = base_questionnaire.subject
+            self.uploader    = base_questionnaire.uploader
+
+    proxy = WorkspaceQuestionnaireProxy(first_quest, selected_questions)
+
+    # ── Generate the document ─────────────────────────────────────────────────
+    try:
+        file_format = request.GET.get('format', 'docx').lower()
+        docx_path, pdf_path = generate_bisu_questionnaire(proxy, selected_questions)
+
+        if file_format == 'pdf' and pdf_path and os.path.exists(pdf_path):
+            filepath     = pdf_path
+            content_type = 'application/pdf'
+            filename     = 'BISU_Workspace_Questionnaire.pdf'
+        else:
+            filepath     = docx_path
+            content_type = (
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+            filename = 'BISU_Workspace_Questionnaire.docx'
+
+        # Log the workspace download activity
+        ActivityLog.objects.create(
+            activity_type='questionnaire_downloaded',
+            user=request.user,
+            description=(
+                f'Downloaded workspace selection: '
+                f'{selected_questions.count()} question(s) from '
+                f'{selected_questions.values("questionnaire__subject__code").distinct().count()} subject(s)'
+            )
+        )
+
+        file_handle = open(filepath, 'rb')
+        response    = FileResponse(file_handle, content_type=content_type)
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    except Exception as e:
+        messages.error(request, f'Failed to generate workspace document: {str(e)}')
+        return redirect('questionnaires:workspace')

@@ -2,7 +2,7 @@
 
 {% block title %}Browse Questionnaires - Teacher{% endblock %}
 {% block header_title %}Browse Questionnaires{% endblock %}
-{% block header_subtitle %}Discover and download questionnaires from your colleagues{% endblock %}
+{% block header_subtitle %}Discover questionnaires and save questions to your workspace folders{% endblock %}
 
 {% block content %}
 
@@ -38,6 +38,25 @@
             </button>
         </div>
     </form>
+</div>
+
+<!-- Workspace mini banner -->
+<div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg p-4 mb-6 flex items-center gap-4">
+    <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+        <i class="bi bi-folder2-open text-white text-lg"></i>
+    </div>
+    <div class="flex-1">
+        <div class="text-white font-bold text-sm">My Workspace</div>
+        <div class="text-white/75 text-xs">
+            <span id="browse-ws-folders">0</span> folder(s) &mdash;
+            <span id="browse-ws-count">0</span> question(s) saved across all folders
+        </div>
+    </div>
+    <a href="{% url 'questionnaires:workspace' %}"
+        class="px-4 py-2 bg-white text-indigo-700 font-bold text-sm rounded-lg
+               hover:bg-indigo-50 transition-colors flex items-center gap-2 flex-shrink-0">
+        <i class="bi bi-arrow-right-circle"></i> Open Workspace
+    </a>
 </div>
 
 <!-- Questionnaires Grid -->
@@ -104,29 +123,31 @@
         </div>
 
         <!-- Card Footer -->
-        <div class="bg-gray-50 px-5 py-4 rounded-b-xl">
+        <div class="bg-gray-50 px-5 py-4 rounded-b-xl space-y-2">
             <!-- Download dropdown -->
-            <div class="mb-2">
-                <button type="button"
-                    data-quest-id="{{ quest.pk }}"
-                    data-file-type="{{ quest.file_type|upper }}"
-                    data-is-extracted="{{ quest.is_extracted|yesno:'true,false' }}"
-                    data-url-original="{% url 'questionnaires:download_questionnaire' quest.pk %}?type=original"
-                    data-url-docx="{% url 'questionnaires:download_questionnaire' quest.pk %}?type=generated&format=docx"
-                    data-url-pdf="{% url 'questionnaires:download_questionnaire' quest.pk %}?type=generated&format=pdf"
-                    class="download-btn w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all flex items-center justify-center shadow-lg">
-                    <i class="bi bi-download mr-2"></i> Download
-                    <i class="bi bi-chevron-down ml-auto"></i>
-                </button>
-            </div>
+            <button type="button"
+                data-quest-id="{{ quest.pk }}"
+                data-file-type="{{ quest.file_type|upper }}"
+                data-is-extracted="{{ quest.is_extracted|yesno:'true,false' }}"
+                data-url-original="{% url 'questionnaires:download_questionnaire' quest.pk %}?type=original"
+                data-url-docx="{% url 'questionnaires:download_questionnaire' quest.pk %}?type=generated&format=docx"
+                data-url-pdf="{% url 'questionnaires:download_questionnaire' quest.pk %}?type=generated&format=pdf"
+                class="download-btn w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all flex items-center justify-center shadow-lg">
+                <i class="bi bi-download mr-2"></i> Download
+                <i class="bi bi-chevron-down ml-auto"></i>
+            </button>
 
-            <!-- Review button (only if questions extracted) -->
             {% if quest.is_extracted %}
+            <!-- Select & Save to Workspace Folder -->
             <button type="button"
                 data-quest-id="{{ quest.pk }}"
                 data-quest-title="{{ quest.title }}"
-                class="review-btn w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg transition-all flex items-center justify-center text-sm">
-                <i class="bi bi-list-check mr-2"></i> Review Questions
+                data-quest-subject-code="{{ quest.subject.code }}"
+                data-quest-subject-name="{{ quest.subject.name }}"
+                class="review-btn w-full bg-gradient-to-r from-indigo-500 to-purple-600
+                       hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-2 px-4
+                       rounded-lg transition-all flex items-center justify-center text-sm shadow">
+                <i class="bi bi-folder-plus mr-2"></i> Select &amp; Save to Workspace
             </button>
             {% endif %}
         </div>
@@ -150,7 +171,7 @@
 
 <!-- Pagination -->
 {% if page_obj.has_other_pages %}
-<div class="flex justify-center">
+<div class="flex justify-center mt-2">
     <nav class="flex items-center space-x-2">
         {% if page_obj.has_previous %}
             <a href="?page={{ page_obj.previous_page_number }}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
@@ -178,21 +199,25 @@
 </div>
 {% endif %}
 
-<!-- DOWNLOAD DROPDOWN PORTAL -->
+<!-- ══════════════════════════════════════════════════════════
+     DOWNLOAD DROPDOWN PORTAL
+════════════════════════════════════════════════════════════ -->
 <div id="download-dropdown-portal"
     style="display:none; position:fixed; z-index:99999; min-width:220px;"
-    class="bg-white rounded-lg shadow-2xl border-2 border-gray-200">
-</div>
+    class="bg-white rounded-lg shadow-2xl border-2 border-gray-200"></div>
 
-<!-- REVIEW MODAL -->
-<div id="reviewModal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden items-start justify-center p-4 overflow-y-auto">
+<!-- ══════════════════════════════════════════════════════════
+     REVIEW MODAL  (Step 1: pick questions)
+════════════════════════════════════════════════════════════ -->
+<div id="reviewModal"
+    class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden items-start justify-center p-4 overflow-y-auto">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
 
-        <!-- Modal Header -->
-        <div class="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-5 rounded-t-2xl flex items-center justify-between">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5 rounded-t-2xl flex items-center justify-between">
             <div>
-                <h2 class="text-xl font-bold text-white" id="modalTitle">Review Questions</h2>
-                <p class="text-white/80 text-sm mt-0.5" id="modalSubtitle">Select questions to include in your download</p>
+                <h2 class="text-xl font-bold text-white" id="modalTitle">Select Questions</h2>
+                <p class="text-white/80 text-sm mt-0.5">Choose questions then save them to a workspace folder</p>
             </div>
             <button type="button" id="closeReviewModal"
                 class="text-white hover:bg-white/20 rounded-lg p-2 transition-colors">
@@ -200,11 +225,11 @@
             </button>
         </div>
 
-        <!-- Modal Stats Bar -->
+        <!-- Stats bar -->
         <div class="grid grid-cols-3 gap-0 border-b border-gray-200">
             <div class="p-4 text-center border-r border-gray-200">
                 <div class="text-2xl font-bold text-blue-600" id="modalTotalCount">0</div>
-                <div class="text-xs text-gray-500">Total Questions</div>
+                <div class="text-xs text-gray-500">Total</div>
             </div>
             <div class="p-4 text-center border-r border-gray-200">
                 <div class="text-2xl font-bold text-green-600" id="modalSelectedCount">0</div>
@@ -212,18 +237,18 @@
             </div>
             <div class="p-4 text-center">
                 <div class="text-2xl font-bold text-orange-600" id="modalPointsCount">0</div>
-                <div class="text-xs text-gray-500">Total Points</div>
+                <div class="text-xs text-gray-500">Points</div>
             </div>
         </div>
 
-        <!-- Modal Filter & Actions Bar -->
+        <!-- Filter bar -->
         <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
             <select id="modalFilterType"
-                class="px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 text-sm">
+                class="px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
                 <option value="all">All Types</option>
             </select>
             <select id="modalFilterDiff"
-                class="px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 text-sm">
+                class="px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
                 <option value="all">All Difficulties</option>
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>
@@ -239,37 +264,44 @@
             </button>
         </div>
 
-        <!-- Modal Questions List -->
-        <div id="modalQuestionsList" class="p-6 space-y-3 max-h-[50vh] overflow-y-auto">
-            <div class="flex items-center justify-center py-10 text-gray-400">
-                <div class="text-center">
-                    <div class="w-10 h-10 border-4 border-purple-200 border-t-purple-500 rounded-full mx-auto mb-3" id="modalSpinner" style="animation: spin 1s linear infinite;"></div>
-                    <p>Loading questions...</p>
-                </div>
-            </div>
-        </div>
+        <!-- Questions list -->
+        <div id="modalQuestionsList" class="p-6 space-y-3 max-h-[50vh] overflow-y-auto"></div>
 
-        <!-- Modal Footer -->
+        <!-- Footer -->
         <div class="px-6 py-5 bg-gray-50 rounded-b-2xl border-t border-gray-200">
-            <p id="modalSelectionLabel" class="text-xs text-gray-500 mb-3 font-medium">
-                All questions selected for download
-            </p>
+            <p id="modalSelectionLabel" class="text-xs text-gray-500 mb-3 font-medium">0 questions selected</p>
             <div class="flex flex-wrap items-center gap-3">
-                <span class="text-sm font-semibold text-gray-700">Download selected as:</span>
+
+                <!-- PRIMARY: Save to Workspace Folder -->
+                <button id="modalSaveToFolder"
+                    class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500
+                           to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold
+                           rounded-lg transition-all shadow text-sm opacity-50 cursor-not-allowed">
+                    <i class="bi bi-folder-plus"></i> Save to Folder
+                </button>
+
+                <div class="h-8 border-l border-gray-300 mx-1"></div>
+                <span class="text-xs text-gray-500 font-medium">or download directly:</span>
+
                 <a id="modalDownloadDocx" href="#"
-                    class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-lg transition-all shadow text-sm">
+                    class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600
+                           text-white font-semibold rounded-lg text-sm opacity-50 cursor-not-allowed">
                     <i class="bi bi-file-word"></i> BISU DOCX
                 </a>
                 <a id="modalDownloadPdf" href="#"
-                    class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold rounded-lg transition-all shadow text-sm">
+                    class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600
+                           text-white font-semibold rounded-lg text-sm opacity-50 cursor-not-allowed">
                     <i class="bi bi-file-pdf"></i> BISU PDF
                 </a>
                 <a id="modalDownloadOriginal" href="#"
-                    class="flex items-center gap-2 px-4 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all shadow text-sm">
-                    <i class="bi bi-file-earmark"></i> Original File
+                    class="flex items-center gap-2 px-4 py-2.5 bg-gray-500 hover:bg-gray-600
+                           text-white font-semibold rounded-lg text-sm">
+                    <i class="bi bi-file-earmark"></i> Original
                 </a>
+
                 <button type="button" id="closeReviewModalFooter"
-                    class="ml-auto px-4 py-2.5 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold rounded-lg transition-all text-sm">
+                    class="ml-auto px-4 py-2.5 bg-white border-2 border-gray-300
+                           hover:border-gray-400 text-gray-700 font-semibold rounded-lg text-sm">
                     <i class="bi bi-x mr-1"></i> Close
                 </button>
             </div>
@@ -277,365 +309,449 @@
     </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════
+     FOLDER PICKER MODAL  (Step 2: choose / create folder)
+════════════════════════════════════════════════════════════ -->
+<div id="folderPickerModal"
+    class="fixed inset-0 bg-black/70 z-[60] hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5 rounded-t-2xl flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-folder-plus text-white text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-bold text-lg">Save to Folder</h3>
+                    <p class="text-white/75 text-xs" id="fpModalSubtitle">Choose a folder for your questions</p>
+                </div>
+            </div>
+            <button id="closeFolderPicker" class="text-white hover:bg-white/20 rounded-lg p-2 transition-colors">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div class="p-6">
+            <!-- Existing folders list -->
+            <div id="fp-folder-list" class="space-y-2 mb-5 max-h-60 overflow-y-auto"></div>
+
+            <!-- No folders hint -->
+            <div id="fp-no-folders" class="hidden text-center py-4 text-gray-500 text-sm mb-5">
+                <i class="bi bi-folder2 text-3xl text-gray-300 block mb-2"></i>
+                You don't have any folders yet.
+            </div>
+
+            <!-- Create new folder inline -->
+            <div class="border-t border-gray-200 pt-4">
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                    <i class="bi bi-plus-circle mr-1"></i> Create New Folder
+                </p>
+                <div class="flex gap-2">
+                    <input type="text" id="fp-new-folder-name" maxlength="80"
+                        placeholder="Folder name (e.g. Midterm Exam)..."
+                        class="flex-1 px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm
+                               focus:outline-none focus:border-indigo-500 transition-colors">
+                    <button id="fp-create-and-save"
+                        class="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-bold
+                               rounded-xl text-sm transition-colors flex items-center gap-1.5 flex-shrink-0">
+                        <i class="bi bi-folder-plus"></i> Create &amp; Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
-.line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-.line-clamp-3 {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
+.line-clamp-2 { display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
+.line-clamp-3 { display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden; }
 </style>
 
 <script>
 (function () {
+'use strict';
 
-    // ================================================================
-    // DOWNLOAD DROPDOWN PORTAL
-    // ================================================================
-    var portal = document.getElementById('download-dropdown-portal');
-    var activeBtn = null;
+/* ── Workspace storage (same schema as workspace.html) ── */
+var STORE_KEY = 'bisu_workspace_v2';
+function loadStore() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || { folders: [] }; }
+    catch(e) { return { folders: [] }; }
+}
+function saveStore(s) { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-    function buildMenuHTML(btn) {
-        var fileType    = btn.getAttribute('data-file-type');
-        var isExtracted = btn.getAttribute('data-is-extracted') === 'true';
-        var urlOriginal = btn.getAttribute('data-url-original');
-        var urlDocx     = btn.getAttribute('data-url-docx');
-        var urlPdf      = btn.getAttribute('data-url-pdf');
+function updateBrowseBanner() {
+    var s = loadStore();
+    var totalQ = s.folders.reduce(function(a,f){ return a+f.questions.length; }, 0);
+    var el1 = document.getElementById('browse-ws-folders');
+    var el2 = document.getElementById('browse-ws-count');
+    if (el1) el1.textContent = s.folders.length;
+    if (el2) el2.textContent = totalQ;
+    var badge = document.getElementById('ws-sidebar-badge');
+    if (badge) badge.textContent = totalQ;
+}
+updateBrowseBanner();
 
-        var html = '<a href="' + urlOriginal + '" class="block px-4 py-3 hover:bg-gray-100 transition-colors rounded-t-lg">' +
-            '<div class="flex items-center">' +
-            '<i class="bi bi-file-earmark text-blue-500 text-lg mr-3"></i>' +
-            '<div><span class="font-semibold text-gray-800 block">Original File</span>' +
-            '<span class="text-xs text-gray-500">' + fileType + ' format</span></div>' +
-            '</div></a>';
+/* ══════════════════════════════════════════════════
+   DOWNLOAD DROPDOWN PORTAL
+════════════════════════════════════════════════ */
+var portal    = document.getElementById('download-dropdown-portal');
+var activeBtn = null;
 
-        if (isExtracted) {
-            html += '<div class="border-t border-gray-200"></div>' +
-                '<div class="px-4 py-2 bg-purple-50">' +
-                '<span class="text-xs font-bold text-purple-700"><i class="bi bi-stars mr-1"></i> BISU Official Format</span>' +
-                '</div>' +
-                '<a href="' + urlDocx + '" class="block px-4 py-3 hover:bg-gray-100 transition-colors">' +
-                '<div class="flex items-center">' +
-                '<i class="bi bi-file-word text-blue-600 text-lg mr-3"></i>' +
-                '<div><span class="font-semibold text-gray-800 block">Word Document</span>' +
-                '<span class="text-xs text-gray-500">Professional BISU format (DOCX)</span></div>' +
-                '</div></a>' +
-                '<a href="' + urlPdf + '" class="block px-4 py-3 hover:bg-gray-100 transition-colors rounded-b-lg">' +
-                '<div class="flex items-center">' +
-                '<i class="bi bi-file-pdf text-red-600 text-lg mr-3"></i>' +
-                '<div><span class="font-semibold text-gray-800 block">PDF Document</span>' +
-                '<span class="text-xs text-gray-500">Ready-to-print BISU format (PDF)</span></div>' +
-                '</div></a>';
-        }
-        return html;
+function buildMenuHTML(btn) {
+    var ft  = btn.getAttribute('data-file-type');
+    var ix  = btn.getAttribute('data-is-extracted') === 'true';
+    var uO  = btn.getAttribute('data-url-original');
+    var uDx = btn.getAttribute('data-url-docx');
+    var uPf = btn.getAttribute('data-url-pdf');
+
+    var h = '<a href="'+uO+'" class="block px-4 py-3 hover:bg-gray-100 transition-colors rounded-t-lg">' +
+        '<div class="flex items-center"><i class="bi bi-file-earmark text-blue-500 text-lg mr-3"></i>' +
+        '<div><span class="font-semibold text-gray-800 block">Original File</span>' +
+        '<span class="text-xs text-gray-500">'+ft+' format</span></div></div></a>';
+    if (ix) {
+        h += '<div class="border-t border-gray-200"></div>' +
+            '<div class="px-4 py-2 bg-purple-50"><span class="text-xs font-bold text-purple-700"><i class="bi bi-stars mr-1"></i> BISU Official Format</span></div>' +
+            '<a href="'+uDx+'" class="block px-4 py-3 hover:bg-gray-100">' +
+            '<div class="flex items-center"><i class="bi bi-file-word text-blue-600 text-lg mr-3"></i>' +
+            '<div><span class="font-semibold text-gray-800 block">Word Document</span><span class="text-xs text-gray-500">BISU format (DOCX)</span></div></div></a>' +
+            '<a href="'+uPf+'" class="block px-4 py-3 hover:bg-gray-100 rounded-b-lg">' +
+            '<div class="flex items-center"><i class="bi bi-file-pdf text-red-600 text-lg mr-3"></i>' +
+            '<div><span class="font-semibold text-gray-800 block">PDF Document</span><span class="text-xs text-gray-500">Ready-to-print (PDF)</span></div></div></a>';
     }
+    return h;
+}
+function openDropdown(btn) {
+    var r = btn.getBoundingClientRect();
+    portal.innerHTML = buildMenuHTML(btn);
+    portal.style.cssText = 'display:block;position:fixed;z-index:99999;min-width:220px;top:-9999px;left:'+r.left+'px;width:'+r.width+'px;';
+    var mh = portal.offsetHeight;
+    var sb = window.innerHeight - r.bottom;
+    portal.style.top = (sb >= mh+8 ? r.bottom+4 : Math.max(8, r.top-mh-4)) + 'px';
+    activeBtn = btn;
+}
+function closeDropdown() { portal.style.display='none'; portal.innerHTML=''; activeBtn=null; }
 
-    function openDropdown(btn) {
-        var rect = btn.getBoundingClientRect();
-        portal.innerHTML = buildMenuHTML(btn);
-        portal.style.display = 'block';
-        portal.style.left = rect.left + 'px';
-        portal.style.width = rect.width + 'px';
-        portal.style.top = '-9999px';
-        portal.style.bottom = '';
-        portal.style.maxHeight = '';
-        portal.style.overflowY = '';
+document.querySelectorAll('.download-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) { e.stopPropagation(); activeBtn===btn ? closeDropdown() : openDropdown(btn); });
+});
+document.addEventListener('click', function(e){ if (!portal.contains(e.target)) closeDropdown(); });
+window.addEventListener('scroll', closeDropdown, true);
+window.addEventListener('resize', closeDropdown);
 
-        var menuHeight = portal.offsetHeight;
-        var spaceBelow = window.innerHeight - rect.bottom;
-        var spaceAbove = rect.top;
+/* ══════════════════════════════════════════════════
+   REVIEW MODAL  (Step 1)
+════════════════════════════════════════════════ */
+var reviewModal     = document.getElementById('reviewModal');
+var modalList       = document.getElementById('modalQuestionsList');
+var modalFilterType = document.getElementById('modalFilterType');
+var modalFilterDiff = document.getElementById('modalFilterDiff');
+var currentQuestData  = null;
+var currentQuestId    = null;
+var currentSubjectCode = null;
+var currentSubjectName = null;
 
-        if (spaceBelow >= menuHeight + 8) {
-            portal.style.top = (rect.bottom + 4) + 'px';
-        } else if (spaceAbove >= menuHeight + 8) {
-            portal.style.top = (rect.top - menuHeight - 4) + 'px';
-        } else {
-            if (spaceBelow >= spaceAbove) {
-                portal.style.top = (rect.bottom + 4) + 'px';
-                portal.style.maxHeight = (spaceBelow - 8) + 'px';
-                portal.style.overflowY = 'auto';
-            } else {
-                portal.style.top = '8px';
-                portal.style.maxHeight = (spaceAbove - 8) + 'px';
-                portal.style.overflowY = 'auto';
-            }
-        }
-        activeBtn = btn;
-    }
+document.querySelectorAll('.review-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        currentQuestId     = btn.getAttribute('data-quest-id');
+        currentSubjectCode = btn.getAttribute('data-quest-subject-code');
+        currentSubjectName = btn.getAttribute('data-quest-subject-name');
+        document.getElementById('modalTitle').textContent = btn.getAttribute('data-quest-title');
 
-    function closeDropdown() {
-        portal.style.display = 'none';
-        portal.style.maxHeight = '';
-        portal.style.overflowY = '';
-        portal.innerHTML = '';
-        activeBtn = null;
-    }
+        document.getElementById('modalDownloadDocx').href     = '/questionnaires/download/'+currentQuestId+'/?type=generated&format=docx';
+        document.getElementById('modalDownloadPdf').href      = '/questionnaires/download/'+currentQuestId+'/?type=generated&format=pdf';
+        document.getElementById('modalDownloadOriginal').href = '/questionnaires/download/'+currentQuestId+'/?type=original';
 
-    document.querySelectorAll('.download-btn').forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (activeBtn === btn) { closeDropdown(); } else { openDropdown(btn); }
+        reviewModal.classList.remove('hidden');
+        reviewModal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+        loadQuestions(currentQuestId);
+    });
+});
+
+function closeReviewModal() {
+    reviewModal.classList.add('hidden');
+    reviewModal.classList.remove('flex');
+    document.body.style.overflow = '';
+    modalList.innerHTML = '';
+    currentQuestData = null;
+    modalFilterType.innerHTML = '<option value="all">All Types</option>';
+    modalFilterDiff.value = 'all';
+}
+document.getElementById('closeReviewModal').addEventListener('click', closeReviewModal);
+document.getElementById('closeReviewModalFooter').addEventListener('click', closeReviewModal);
+reviewModal.addEventListener('click', function(e){ if(e.target===reviewModal) closeReviewModal(); });
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeFolderPicker(); closeReviewModal(); } });
+
+function loadQuestions(qid) {
+    modalList.innerHTML = '<div class="flex items-center justify-center py-10 text-gray-400"><div class="text-center">' +
+        '<div style="width:40px;height:40px;border:4px solid #e0e7ff;border-top-color:#6366f1;border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite;"></div>' +
+        '<p>Loading questions...</p></div></div>';
+
+    fetch('/questionnaires/get-questions/' + qid + '/')
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+            currentQuestData = data.questions;
+            renderModalQuestions(data.questions);
+            buildModalTypeFilter(data.questions);
+        })
+        .catch(function() {
+            modalList.innerHTML = '<div class="text-center py-10 text-red-500"><i class="bi bi-exclamation-circle text-3xl mb-2 block"></i><p>Failed to load questions.</p></div>';
         });
-    });
+}
 
-    document.addEventListener('click', function (e) {
-        if (!portal.contains(e.target)) closeDropdown();
-    });
-    window.addEventListener('scroll', closeDropdown, true);
-    window.addEventListener('resize', closeDropdown);
-
-    // ================================================================
-    // REVIEW MODAL
-    // ================================================================
-    var reviewModal   = document.getElementById('reviewModal');
-    var modalTitle    = document.getElementById('modalTitle');
-    var modalSubtitle = document.getElementById('modalSubtitle');
-    var modalList     = document.getElementById('modalQuestionsList');
-    var modalFilterType = document.getElementById('modalFilterType');
-    var modalFilterDiff = document.getElementById('modalFilterDiff');
-    var currentQuestData = null;
-    var currentQuestId   = null;
-
-    document.querySelectorAll('.review-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var questId    = btn.getAttribute('data-quest-id');
-            var questTitle = btn.getAttribute('data-quest-title');
-
-            currentQuestId = questId;
-            modalTitle.textContent    = questTitle;
-            modalSubtitle.textContent = 'Select questions to include in your download';
-
-            document.getElementById('modalDownloadDocx').href     = '/questionnaires/download/' + questId + '/?type=generated&format=docx';
-            document.getElementById('modalDownloadPdf').href      = '/questionnaires/download/' + questId + '/?type=generated&format=pdf';
-            document.getElementById('modalDownloadOriginal').href = '/questionnaires/download/' + questId + '/?type=original';
-
-            reviewModal.classList.remove('hidden');
-            reviewModal.classList.add('flex');
-            document.body.style.overflow = 'hidden';
-
-            loadQuestions(questId);
-        });
-    });
-
-    function closeModal() {
-        reviewModal.classList.add('hidden');
-        reviewModal.classList.remove('flex');
-        document.body.style.overflow = '';
-        modalList.innerHTML = '';
-        currentQuestData = null;
-        modalFilterType.innerHTML = '<option value="all">All Types</option>';
-        modalFilterDiff.value = 'all';
+function renderModalQuestions(questions) {
+    if (!questions || !questions.length) {
+        modalList.innerHTML = '<div class="text-center py-10 text-gray-400"><i class="bi bi-inbox text-4xl mb-2 block"></i><p>No questions available.</p></div>';
+        return;
     }
+    var dBorder = {easy:'border-green-500',medium:'border-yellow-500',hard:'border-red-500'};
+    var dBadge  = {easy:'bg-green-100 text-green-800',medium:'bg-yellow-100 text-yellow-800',hard:'bg-red-100 text-red-800'};
 
-    document.getElementById('closeReviewModal').addEventListener('click', closeModal);
-    document.getElementById('closeReviewModalFooter').addEventListener('click', closeModal);
-    reviewModal.addEventListener('click', function (e) { if (e.target === reviewModal) closeModal(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+    /* check which are already in any folder */
+    var inWs = new Set();
+    loadStore().folders.forEach(function(f){ f.questions.forEach(function(q){ inWs.add(String(q.id)); }); });
 
-    function loadQuestions(questId) {
-        modalList.innerHTML = '<div class="flex items-center justify-center py-10 text-gray-400">' +
-            '<div class="text-center">' +
-            '<div style="width:40px;height:40px;border:4px solid #e9d5ff;border-top-color:#a855f7;border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite;"></div>' +
-            '<p>Loading questions...</p></div></div>';
-
-        fetch('/questionnaires/get-questions/' + questId + '/')
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                currentQuestData = data.questions;
-                renderQuestions(data.questions);
-                buildTypeFilter(data.questions);
-                updateModalStats();
-            })
-            .catch(function () {
-                modalList.innerHTML = '<div class="text-center py-10 text-red-500">' +
-                    '<i class="bi bi-exclamation-circle text-3xl mb-2 block"></i>' +
-                    '<p>Failed to load questions. Please try again.</p></div>';
-            });
-    }
-
-    function renderQuestions(questions) {
-        if (!questions || questions.length === 0) {
-            modalList.innerHTML = '<div class="text-center py-10 text-gray-500">' +
-                '<i class="bi bi-inbox text-4xl mb-3 block text-gray-300"></i>' +
-                '<p>No questions available for this questionnaire.</p></div>';
-            return;
-        }
-
-        var diffColors = { easy: 'border-green-500', medium: 'border-yellow-500', hard: 'border-red-500' };
-        var diffBadge  = { easy: 'bg-green-100 text-green-800', medium: 'bg-yellow-100 text-yellow-800', hard: 'bg-red-100 text-red-800' };
-
-        var html = '';
-        questions.forEach(function (q, i) {
-            var borderColor = diffColors[q.difficulty] || 'border-gray-300';
-            var badgeColor  = diffBadge[q.difficulty]  || 'bg-gray-100 text-gray-700';
-
-            html += '<div class="modal-question-card bg-white rounded-lg border-l-4 ' + borderColor + ' shadow-sm p-4"' +
-                ' data-type="' + q.type + '" data-difficulty="' + q.difficulty + '" data-points="' + q.points + '">' +
-                '<div class="flex items-start gap-3">' +
-                '<input type="checkbox" class="modal-checkbox w-5 h-5 text-purple-600 rounded mt-0.5 cursor-pointer flex-shrink-0"' +
-                ' data-question-id="' + q.id + '" checked>' +
+    var html = '';
+    questions.forEach(function(q, i) {
+        var already = inWs.has(String(q.id));
+        html += '<div class="modal-question-card bg-white rounded-lg border-l-4 ' + (dBorder[q.difficulty]||'border-gray-300') + ' shadow-sm p-4"' +
+            ' data-type="'+q.type+'" data-difficulty="'+q.difficulty+'" data-points="'+q.points+'">' +
+            '<div class="flex items-start gap-3">' +
+                '<input type="checkbox" class="modal-checkbox w-5 h-5 text-indigo-600 rounded mt-0.5 cursor-pointer flex-shrink-0" data-question-id="'+q.id+'" '+(already?'':'checked')+'>' +
                 '<div class="flex-1 min-w-0">' +
-                '<div class="flex flex-wrap gap-2 mb-2">' +
-                '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">' + q.type_display + '</span>' +
-                '<span class="px-2 py-0.5 ' + badgeColor + ' text-xs font-semibold rounded-full">' + q.difficulty + '</span>' +
-                '<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">' + q.points + ' pt</span>' +
-                '</div>' +
-                '<p class="text-gray-800 font-medium text-sm mb-2">' + (i + 1) + '. ' + escapeHtml(q.question_text) + '</p>';
+                    '<div class="flex flex-wrap gap-1.5 mb-2">' +
+                        '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">'+q.type_display+'</span>' +
+                        '<span class="px-2 py-0.5 '+(dBadge[q.difficulty]||'bg-gray-100 text-gray-700')+' text-xs font-semibold rounded-full">'+q.difficulty+'</span>' +
+                        '<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">'+q.points+' pt</span>' +
+                        (already ? '<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full"><i class="bi bi-folder-fill mr-1"></i>In Workspace</span>' : '') +
+                    '</div>' +
+                    '<p class="text-gray-800 font-medium text-sm mb-2">'+(i+1)+'. '+esc(q.question_text)+'</p>';
 
-            if (q.type === 'multiple_choice' && q.options) {
-                html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-1.5 ml-2">';
-                var letters = ['A', 'B', 'C', 'D'];
-                q.options.forEach(function (opt, idx) {
-                    var isCorrect = q.correct_answer && q.correct_answer.toUpperCase() === letters[idx];
-                    html += '<div class="flex items-center p-1.5 rounded text-xs ' +
-                        (isCorrect ? 'bg-green-50 border border-green-400 text-green-800 font-semibold' : 'bg-gray-50 text-gray-700') + '">' +
-                        '<span class="font-bold mr-1">' + letters[idx] + '.</span>' + escapeHtml(opt) +
-                        (isCorrect ? '<i class="bi bi-check-circle-fill ml-auto text-green-600"></i>' : '') +
-                        '</div>';
-                });
-                html += '</div>';
-            } else {
-                html += '<div class="bg-green-50 border-l-4 border-green-400 p-2 rounded text-xs mt-1">' +
-                    '<span class="text-gray-500">Answer: </span>' +
-                    '<span class="text-green-800 font-semibold">' + escapeHtml(q.correct_answer || '') + '</span></div>';
-            }
+        if (q.type === 'multiple_choice' && q.options) {
+            var L=['A','B','C','D'];
+            html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-1 ml-2">';
+            q.options.forEach(function(opt,idx){
+                var ok = q.correct_answer && q.correct_answer.toUpperCase()===L[idx];
+                html += '<div class="flex items-center p-1.5 rounded text-xs '+(ok?'bg-green-50 border border-green-400 text-green-800 font-semibold':'bg-gray-50 text-gray-700')+'">'+
+                    '<span class="font-bold mr-1">'+L[idx]+'.</span>'+esc(opt)+
+                    (ok?'<i class="bi bi-check-circle-fill ml-auto text-green-600"></i>':'')+
+                    '</div>';
+            });
+            html += '</div>';
+        } else if (q.correct_answer) {
+            html += '<div class="bg-green-50 border-l-4 border-green-400 p-2 rounded text-xs mt-1">' +
+                '<span class="text-gray-500">Answer: </span><span class="text-green-800 font-semibold">'+esc(q.correct_answer)+'</span></div>';
+        }
+        if (q.explanation) {
+            html += '<div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300"><i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>'+esc(q.explanation)+'</div>';
+        }
+        html += '</div></div></div>';
+    });
 
-            if (q.explanation) {
-                html += '<div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300">' +
-                    '<i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>' + escapeHtml(q.explanation) + '</div>';
-            }
+    modalList.innerHTML = html;
+    modalList.querySelectorAll('.modal-checkbox').forEach(function(cb){
+        cb.addEventListener('change', function(){ updateModalStats(); updateModalDownloadLinks(); });
+    });
+    updateModalStats();
+    updateModalDownloadLinks();
+}
 
-            html += '</div></div></div>';
+function buildModalTypeFilter(questions) {
+    var types = {};
+    questions.forEach(function(q){ types[q.type]=q.type_display; });
+    var h = '<option value="all">All Types</option>';
+    Object.keys(types).forEach(function(k){ h += '<option value="'+k+'">'+types[k]+'</option>'; });
+    modalFilterType.innerHTML = h;
+}
+
+function applyModalFilters() {
+    var type = modalFilterType.value;
+    var diff = modalFilterDiff.value;
+    modalList.querySelectorAll('.modal-question-card').forEach(function(card){
+        var ok = (type==='all'||card.dataset.type===type) && (diff==='all'||card.dataset.difficulty===diff);
+        card.style.display = ok ? 'block' : 'none';
+        var cb = card.querySelector('.modal-checkbox');
+        if (cb) cb.checked = ok;
+    });
+    updateModalStats(); updateModalDownloadLinks();
+}
+modalFilterType.addEventListener('change', applyModalFilters);
+modalFilterDiff.addEventListener('change', applyModalFilters);
+
+document.getElementById('modalSelectAll').addEventListener('click', function(){
+    modalList.querySelectorAll('.modal-question-card').forEach(function(c){
+        if (c.style.display!=='none') c.querySelector('.modal-checkbox').checked=true;
+    });
+    updateModalStats(); updateModalDownloadLinks();
+});
+document.getElementById('modalDeselectAll').addEventListener('click', function(){
+    modalList.querySelectorAll('.modal-checkbox').forEach(function(cb){ cb.checked=false; });
+    updateModalStats(); updateModalDownloadLinks();
+});
+
+function getCheckedIds() {
+    return Array.from(modalList.querySelectorAll('.modal-checkbox:checked'))
+                .map(function(cb){ return cb.getAttribute('data-question-id'); });
+}
+
+function updateModalStats() {
+    var cards   = modalList.querySelectorAll('.modal-question-card');
+    var checked = modalList.querySelectorAll('.modal-checkbox:checked');
+    var pts = 0;
+    checked.forEach(function(cb){ pts += parseInt(cb.closest('.modal-question-card').dataset.points||1); });
+    document.getElementById('modalTotalCount').textContent    = cards.length;
+    document.getElementById('modalSelectedCount').textContent = checked.length;
+    document.getElementById('modalPointsCount').textContent   = pts;
+    document.getElementById('modalSelectionLabel').textContent = checked.length + ' question(s) selected';
+}
+
+function updateModalDownloadLinks() {
+    var ids = getCheckedIds();
+    var saveBtn = document.getElementById('modalSaveToFolder');
+    var docxBtn = document.getElementById('modalDownloadDocx');
+    var pdfBtn  = document.getElementById('modalDownloadPdf');
+    var base = '/questionnaires/download/'+currentQuestId+'/?type=generated';
+    if (ids.length > 0) {
+        var qs = '&questions='+ids.join(',');
+        docxBtn.href = base + '&format=docx' + qs;
+        pdfBtn.href  = base + '&format=pdf'  + qs;
+        [saveBtn].forEach(function(b){ b.classList.remove('opacity-50','cursor-not-allowed'); b.onclick=null; });
+        [docxBtn, pdfBtn].forEach(function(b){ b.classList.remove('opacity-50','cursor-not-allowed'); b.onclick=null; });
+    } else {
+        docxBtn.href='#'; pdfBtn.href='#';
+        [saveBtn,docxBtn,pdfBtn].forEach(function(b){
+            b.classList.add('opacity-50','cursor-not-allowed');
+            b.onclick = function(e){ e.preventDefault(); showToast('Select at least one question.','warning'); };
         });
+    }
+}
 
-        modalList.innerHTML = html;
+/* ══════════════════════════════════════════════════
+   FOLDER PICKER MODAL  (Step 2)
+════════════════════════════════════════════════ */
+var folderPickerModal = document.getElementById('folderPickerModal');
+var pendingQuestions  = [];   // questions to save once folder is chosen
 
-        modalList.querySelectorAll('.modal-checkbox').forEach(function (cb) {
-            cb.addEventListener('change', function () {
-                updateModalStats();
-                updateDownloadLinks();
+document.getElementById('modalSaveToFolder').addEventListener('click', function() {
+    var ids = getCheckedIds();
+    if (!ids.length) { showToast('Select at least one question.','warning'); return; }
+
+    /* Build question objects from currentQuestData */
+    pendingQuestions = (currentQuestData||[])
+        .filter(function(q){ return ids.includes(String(q.id)); })
+        .map(function(q){
+            return Object.assign({}, q, {
+                subject_code: currentSubjectCode,
+                subject_name: currentSubjectName
             });
         });
 
-        updateModalStats();
-        updateDownloadLinks();
+    /* Subtitle */
+    document.getElementById('fpModalSubtitle').textContent =
+        pendingQuestions.length + ' question(s) to save';
+
+    renderFolderPicker();
+    folderPickerModal.classList.remove('hidden');
+    folderPickerModal.classList.add('flex');
+});
+
+function closeFolderPicker() {
+    folderPickerModal.classList.add('hidden');
+    folderPickerModal.classList.remove('flex');
+    document.getElementById('fp-new-folder-name').value = '';
+}
+document.getElementById('closeFolderPicker').addEventListener('click', closeFolderPicker);
+folderPickerModal.addEventListener('click', function(e){ if(e.target===folderPickerModal) closeFolderPicker(); });
+
+function renderFolderPicker() {
+    var folders = loadStore().folders;
+    var list    = document.getElementById('fp-folder-list');
+    var nf      = document.getElementById('fp-no-folders');
+
+    if (folders.length === 0) {
+        nf.classList.remove('hidden');
+        list.innerHTML = '';
+        return;
     }
+    nf.classList.add('hidden');
 
-    function buildTypeFilter(questions) {
-        var types = {};
-        questions.forEach(function (q) { types[q.type] = q.type_display; });
-        var html = '<option value="all">All Types</option>';
-        Object.keys(types).forEach(function (key) {
-            html += '<option value="' + key + '">' + types[key] + '</option>';
+    var GRADS = ['from-indigo-400 to-purple-500','from-blue-400 to-cyan-500',
+                 'from-emerald-400 to-teal-500','from-orange-400 to-amber-500',
+                 'from-pink-400 to-rose-500'];
+
+    list.innerHTML = '';
+    folders.forEach(function(folder, idx) {
+        var grad = GRADS[idx % GRADS.length];
+        var btn  = document.createElement('button');
+        btn.className = 'w-full flex items-center gap-3 p-3.5 rounded-xl border-2 border-gray-100 ' +
+            'hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left group';
+        btn.innerHTML =
+            '<div class="w-10 h-10 bg-gradient-to-br '+grad+' rounded-lg flex items-center justify-center flex-shrink-0">' +
+                '<i class="bi bi-folder2-open text-white"></i>' +
+            '</div>' +
+            '<div class="flex-1 min-w-0">' +
+                '<div class="font-bold text-gray-800 text-sm truncate">'+esc(folder.name)+'</div>' +
+                '<div class="text-xs text-gray-400">'+folder.questions.length+' question(s)</div>' +
+            '</div>' +
+            '<i class="bi bi-arrow-right text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"></i>';
+        btn.addEventListener('click', function(){
+            saveToFolder(folder.id);
         });
-        modalFilterType.innerHTML = html;
-    }
-
-    function applyModalFilters() {
-        var type = modalFilterType.value;
-        var diff = modalFilterDiff.value;
-
-        modalList.querySelectorAll('.modal-question-card').forEach(function (card) {
-            var visible = (type === 'all' || card.dataset.type === type) &&
-                          (diff === 'all' || card.dataset.difficulty === diff);
-            card.style.display = visible ? 'block' : 'none';
-            var cb = card.querySelector('.modal-checkbox');
-            if (cb) cb.checked = visible;
-        });
-
-        updateModalStats();
-        updateDownloadLinks();
-    }
-
-    modalFilterType.addEventListener('change', applyModalFilters);
-    modalFilterDiff.addEventListener('change', applyModalFilters);
-
-    document.getElementById('modalSelectAll').addEventListener('click', function () {
-        modalList.querySelectorAll('.modal-question-card').forEach(function (card) {
-            if (card.style.display !== 'none') card.querySelector('.modal-checkbox').checked = true;
-        });
-        updateModalStats();
-        updateDownloadLinks();
+        list.appendChild(btn);
     });
+}
 
-    document.getElementById('modalDeselectAll').addEventListener('click', function () {
-        modalList.querySelectorAll('.modal-checkbox').forEach(function (cb) { cb.checked = false; });
-        updateModalStats();
-        updateDownloadLinks();
+function saveToFolder(folderId) {
+    var s = loadStore();
+    var folder = s.folders.find(function(f){ return f.id === folderId; });
+    if (!folder) return;
+    var existingIds = folder.questions.map(function(q){ return String(q.id); });
+    var added = 0;
+    pendingQuestions.forEach(function(q){
+        if (!existingIds.includes(String(q.id))) { folder.questions.push(q); added++; }
     });
+    saveStore(s);
+    updateBrowseBanner();
+    closeFolderPicker();
+    closeReviewModal();
 
-    function updateModalStats() {
-        var cards   = modalList.querySelectorAll('.modal-question-card');
-        var checked = modalList.querySelectorAll('.modal-checkbox:checked');
-        var pts = 0;
-        checked.forEach(function (cb) {
-            pts += parseInt(cb.closest('.modal-question-card').dataset.points || 1);
-        });
-        document.getElementById('modalTotalCount').textContent    = cards.length;
-        document.getElementById('modalSelectedCount').textContent = checked.length;
-        document.getElementById('modalPointsCount').textContent   = pts;
+    if (added > 0) {
+        showToast(added+' question(s) saved to "'+folder.name+'"!','success');
+    } else {
+        showToast('All selected questions are already in "'+folder.name+'".','info');
     }
+}
 
-    function updateDownloadLinks() {
-        var checked = modalList.querySelectorAll('.modal-checkbox:checked');
-        var ids = [];
-        checked.forEach(function (cb) { ids.push(cb.getAttribute('data-question-id')); });
+/* Create new folder inline and save */
+document.getElementById('fp-create-and-save').addEventListener('click', function(){
+    var name = document.getElementById('fp-new-folder-name').value.trim();
+    if (!name) { showToast('Please enter a folder name.','warning'); return; }
+    var s = loadStore();
+    var newFolder = { id: uid(), name: name, createdAt: Date.now(), questions: [] };
+    s.folders.push(newFolder);
+    saveStore(s);
+    showToast('Folder "'+name+'" created!','success');
+    saveToFolder(newFolder.id);
+});
+document.getElementById('fp-new-folder-name').addEventListener('keydown', function(e){
+    if (e.key==='Enter') document.getElementById('fp-create-and-save').click();
+});
 
-        var questId  = currentQuestId;
-        var baseDocx = '/questionnaires/download/' + questId + '/?type=generated&format=docx';
-        var basePdf  = '/questionnaires/download/' + questId + '/?type=generated&format=pdf';
-
-        if (ids.length > 0) {
-            var qs = '&questions=' + ids.join(',');
-            document.getElementById('modalDownloadDocx').href = baseDocx + qs;
-            document.getElementById('modalDownloadPdf').href  = basePdf + qs;
-        } else {
-            document.getElementById('modalDownloadDocx').href = '#';
-            document.getElementById('modalDownloadPdf').href  = '#';
-        }
-        document.getElementById('modalDownloadOriginal').href = '/questionnaires/download/' + questId + '/?type=original';
-
-        var bisuBtns = [
-            document.getElementById('modalDownloadDocx'),
-            document.getElementById('modalDownloadPdf')
-        ];
-        bisuBtns.forEach(function (btn) {
-            if (ids.length === 0) {
-                btn.classList.add('opacity-50', 'cursor-not-allowed');
-                btn.onclick = function(e) { e.preventDefault(); alert('Please select at least one question first.'); };
-            } else {
-                btn.classList.remove('opacity-50', 'cursor-not-allowed');
-                btn.onclick = null;
-            }
-        });
-
-        var label = document.getElementById('modalSelectionLabel');
-        if (label) {
-            label.textContent = ids.length > 0
-                ? ids.length + ' question(s) selected for download'
-                : 'No questions selected';
-        }
-    }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
+/* ── utils ── */
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function esc(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 })();
 </script>
+
+<style>
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
 
 {% endblock %}

@@ -25,4 +25,9 @@ urlpatterns = [
     # AJAX
     path('get-subjects/', views.get_subjects_ajax, name='get_subjects'),
     path('get-questions/<int:pk>/', views.get_questions_json, name='get_questions_json'),
+    
+    # urls.py (questionnaires app)
+    path('workspace/', views.workspace, name='workspace'),
+    # and for multi-questionnaire downloads:
+    path('download-workspace/', views.download_workspace, name='download_workspace'),
 ]
