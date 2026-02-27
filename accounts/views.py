@@ -14,7 +14,7 @@ from .forms import TeacherCreationForm, TeacherEditForm, DepartmentForm, Subject
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from .forms import DepartmentForm, SubjectForm 
-
+from django.db import OperationalError
 
 import logging
 logger = logging.getLogger(__name__)
@@ -56,26 +56,35 @@ def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
         
-        if user is not None:
-            login(request, user)
+        try:
+            user = authenticate(request, username=username, password=password)
             
-            # LOG LOGIN ACTIVITY with role information
-            from .models import ActivityLog
-            user_role = "Administrator" if user.is_staff else "Teacher"
-            ActivityLog.objects.create(
-                activity_type='user_login',
-                user=user,
-                description=f"{user_role} {user.get_full_name()} logged in to the system"
-            )
-            
-            if user.is_staff:
-                return redirect('accounts:admin_dashboard')
+            if user is not None:
+                login(request, user)
+                
+                from .models import ActivityLog
+                user_role = "Administrator" if user.is_staff else "Teacher"
+                ActivityLog.objects.create(
+                    activity_type='user_login',
+                    user=user,
+                    description=f"{user_role} {user.get_full_name()} logged in to the system"
+                )
+                
+                if user.is_staff:
+                    return redirect('accounts:admin_dashboard')
+                else:
+                    return redirect('accounts:teacher_dashboard')
             else:
-                return redirect('accounts:teacher_dashboard')
-        else:
-            messages.error(request, 'Invalid username or password')
+                messages.error(request, 'Invalid username or password')
+
+        except OperationalError:
+            messages.error(
+                request,
+                'Please check your internet connection and try again.'
+            )
+        except Exception:
+            messages.error(request, 'An unexpected error occurred. Please try again.')
     
     return render(request, 'accounts/login.html')
 
@@ -540,45 +549,42 @@ def teacher_dashboard(request):
 
 
 def get_teacher_upload_stats(teacher):
-    """
-    Get upload statistics for the last 6 months
-    Returns a list of dictionaries with month labels and upload counts
-    """
     from questionnaires.models import Questionnaire
-    
+    from django.utils import timezone
+    from dateutil.relativedelta import relativedelta  # more precise than timedelta
+
     stats = []
     today = timezone.now()
-    
-    for i in range(5, -1, -1):  # Last 6 months
-        # Calculate the month and year
-        month_date = today - timedelta(days=30 * i)
+
+    for i in range(5, -1, -1):  # oldest to newest
+        # Use relativedelta for accurate month subtraction
+        month_date = today - relativedelta(months=i)
         month = month_date.month
         year = month_date.year
-        
-        # Count uploads for this month
+
         count = Questionnaire.objects.filter(
             uploader=teacher,
             uploaded_at__month=month,
             uploaded_at__year=year
         ).count()
-        
-        # Get month label (e.g., "Jan", "Feb")
-        month_label = month_date.strftime('%b')
-        
+
         stats.append({
-            'label': month_label,
+            'label': month_date.strftime('%b'),
             'count': count,
-            'percentage': 0  # Will calculate after getting all counts
+            'percentage': 0  # placeholder
         })
-    
-    # Calculate percentages based on max count
-    max_count = max([s['count'] for s in stats]) if stats else 1
-    if max_count == 0:
-        max_count = 1  # Prevent division by zero
-    
+
+    # Calculate percentages
+    max_count = max(s['count'] for s in stats) if stats else 0
+
     for stat in stats:
-        stat['percentage'] = int((stat['count'] / max_count) * 100) if stat['count'] > 0 else 10
-    
+        if max_count == 0:
+            stat['percentage'] = 10  # flat baseline so bars are visible
+        elif stat['count'] == 0:
+            stat['percentage'] = 5   # small nub to show the bar exists
+        else:
+            stat['percentage'] = max(10, int((stat['count'] / max_count) * 100))
+
     return stats
 
 

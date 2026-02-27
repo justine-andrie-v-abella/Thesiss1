@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,13 +54,13 @@
     <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden lg:hidden"></div>
     
     <!-- Sidebar -->
-    <aside id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-blue-900 to-blue-800 text-white z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 shadow-2xl">
+    <aside id="sidebar" class="fixed left-0 top-0 h-full w-72 bg-gradient-to-b from-blue-900 to-blue-800 text-white z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 shadow-2xl">
         <!-- Brand -->
         <div class="p-6 border-b border-blue-700">
-            <div class="flex items-center space-x-3">
-                <div class="bg-white p-2 rounded-lg">
-                    <i class="bi bi-bank2 text-2xl text-blue-900"></i>
-                </div>
+            <div class="flex items-center space-x-3">           
+                <img src="{% static 'images/bisulogo.png' %}" 
+                    alt="BISU Logo" 
+                    class="w-10 h-10 object-contain flex-shrink-0">
                 <div>
                     <h1 class="text-xl font-bold">BISU TEST BANK</h1>
                     <p class="text-xs text-blue-200">Management System</p>
@@ -153,7 +154,7 @@
     </aside>
     
     <!-- Main Content Area -->
-    <div class="lg:ml-64 min-h-screen">
+    <div class="lg:ml-72 min-h-screen">
         <!-- Header -->
         <header class="bg-white shadow-sm sticky top-0 z-20">
             <div class="px-4 sm:px-6 lg:px-8 py-4">

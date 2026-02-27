@@ -109,42 +109,24 @@ FILE: templates/teacher_dashboard/dashboard.html
                     <i class="bi bi-graph-up text-indigo-500 mr-2"></i>
                     Upload Activity (Last 6 Months)
                 </h3>
-                <div class="h-48 flex items-end justify-between space-x-2">
+                <!-- Replace the existing chart container div -->
+                <div class="relative h-48 flex items-end justify-between space-x-2 bg-gray-50 rounded-lg p-2">
                     {% for month in upload_stats %}
-                    <div class="flex-1 flex flex-col items-center">
-                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg hover:from-indigo-600 hover:to-indigo-500 transition-all cursor-pointer relative group" 
-                             style="height: {{ month.percentage }}%;">
-                            <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    <div class="flex-1 flex flex-col items-center justify-end h-full">
+                        <div class="w-full bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-lg 
+                                    hover:from-indigo-700 hover:to-indigo-500 transition-all cursor-pointer 
+                                    relative group border border-indigo-300 shadow-sm" 
+                            style="height: {{ month.percentage }}%; min-height: 8px;">
+                            <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 
+                                        text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 
+                                        transition-opacity whitespace-nowrap z-10">
                                 {{ month.count }} upload{{ month.count|pluralize }}
                             </div>
                         </div>
                         <span class="text-xs text-gray-600 mt-2 font-medium">{{ month.label }}</span>
                     </div>
                     {% empty %}
-                    <div class="flex-1 flex flex-col items-center">
-                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 20%;"></div>
-                        <span class="text-xs text-gray-600 mt-2">Jan</span>
-                    </div>
-                    <div class="flex-1 flex flex-col items-center">
-                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 40%;"></div>
-                        <span class="text-xs text-gray-600 mt-2">Feb</span>
-                    </div>
-                    <div class="flex-1 flex flex-col items-center">
-                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 60%;"></div>
-                        <span class="text-xs text-gray-600 mt-2">Mar</span>
-                    </div>
-                    <div class="flex-1 flex flex-col items-center">
-                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 35%;"></div>
-                        <span class="text-xs text-gray-600 mt-2">Apr</span>
-                    </div>
-                    <div class="flex-1 flex flex-col items-center">
-                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 80%;"></div>
-                        <span class="text-xs text-gray-600 mt-2">May</span>
-                    </div>
-                    <div class="flex-1 flex flex-col items-center">
-                        <div class="w-full bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t-lg" style="height: 50%;"></div>
-                        <span class="text-xs text-gray-600 mt-2">Jun</span>
-                    </div>
+                    <!-- your existing empty fallback -->
                     {% endfor %}
                 </div>
             </div>
