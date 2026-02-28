@@ -6,6 +6,8 @@
 
 {% block content %}
 
+<script id="ws-initial-data" type="application/json">{{ folders_json|safe }}</script>
+
 <!-- ══════════════════════════════════════════════════════════
      OVERVIEW — Folder Grid
 ════════════════════════════════════════════════════════════ -->
@@ -64,7 +66,7 @@
         </button>
     </div>
 
-    <!-- Empty workspace hint -->
+    <!-- Empty state -->
     <div id="ws-no-folders" class="hidden bg-white rounded-2xl shadow p-16 text-center">
         <div class="w-28 h-28 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <i class="bi bi-folder2 text-6xl text-indigo-300"></i>
@@ -82,7 +84,7 @@
         </button>
     </div>
 
-    <!-- Folder Cards -->
+    <!-- Folder Cards Grid -->
     <div id="ws-folder-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
 </div>
 
@@ -220,7 +222,7 @@
         </div>
     </div>
 
-    <!-- Empty folder -->
+    <!-- Empty folder state -->
     <div id="fv-empty-state" class="hidden bg-white rounded-2xl shadow p-14 text-center">
         <div class="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-5">
             <i class="bi bi-inbox text-5xl text-indigo-300"></i>
@@ -237,7 +239,7 @@
         </a>
     </div>
 
-    <!-- Questions list (grouped by subject) -->
+    <!-- Questions list -->
     <div id="fv-questions-container" class="space-y-5"></div>
 </div>
 
@@ -248,7 +250,7 @@
 <!-- Create / Rename Folder -->
 <div id="folderModal"
     class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-fadeIn">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
         <div class="flex items-center gap-3 mb-6">
             <div class="w-11 h-11 bg-indigo-100 rounded-xl flex items-center justify-center">
                 <i class="bi bi-folder-plus text-indigo-600 text-xl"></i>
@@ -268,8 +270,8 @@
             <button id="folderModalOk"
                 class="px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white
                        font-bold rounded-xl hover:from-indigo-600 hover:to-purple-700
-                       transition-all shadow">
-                <i class="bi bi-check-lg mr-1"></i>
+                       transition-all shadow flex items-center gap-2">
+                <i class="bi bi-check-lg"></i>
                 <span id="folderModalOkLabel">Create</span>
             </button>
         </div>
@@ -299,26 +301,17 @@
 </div>
 
 <style>
-/* Folder cards */
 .ws-folder-card { transition: transform .18s ease, box-shadow .18s ease; cursor: pointer; }
 .ws-folder-card:hover { transform: translateY(-4px); box-shadow: 0 14px 36px rgba(99,102,241,.18); }
-/* Question cards */
 .fv-question-card { transition: background .15s; }
 .fv-question-card:hover { background: #f8f7ff; }
-/* Diff badges */
 .diff-easy   { background:#dcfce7; color:#166534; }
 .diff-medium { background:#fef9c3; color:#854d0e; }
 .diff-hard   { background:#fee2e2; color:#991b1b; }
-/* Subject group header */
 .subj-header { background: linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%); }
-/* Stagger fade-up for folder cards */
-@keyframes fadeUp {
-    from { opacity:0; transform:translateY(14px); }
-    to   { opacity:1; transform:translateY(0); }
-}
+@keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
 .ws-folder-card { animation: fadeUp .28s ease both; }
-/* line clamp */
-.line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.line-clamp-2 { display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
 </style>
 
 <script>
@@ -326,60 +319,73 @@
 'use strict';
 
 /* ══════════════════════════════════════════════════
-   STORAGE   key: 'bisu_workspace_v2'
-   Schema: { folders: [ { id, name, createdAt, questions:[] } ] }
-   Each question: { id, question_text, type, type_display, difficulty,
-                   points, correct_answer, explanation, options?,
-                   subject_code, subject_name }
+   CONFIG  — Django URL stubs injected via data attrs
+   (We build URLs manually to avoid reversing in JS)
 ════════════════════════════════════════════════ */
-var STORE_KEY = 'bisu_workspace_v2';
+var BASE = '/questionnaires/workspace';
 
-function loadStore() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || { folders: [] }; }
-    catch(e) { return { folders: [] }; }
-}
-function saveStore(s) { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-
-/* ── Public API (used by browse_questionnaires.html) ── */
-window.WS = {
-    getFolders: function() { return loadStore().folders; },
-
-    createFolder: function(name) {
-        var s = loadStore();
-        var f = { id: uid(), name: name.trim(), createdAt: Date.now(), questions: [] };
-        s.folders.push(f);
-        saveStore(s);
-        refreshSidebarBadge();
-        return f;
-    },
-
-    addQuestionsToFolder: function(folderId, questions) {
-        var s = loadStore();
-        var folder = s.folders.find(function(f){ return f.id === folderId; });
-        if (!folder) return 0;
-        var existingIds = folder.questions.map(function(q){ return String(q.id); });
-        var added = 0;
-        questions.forEach(function(q) {
-            if (!existingIds.includes(String(q.id))) { folder.questions.push(q); added++; }
-        });
-        saveStore(s);
-        refreshSidebarBadge();
-        return added;
-    },
-
-    getTotalQuestions: function() {
-        return loadStore().folders.reduce(function(a,f){ return a + f.questions.length; }, 0);
-    }
+var API = {
+    createFolder:   function()         { return BASE + '/folders/create/'; },
+    renameFolder:   function(id)       { return BASE + '/folders/' + id + '/rename/'; },
+    deleteFolder:   function(id)       { return BASE + '/folders/' + id + '/delete/'; },
+    addQuestions:   function(id)       { return BASE + '/folders/' + id + '/add-questions/'; },
+    removeQuestion: function(fid, qid) { return BASE + '/folders/' + fid + '/remove-question/' + qid + '/'; },
+    download:       function(ids, fmt) { return BASE + '/download/?questions=' + ids.join(',') + '&format=' + fmt; },
 };
 
-/* ── Sidebar badge ── */
+/* CSRF */
+function csrfToken() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+}
+function postJSON(url, data) {
+    return fetch(url, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+        body:    JSON.stringify(data),
+    }).then(function(r) { return r.json(); });
+}
+
+/* ══════════════════════════════════════════════════
+   IN-MEMORY STATE  — seeded from server on page load
+   Structure matches what workspace() view returns:
+   [ { id, name, created_at, questions: [...] } ]
+════════════════════════════════════════════════ */
+var state = { folders: [] };
+
+(function seedFromServer() {
+    var el = document.getElementById('ws-initial-data');
+    if (!el) return;
+    try {
+        var data = JSON.parse(el.textContent);
+        state.folders = data;
+    } catch(e) { console.error('workspace seed error', e); }
+})();
+
+/* ── sidebar badge ── */
 function refreshSidebarBadge() {
+    var total = state.folders.reduce(function(a,f){ return a + f.questions.length; }, 0);
     var b = document.getElementById('ws-sidebar-badge');
-    if (b) b.textContent = WS.getTotalQuestions();
+    if (b) b.textContent = total;
 }
 refreshSidebarBadge();
-window.addEventListener('storage', function(e) { if (e.key === STORE_KEY) refreshSidebarBadge(); });
+
+/* Expose for browse_questionnaires.html */
+window.WS = {
+    getFolders: function() { return state.folders; },
+
+    /* Called by browse page after a successful addQuestions API call */
+    syncFolderQuestions: function(folderId, newQuestions) {
+        var folder = state.folders.find(function(f){ return String(f.id) === String(folderId); });
+        if (!folder) return;
+        newQuestions.forEach(function(q) {
+            if (!folder.questions.find(function(x){ return String(x.id) === String(q.id); })) {
+                folder.questions.push(q);
+            }
+        });
+        refreshSidebarBadge();
+    }
+};
 
 /* ══════════════════════════════════════════════════
    DOM REFS
@@ -390,23 +396,20 @@ var folderGrid  = document.getElementById('ws-folder-grid');
 var noFolders   = document.getElementById('ws-no-folders');
 var fvContainer = document.getElementById('fv-questions-container');
 var fvEmpty     = document.getElementById('fv-empty-state');
-var currentFid  = null;   // open folder id
+var currentFid  = null;
 
 /* ══════════════════════════════════════════════════
-   OVERVIEW — render folder grid
+   OVERVIEW
 ════════════════════════════════════════════════ */
 function renderOverview() {
-    var s = loadStore();
-    var folders = s.folders;
-
-    /* global stats */
-    var totalQ = 0, totalPts = 0;
+    var folders  = state.folders;
+    var totalQ   = 0, totalPts = 0;
     var allSubjs = new Set();
     folders.forEach(function(f) {
         f.questions.forEach(function(q) {
             totalQ++;
-            totalPts += (q.points||1);
-            allSubjs.add(q.subject_code||'?');
+            totalPts += (q.points || 1);
+            allSubjs.add(q.subject_code || '?');
         });
     });
     setText('ws-stat-folders',   folders.length);
@@ -434,17 +437,15 @@ function renderOverview() {
     folders.forEach(function(folder, idx) {
         var grad  = GRADS[idx % GRADS.length];
         var qCnt  = folder.questions.length;
-        var subs  = new Set(folder.questions.map(function(q){ return q.subject_code||'?'; }));
+        var subs  = new Set(folder.questions.map(function(q){ return q.subject_code || '?'; }));
         var pts   = folder.questions.reduce(function(a,q){ return a+(q.points||1); }, 0);
-        var delay = idx * 55;
 
         var card = document.createElement('div');
-        card.className     = 'ws-folder-card bg-white rounded-2xl shadow-md overflow-hidden';
-        card.style.animationDelay = delay + 'ms';
+        card.className = 'ws-folder-card bg-white rounded-2xl shadow-md overflow-hidden';
+        card.style.animationDelay = (idx * 55) + 'ms';
         card.dataset.folderId = folder.id;
 
         card.innerHTML =
-            /* colour header */
             '<div class="bg-gradient-to-br ' + grad + ' px-5 py-5">' +
                 '<div class="flex items-start justify-between mb-3">' +
                     '<div class="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">' +
@@ -457,7 +458,6 @@ function renderOverview() {
                 '</div>' +
                 '<h3 class="text-white font-bold text-base line-clamp-2">' + esc(folder.name) + '</h3>' +
             '</div>' +
-            /* card body */
             '<div class="px-5 py-4">' +
                 '<div class="flex items-center justify-between text-sm mb-2.5">' +
                     '<div class="flex items-center gap-1.5 text-gray-600"><i class="bi bi-collection text-indigo-400"></i> <span class="font-semibold">' + qCnt + '</span> <span class="text-gray-400">question' + (qCnt!==1?'s':'') + '</span></div>' +
@@ -472,9 +472,8 @@ function renderOverview() {
         folderGrid.appendChild(card);
     });
 
-    /* bind events on the grid */
     folderGrid.querySelectorAll('.folder-open-btn').forEach(function(btn) {
-        btn.addEventListener('click', function(e) { e.stopPropagation(); openFolder(btn.dataset.folderId); });
+        btn.addEventListener('click', function(e){ e.stopPropagation(); openFolder(btn.dataset.folderId); });
     });
     folderGrid.querySelectorAll('.ws-folder-card').forEach(function(card) {
         card.addEventListener('click', function(e) {
@@ -483,10 +482,10 @@ function renderOverview() {
         });
     });
     folderGrid.querySelectorAll('.folder-rename-btn').forEach(function(btn) {
-        btn.addEventListener('click', function(e) { e.stopPropagation(); showFolderModal('rename', btn.dataset.folderId); });
+        btn.addEventListener('click', function(e){ e.stopPropagation(); showFolderModal('rename', btn.dataset.folderId); });
     });
     folderGrid.querySelectorAll('.folder-delete-btn').forEach(function(btn) {
-        btn.addEventListener('click', function(e) { e.stopPropagation(); showDeleteFolderModal(btn.dataset.folderId); });
+        btn.addEventListener('click', function(e){ e.stopPropagation(); showDeleteFolderModal(btn.dataset.folderId); });
     });
 }
 
@@ -494,8 +493,7 @@ function renderOverview() {
    FOLDER DETAIL
 ════════════════════════════════════════════════ */
 function openFolder(fid) {
-    var s = loadStore();
-    var folder = s.folders.find(function(f){ return f.id === fid; });
+    var folder = state.folders.find(function(f){ return String(f.id) === String(fid); });
     if (!folder) return;
     currentFid = fid;
     overview.classList.add('hidden');
@@ -506,7 +504,7 @@ function openFolder(fid) {
 }
 
 function renderFolderDetail(folder) {
-    var subs = new Set(folder.questions.map(function(q){ return q.subject_code||'?'; }));
+    var subs = new Set(folder.questions.map(function(q){ return q.subject_code || '?'; }));
     document.getElementById('fv-folder-meta').textContent =
         folder.questions.length + ' question' + (folder.questions.length!==1?'s':'') +
         ' \u2022 ' + subs.size + ' subject' + (subs.size!==1?'s':'');
@@ -525,7 +523,7 @@ function renderFolderDetail(folder) {
     var groups = {};
     folder.questions.forEach(function(q) {
         var key = (q.subject_code||'Unknown') + '||' + (q.subject_name||'');
-        if (!groups[key]) groups[key] = { code: q.subject_code||'Unknown', name: q.subject_name||'', questions:[] };
+        if (!groups[key]) groups[key] = { code: q.subject_code||'Unknown', name: q.subject_name||'', questions: [] };
         groups[key].questions.push(q);
     });
 
@@ -533,8 +531,6 @@ function renderFolderDetail(folder) {
     Object.keys(groups).forEach(function(key) {
         var g = groups[key];
         html += '<div class="fv-subject-group bg-white rounded-xl shadow overflow-hidden" data-subject-key="' + esc(key) + '">';
-
-        /* subject header */
         html += '<div class="subj-header px-5 py-3.5 flex items-center justify-between">' +
             '<div class="flex items-center gap-2.5">' +
                 '<div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center"><i class="bi bi-book text-white"></i></div>' +
@@ -543,16 +539,16 @@ function renderFolderDetail(folder) {
             '</div>' +
             '<button class="fv-remove-group px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold rounded-lg transition-colors" data-subject-key="' + esc(key) + '">' +
                 '<i class="bi bi-trash mr-1"></i>Remove Group</button>' +
-        '</div>';
+        '</div><div class="divide-y divide-gray-100">';
 
-        /* questions */
-        html += '<div class="divide-y divide-gray-100">';
         g.questions.forEach(function(q, i) {
             var dc = {easy:'diff-easy',medium:'diff-medium',hard:'diff-hard'}[q.difficulty]||'bg-gray-100 text-gray-700';
-            html += '<div class="fv-question-card p-4" ' +
-                'data-question-id="' + q.id + '" data-subject="' + esc(q.subject_code||'') + '" ' +
-                'data-type="' + esc(q.type||'') + '" data-difficulty="' + esc(q.difficulty||'') + '" ' +
-                'data-points="' + (q.points||1) + '">' +
+            html += '<div class="fv-question-card p-4"' +
+                ' data-question-id="' + q.id + '"' +
+                ' data-subject="' + esc(q.subject_code||'') + '"' +
+                ' data-type="' + esc(q.type||'') + '"' +
+                ' data-difficulty="' + esc(q.difficulty||'') + '"' +
+                ' data-points="' + (q.points||1) + '">' +
                 '<div class="flex items-start gap-3">' +
                     '<input type="checkbox" class="fv-checkbox w-5 h-5 text-indigo-600 rounded mt-0.5 cursor-pointer flex-shrink-0" data-question-id="' + q.id + '" checked>' +
                     '<div class="flex-1 min-w-0">' +
@@ -564,27 +560,28 @@ function renderFolderDetail(folder) {
                         '<p class="text-gray-800 font-medium text-sm mb-2">' + (i+1) + '. ' + esc(q.question_text||'') + '</p>';
 
             if (q.type === 'multiple_choice' && q.options && q.options.length) {
-                var L = ['A','B','C','D'];
+                var L=['A','B','C','D'];
                 html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-1 ml-2">';
-                q.options.forEach(function(opt,idx) {
-                    var correct = q.correct_answer && q.correct_answer.toUpperCase() === L[idx];
+                q.options.forEach(function(opt,idx){
+                    var correct = q.correct_answer && q.correct_answer.toUpperCase()===L[idx];
                     html += '<div class="flex items-center p-1.5 rounded text-xs ' +
-                        (correct ? 'bg-green-50 border border-green-400 text-green-800 font-semibold' : 'bg-gray-50 text-gray-700') + '">' +
-                        '<span class="font-bold mr-1">' + L[idx] + '.</span>' + esc(opt) +
-                        (correct ? '<i class="bi bi-check-circle-fill ml-auto text-green-600"></i>' : '') + '</div>';
+                        (correct?'bg-green-50 border border-green-400 text-green-800 font-semibold':'bg-gray-50 text-gray-700') + '">' +
+                        '<span class="font-bold mr-1">'+L[idx]+'.</span>'+esc(opt)+
+                        (correct?'<i class="bi bi-check-circle-fill ml-auto text-green-600"></i>':'')+
+                        '</div>';
                 });
                 html += '</div>';
             } else if (q.correct_answer) {
                 html += '<div class="bg-green-50 border-l-4 border-green-400 p-2 rounded text-xs mt-1">' +
-                    '<span class="text-gray-500">Answer: </span><span class="text-green-800 font-semibold">' + esc(q.correct_answer) + '</span></div>';
+                    '<span class="text-gray-500">Answer: </span><span class="text-green-800 font-semibold">'+esc(q.correct_answer)+'</span></div>';
             }
             if (q.explanation) {
                 html += '<div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300">' +
-                    '<i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>' + esc(q.explanation) + '</div>';
+                    '<i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>'+esc(q.explanation)+'</div>';
             }
-
             html += '</div>' +
-                '<button class="fv-remove-one flex-shrink-0 w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" data-question-id="' + q.id + '" title="Remove"><i class="bi bi-x-lg text-sm"></i></button>' +
+                '<button class="fv-remove-one flex-shrink-0 w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" data-question-id="' + q.id + '" title="Remove">' +
+                    '<i class="bi bi-x-lg text-sm"></i></button>' +
             '</div></div>';
         });
         html += '</div></div>';
@@ -592,17 +589,16 @@ function renderFolderDetail(folder) {
 
     fvContainer.innerHTML = html;
 
-    /* bind */
     fvContainer.querySelectorAll('.fv-remove-one').forEach(function(btn) {
-        btn.addEventListener('click', function() { removeQFromFolder(currentFid, btn.dataset.questionId); });
+        btn.addEventListener('click', function(){ removeQFromFolder(currentFid, btn.dataset.questionId); });
     });
     fvContainer.querySelectorAll('.fv-remove-group').forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function(){
             removeGroupFromFolder(currentFid, btn.dataset.subjectKey.split('||')[0]);
         });
     });
     fvContainer.querySelectorAll('.fv-checkbox').forEach(function(cb) {
-        cb.addEventListener('change', function() { updateFolderStats(); updateFolderDownloadBar(); });
+        cb.addEventListener('change', function(){ updateFolderStats(); updateFolderDownloadBar(); });
     });
 
     rebuildFolderFilters(folder);
@@ -610,32 +606,39 @@ function renderFolderDetail(folder) {
     updateFolderDownloadBar();
 }
 
+/* ── Remove question (API + state) ── */
 function removeQFromFolder(fid, qid) {
-    var s = loadStore();
-    var f = s.folders.find(function(x){ return x.id === fid; });
-    if (!f) return;
-    f.questions = f.questions.filter(function(q){ return String(q.id) !== String(qid); });
-    saveStore(s);
-    refreshSidebarBadge();
-    showToast('Question removed.','info');
-    renderFolderDetail(f);
-}
-function removeGroupFromFolder(fid, subCode) {
-    var s = loadStore();
-    var f = s.folders.find(function(x){ return x.id === fid; });
-    if (!f) return;
-    f.questions = f.questions.filter(function(q){ return (q.subject_code||'Unknown') !== subCode; });
-    saveStore(s);
-    refreshSidebarBadge();
-    showToast('Subject group removed.','info');
-    renderFolderDetail(f);
+    postJSON(API.removeQuestion(fid, qid), {})
+        .then(function() {
+            var folder = state.folders.find(function(f){ return String(f.id)===String(fid); });
+            if (!folder) return;
+            folder.questions = folder.questions.filter(function(q){ return String(q.id)!==String(qid); });
+            refreshSidebarBadge();
+            showToast('Question removed.','info');
+            renderFolderDetail(folder);
+        })
+        .catch(function(){ showToast('Failed to remove question.','error'); });
 }
 
-/* ── Folder stats + download ── */
+/* ── Remove subject group (API calls for each question) ── */
+function removeGroupFromFolder(fid, subCode) {
+    var folder = state.folders.find(function(f){ return String(f.id)===String(fid); });
+    if (!folder) return;
+    var toRemove = folder.questions.filter(function(q){ return (q.subject_code||'Unknown')===subCode; });
+    var promises = toRemove.map(function(q){ return postJSON(API.removeQuestion(fid, q.id), {}); });
+    Promise.all(promises).then(function() {
+        folder.questions = folder.questions.filter(function(q){ return (q.subject_code||'Unknown')!==subCode; });
+        refreshSidebarBadge();
+        showToast('Subject group removed.','info');
+        renderFolderDetail(folder);
+    }).catch(function(){ showToast('Failed to remove group.','error'); });
+}
+
+/* ── Stats + download bar ── */
 function updateFolderStats() {
     var checked = fvContainer.querySelectorAll('.fv-checkbox:checked');
     var pts = 0;
-    checked.forEach(function(cb) {
+    checked.forEach(function(cb){
         var card = cb.closest('.fv-question-card');
         if (card) pts += parseInt(card.dataset.points||1);
     });
@@ -649,9 +652,8 @@ function updateFolderDownloadBar() {
     var docx = document.getElementById('fv-download-docx');
     var pdf  = document.getElementById('fv-download-pdf');
     if (ids.length > 0) {
-        var qs = '?type=generated&questions=' + ids.join(',');
-        docx.onclick = function(){ window.location.href = '/questionnaires/download-workspace/' + qs + '&format=docx'; };
-        pdf.onclick  = function(){ window.location.href = '/questionnaires/download-workspace/' + qs + '&format=pdf'; };
+        docx.onclick = function(){ window.location.href = API.download(ids,'docx'); };
+        pdf.onclick  = function(){ window.location.href = API.download(ids,'pdf'); };
         docx.classList.remove('opacity-50','cursor-not-allowed');
         pdf.classList.remove('opacity-50','cursor-not-allowed');
     } else {
@@ -664,71 +666,73 @@ function updateFolderDownloadBar() {
 /* ── Filters ── */
 function rebuildFolderFilters(folder) {
     var subjects={}, types={};
-    folder.questions.forEach(function(q) {
-        if (q.subject_code) subjects[q.subject_code] = q.subject_name||q.subject_code;
-        if (q.type)         types[q.type]            = q.type_display||q.type;
+    folder.questions.forEach(function(q){
+        if (q.subject_code) subjects[q.subject_code]=q.subject_name||q.subject_code;
+        if (q.type)         types[q.type]=q.type_display||q.type;
     });
-    var ss = document.getElementById('fv-filter-subject');
-    ss.innerHTML = '<option value="all">All Subjects</option>';
-    Object.keys(subjects).forEach(function(k){ ss.innerHTML += '<option value="'+k+'">'+k+' \u2013 '+subjects[k]+'</option>'; });
-    var ts = document.getElementById('fv-filter-type');
-    ts.innerHTML = '<option value="all">All Types</option>';
-    Object.keys(types).forEach(function(k){ ts.innerHTML += '<option value="'+k+'">'+types[k]+'</option>'; });
+    var ss=document.getElementById('fv-filter-subject');
+    ss.innerHTML='<option value="all">All Subjects</option>';
+    Object.keys(subjects).forEach(function(k){ ss.innerHTML+='<option value="'+k+'">'+k+' \u2013 '+subjects[k]+'</option>'; });
+    var ts=document.getElementById('fv-filter-type');
+    ts.innerHTML='<option value="all">All Types</option>';
+    Object.keys(types).forEach(function(k){ ts.innerHTML+='<option value="'+k+'">'+types[k]+'</option>'; });
 }
-function applyFolderFilters() {
-    var sub  = document.getElementById('fv-filter-subject').value;
-    var type = document.getElementById('fv-filter-type').value;
-    var diff = document.getElementById('fv-filter-diff').value;
-    var srch = document.getElementById('fv-search').value.toLowerCase().trim();
-    fvContainer.querySelectorAll('.fv-question-card').forEach(function(c) {
-        var ok = (sub==='all'||c.dataset.subject===sub) && (type==='all'||c.dataset.type===type) &&
-                 (diff==='all'||c.dataset.difficulty===diff) && (!srch||c.innerText.toLowerCase().includes(srch));
-        c.style.display = ok ? '' : 'none';
+function applyFolderFilters(){
+    var sub=document.getElementById('fv-filter-subject').value;
+    var type=document.getElementById('fv-filter-type').value;
+    var diff=document.getElementById('fv-filter-diff').value;
+    var srch=document.getElementById('fv-search').value.toLowerCase().trim();
+    fvContainer.querySelectorAll('.fv-question-card').forEach(function(c){
+        var ok=(sub==='all'||c.dataset.subject===sub)&&(type==='all'||c.dataset.type===type)&&
+               (diff==='all'||c.dataset.difficulty===diff)&&(!srch||c.innerText.toLowerCase().includes(srch));
+        c.style.display=ok?'':'none';
     });
-    fvContainer.querySelectorAll('.fv-subject-group').forEach(function(g) {
-        g.style.display = Array.from(g.querySelectorAll('.fv-question-card')).some(function(c){ return c.style.display!=='none'; }) ? '' : 'none';
+    fvContainer.querySelectorAll('.fv-subject-group').forEach(function(g){
+        g.style.display=Array.from(g.querySelectorAll('.fv-question-card')).some(function(c){return c.style.display!=='none';})?'':'none';
     });
     updateFolderStats(); updateFolderDownloadBar();
 }
 ['fv-filter-subject','fv-filter-type','fv-filter-diff'].forEach(function(id){
-    document.getElementById(id).addEventListener('change', applyFolderFilters);
+    document.getElementById(id).addEventListener('change',applyFolderFilters);
 });
-document.getElementById('fv-search').addEventListener('input', applyFolderFilters);
+document.getElementById('fv-search').addEventListener('input',applyFolderFilters);
 
 /* ── Bulk actions ── */
-document.getElementById('fv-select-all').addEventListener('click', function(){
+document.getElementById('fv-select-all').addEventListener('click',function(){
     fvContainer.querySelectorAll('.fv-question-card').forEach(function(c){
-        if (c.style.display!=='none') c.querySelector('.fv-checkbox').checked = true;
+        if(c.style.display!=='none') c.querySelector('.fv-checkbox').checked=true;
     });
     updateFolderStats(); updateFolderDownloadBar();
 });
-document.getElementById('fv-deselect-all').addEventListener('click', function(){
-    fvContainer.querySelectorAll('.fv-checkbox').forEach(function(cb){ cb.checked=false; });
+document.getElementById('fv-deselect-all').addEventListener('click',function(){
+    fvContainer.querySelectorAll('.fv-checkbox').forEach(function(cb){cb.checked=false;});
     updateFolderStats(); updateFolderDownloadBar();
 });
-document.getElementById('fv-remove-selected').addEventListener('click', function(){
-    var ids = Array.from(fvContainer.querySelectorAll('.fv-checkbox:checked')).map(function(cb){ return String(cb.dataset.questionId); });
-    if (!ids.length) { showToast('No questions selected.','warning'); return; }
-    var s = loadStore();
-    var f = s.folders.find(function(x){ return x.id===currentFid; });
-    if (!f) return;
-    f.questions = f.questions.filter(function(q){ return !ids.includes(String(q.id)); });
-    saveStore(s); refreshSidebarBadge();
-    showToast(ids.length+' question(s) removed.','info');
-    renderFolderDetail(f);
+document.getElementById('fv-remove-selected').addEventListener('click',function(){
+    var ids=Array.from(fvContainer.querySelectorAll('.fv-checkbox:checked')).map(function(cb){return cb.dataset.questionId;});
+    if(!ids.length){showToast('No questions selected.','warning');return;}
+    var folder=state.folders.find(function(f){return String(f.id)===String(currentFid);});
+    if(!folder) return;
+    var promises=ids.map(function(qid){return postJSON(API.removeQuestion(currentFid,qid),{});});
+    Promise.all(promises).then(function(){
+        folder.questions=folder.questions.filter(function(q){return !ids.includes(String(q.id));});
+        refreshSidebarBadge();
+        showToast(ids.length+' question(s) removed.','info');
+        renderFolderDetail(folder);
+    }).catch(function(){showToast('Error removing questions.','error');});
 });
 
 /* ── Back ── */
-document.getElementById('btn-back-to-overview').addEventListener('click', function(){
-    currentFid = null;
+document.getElementById('btn-back-to-overview').addEventListener('click',function(){
+    currentFid=null;
     folderView.classList.add('hidden');
     overview.classList.remove('hidden');
     renderOverview();
 });
 
-/* ── Rename / delete from detail view ── */
-document.getElementById('fv-rename-btn').addEventListener('click', function(){ showFolderModal('rename', currentFid); });
-document.getElementById('fv-delete-folder-btn').addEventListener('click', function(){ showDeleteFolderModal(currentFid); });
+/* ── Rename / delete from detail ── */
+document.getElementById('fv-rename-btn').addEventListener('click',function(){showFolderModal('rename',currentFid);});
+document.getElementById('fv-delete-folder-btn').addEventListener('click',function(){showDeleteFolderModal(currentFid);});
 
 /* ══════════════════════════════════════════════════
    CREATE / RENAME FOLDER MODAL
@@ -739,53 +743,62 @@ var folderModalMode  = 'create';
 var folderModalTarget= null;
 
 function showFolderModal(mode, fid) {
-    folderModalMode   = mode;
-    folderModalTarget = fid || null;
-    if (mode === 'rename') {
-        var f = loadStore().folders.find(function(x){ return x.id===fid; });
-        document.getElementById('folderModalTitle').textContent   = 'Rename Folder';
-        document.getElementById('folderModalOkLabel').textContent = 'Save';
-        folderNameInput.value = f ? f.name : '';
+    folderModalMode=mode; folderModalTarget=fid||null;
+    if (mode==='rename') {
+        var f=state.folders.find(function(x){return String(x.id)===String(fid);});
+        document.getElementById('folderModalTitle').textContent='Rename Folder';
+        document.getElementById('folderModalOkLabel').textContent='Save';
+        folderNameInput.value=f?f.name:'';
     } else {
-        document.getElementById('folderModalTitle').textContent   = 'New Folder';
-        document.getElementById('folderModalOkLabel').textContent = 'Create';
-        folderNameInput.value = '';
+        document.getElementById('folderModalTitle').textContent='New Folder';
+        document.getElementById('folderModalOkLabel').textContent='Create';
+        folderNameInput.value='';
     }
-    folderModal.classList.remove('hidden');
-    folderModal.classList.add('flex');
-    setTimeout(function(){ folderNameInput.focus(); folderNameInput.select(); }, 80);
+    folderModal.classList.remove('hidden'); folderModal.classList.add('flex');
+    setTimeout(function(){folderNameInput.focus();folderNameInput.select();},80);
 }
-function closeFolderModal() { folderModal.classList.add('hidden'); folderModal.classList.remove('flex'); }
+function closeFolderModal(){ folderModal.classList.add('hidden'); folderModal.classList.remove('flex'); }
 
-document.getElementById('folderModalCancel').addEventListener('click', closeFolderModal);
-document.getElementById('folderModalOk').addEventListener('click', function(){
-    var name = folderNameInput.value.trim();
-    if (!name) { showToast('Please enter a folder name.','warning'); folderNameInput.focus(); return; }
-    if (folderModalMode === 'create') {
-        WS.createFolder(name);
-        closeFolderModal();
-        renderOverview();
-        showToast('Folder "'+name+'" created!','success');
+document.getElementById('folderModalCancel').addEventListener('click',closeFolderModal);
+document.getElementById('folderModalOk').addEventListener('click',function(){
+    var name=folderNameInput.value.trim();
+    if(!name){showToast('Please enter a folder name.','warning');folderNameInput.focus();return;}
+
+    if (folderModalMode==='create') {
+        postJSON(API.createFolder(),{name:name})
+            .then(function(data){
+                if (data.error){showToast(data.error,'error');return;}
+                /* add to local state */
+                state.folders.unshift({id:data.id,name:data.name,created_at:new Date().toISOString(),questions:[]});
+                closeFolderModal();
+                renderOverview();
+                refreshSidebarBadge();
+                showToast('Folder "'+data.name+'" created!','success');
+            })
+            .catch(function(){showToast('Failed to create folder.','error');});
     } else {
-        var s = loadStore();
-        var f = s.folders.find(function(x){ return x.id===folderModalTarget; });
-        if (f) { f.name = name; saveStore(s); }
-        closeFolderModal();
-        if (currentFid === folderModalTarget) {
-            setText('fv-folder-name', name);
-            setText('fv-folder-name-breadcrumb', name);
-        }
-        renderOverview();
-        showToast('Folder renamed.','success');
+        postJSON(API.renameFolder(folderModalTarget),{name:name})
+            .then(function(data){
+                if (data.error){showToast(data.error,'error');return;}
+                var f=state.folders.find(function(x){return String(x.id)===String(folderModalTarget);});
+                if(f) f.name=data.name;
+                closeFolderModal();
+                if(String(currentFid)===String(folderModalTarget)){
+                    setText('fv-folder-name',data.name);
+                    setText('fv-folder-name-breadcrumb',data.name);
+                }
+                renderOverview();
+                showToast('Folder renamed.','success');
+            })
+            .catch(function(){showToast('Failed to rename folder.','error');});
     }
 });
-folderNameInput.addEventListener('keydown', function(e){
-    if (e.key==='Enter') document.getElementById('folderModalOk').click();
-    if (e.key==='Escape') closeFolderModal();
+folderNameInput.addEventListener('keydown',function(e){
+    if(e.key==='Enter') document.getElementById('folderModalOk').click();
+    if(e.key==='Escape') closeFolderModal();
 });
-
-document.getElementById('btn-new-folder').addEventListener('click', function(){ showFolderModal('create'); });
-document.getElementById('btn-new-folder-empty').addEventListener('click', function(){ showFolderModal('create'); });
+document.getElementById('btn-new-folder').addEventListener('click',function(){showFolderModal('create');});
+document.getElementById('btn-new-folder-empty').addEventListener('click',function(){showFolderModal('create');});
 
 /* ══════════════════════════════════════════════════
    DELETE FOLDER MODAL
@@ -793,39 +806,40 @@ document.getElementById('btn-new-folder-empty').addEventListener('click', functi
 var deleteFolderModal  = document.getElementById('deleteFolderModal');
 var deleteFolderTarget = null;
 
-function showDeleteFolderModal(fid) {
-    var f = loadStore().folders.find(function(x){ return x.id===fid; });
-    if (!f) return;
-    deleteFolderTarget = fid;
-    document.getElementById('deleteFolderName').textContent = '"'+f.name+'"';
-    deleteFolderModal.classList.remove('hidden');
-    deleteFolderModal.classList.add('flex');
+function showDeleteFolderModal(fid){
+    var f=state.folders.find(function(x){return String(x.id)===String(fid);});
+    if(!f) return;
+    deleteFolderTarget=fid;
+    document.getElementById('deleteFolderName').textContent='"'+f.name+'"';
+    deleteFolderModal.classList.remove('hidden'); deleteFolderModal.classList.add('flex');
 }
-function closeDeleteFolderModal() { deleteFolderModal.classList.add('hidden'); deleteFolderModal.classList.remove('flex'); }
-document.getElementById('deleteFolderCancel').addEventListener('click', closeDeleteFolderModal);
-document.getElementById('deleteFolderOk').addEventListener('click', function(){
-    var s = loadStore();
-    var name = (s.folders.find(function(x){ return x.id===deleteFolderTarget; })||{}).name||'';
-    s.folders = s.folders.filter(function(f){ return f.id!==deleteFolderTarget; });
-    saveStore(s); refreshSidebarBadge();
-    closeDeleteFolderModal();
-    showToast('"'+name+'" deleted.','info');
-    if (currentFid === deleteFolderTarget) {
-        currentFid = null;
-        folderView.classList.add('hidden');
-        overview.classList.remove('hidden');
-    }
-    renderOverview();
+function closeDeleteFolderModal(){ deleteFolderModal.classList.add('hidden'); deleteFolderModal.classList.remove('flex'); }
+document.getElementById('deleteFolderCancel').addEventListener('click',closeDeleteFolderModal);
+document.getElementById('deleteFolderOk').addEventListener('click',function(){
+    postJSON(API.deleteFolder(deleteFolderTarget),{})
+        .then(function(data){
+            state.folders=state.folders.filter(function(f){return String(f.id)!==String(deleteFolderTarget);});
+            refreshSidebarBadge();
+            closeDeleteFolderModal();
+            showToast('"'+(data.name||'Folder')+'" deleted.','info');
+            if(String(currentFid)===String(deleteFolderTarget)){
+                currentFid=null;
+                folderView.classList.add('hidden');
+                overview.classList.remove('hidden');
+            }
+            renderOverview();
+        })
+        .catch(function(){showToast('Failed to delete folder.','error');});
 });
 
 /* ══════════════════════════════════════════════════
    UTILS
 ════════════════════════════════════════════════ */
-function esc(str) {
-    if (!str) return '';
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function esc(s){
+    if(!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-function setText(id, val) { var el=document.getElementById(id); if(el) el.textContent=val; }
+function setText(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; }
 
 /* Init */
 renderOverview();

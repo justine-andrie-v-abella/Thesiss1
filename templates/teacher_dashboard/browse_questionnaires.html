@@ -48,8 +48,8 @@
     <div class="flex-1">
         <div class="text-white font-bold text-sm">My Workspace</div>
         <div class="text-white/75 text-xs">
-            <span id="browse-ws-folders">0</span> folder(s) &mdash;
-            <span id="browse-ws-count">0</span> question(s) saved across all folders
+            <span id="browse-ws-folders">—</span> folder(s) &mdash;
+            <span id="browse-ws-count">—</span> question(s) saved across all folders
         </div>
     </div>
     <a href="{% url 'questionnaires:workspace' %}"
@@ -124,7 +124,6 @@
 
         <!-- Card Footer -->
         <div class="bg-gray-50 px-5 py-4 rounded-b-xl space-y-2">
-            <!-- Download dropdown -->
             <button type="button"
                 data-quest-id="{{ quest.pk }}"
                 data-file-type="{{ quest.file_type|upper }}"
@@ -138,7 +137,6 @@
             </button>
 
             {% if quest.is_extracted %}
-            <!-- Select & Save to Workspace Folder -->
             <button type="button"
                 data-quest-id="{{ quest.pk }}"
                 data-quest-title="{{ quest.title }}"
@@ -199,9 +197,7 @@
 </div>
 {% endif %}
 
-<!-- ══════════════════════════════════════════════════════════
-     DOWNLOAD DROPDOWN PORTAL
-════════════════════════════════════════════════════════════ -->
+<!-- Download Dropdown Portal -->
 <div id="download-dropdown-portal"
     style="display:none; position:fixed; z-index:99999; min-width:220px;"
     class="bg-white rounded-lg shadow-2xl border-2 border-gray-200"></div>
@@ -213,7 +209,6 @@
     class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden items-start justify-center p-4 overflow-y-auto">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
 
-        <!-- Header -->
         <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5 rounded-t-2xl flex items-center justify-between">
             <div>
                 <h2 class="text-xl font-bold text-white" id="modalTitle">Select Questions</h2>
@@ -225,7 +220,6 @@
             </button>
         </div>
 
-        <!-- Stats bar -->
         <div class="grid grid-cols-3 gap-0 border-b border-gray-200">
             <div class="p-4 text-center border-r border-gray-200">
                 <div class="text-2xl font-bold text-blue-600" id="modalTotalCount">0</div>
@@ -241,7 +235,6 @@
             </div>
         </div>
 
-        <!-- Filter bar -->
         <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
             <select id="modalFilterType"
                 class="px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
@@ -264,25 +257,19 @@
             </button>
         </div>
 
-        <!-- Questions list -->
         <div id="modalQuestionsList" class="p-6 space-y-3 max-h-[50vh] overflow-y-auto"></div>
 
-        <!-- Footer -->
         <div class="px-6 py-5 bg-gray-50 rounded-b-2xl border-t border-gray-200">
             <p id="modalSelectionLabel" class="text-xs text-gray-500 mb-3 font-medium">0 questions selected</p>
             <div class="flex flex-wrap items-center gap-3">
-
-                <!-- PRIMARY: Save to Workspace Folder -->
                 <button id="modalSaveToFolder"
                     class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500
                            to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold
                            rounded-lg transition-all shadow text-sm opacity-50 cursor-not-allowed">
                     <i class="bi bi-folder-plus"></i> Save to Folder
                 </button>
-
                 <div class="h-8 border-l border-gray-300 mx-1"></div>
                 <span class="text-xs text-gray-500 font-medium">or download directly:</span>
-
                 <a id="modalDownloadDocx" href="#"
                     class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600
                            text-white font-semibold rounded-lg text-sm opacity-50 cursor-not-allowed">
@@ -298,7 +285,6 @@
                            text-white font-semibold rounded-lg text-sm">
                     <i class="bi bi-file-earmark"></i> Original
                 </a>
-
                 <button type="button" id="closeReviewModalFooter"
                     class="ml-auto px-4 py-2.5 bg-white border-2 border-gray-300
                            hover:border-gray-400 text-gray-700 font-semibold rounded-lg text-sm">
@@ -316,7 +302,6 @@
     class="fixed inset-0 bg-black/70 z-[60] hidden items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
 
-        <!-- Header -->
         <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5 rounded-t-2xl flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -332,15 +317,20 @@
             </button>
         </div>
 
-        <!-- Body -->
         <div class="p-6">
+            <!-- Loading state -->
+            <div id="fp-loading" class="hidden text-center py-6">
+                <div style="width:32px;height:32px;border:3px solid #e0e7ff;border-top-color:#6366f1;border-radius:50%;margin:0 auto 10px;animation:spin 1s linear infinite;"></div>
+                <p class="text-sm text-gray-400">Loading folders...</p>
+            </div>
+
             <!-- Existing folders list -->
             <div id="fp-folder-list" class="space-y-2 mb-5 max-h-60 overflow-y-auto"></div>
 
             <!-- No folders hint -->
             <div id="fp-no-folders" class="hidden text-center py-4 text-gray-500 text-sm mb-5">
                 <i class="bi bi-folder2 text-3xl text-gray-300 block mb-2"></i>
-                You don't have any folders yet.
+                You don't have any folders yet. Create one below!
             </div>
 
             <!-- Create new folder inline -->
@@ -367,32 +357,66 @@
 <style>
 .line-clamp-2 { display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
 .line-clamp-3 { display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden; }
+@keyframes spin { to { transform:rotate(360deg); } }
 </style>
 
 <script>
 (function () {
 'use strict';
 
-/* ── Workspace storage (same schema as workspace.html) ── */
-var STORE_KEY = 'bisu_workspace_v2';
-function loadStore() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || { folders: [] }; }
-    catch(e) { return { folders: [] }; }
+/* ══════════════════════════════════════════════════
+   API  — mirrors the workspace JS API object
+════════════════════════════════════════════════ */
+var BASE = '/questionnaires/workspace';
+var API = {
+    getFolders:     function()    { return BASE + '/'; },   // workspace view returns folders_json — we use a dedicated fetch below
+    createFolder:   function()    { return BASE + '/folders/create/'; },
+    addQuestions:   function(id)  { return BASE + '/folders/' + id + '/add-questions/'; },
+};
+
+/* We need a lightweight folders endpoint.
+   We'll fetch the workspace page and parse? No — simpler:
+   we keep a local cache refreshed on page load and after mutations. */
+var cachedFolders = [];   // [ { id, name, question_count } ]
+var cachedInWs    = new Set();  // question ids already in ANY folder
+
+function csrfToken() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
 }
-function saveStore(s) { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function postJSON(url, data) {
+    return fetch(url, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+        body:    JSON.stringify(data),
+    }).then(function(r) { return r.json(); });
+}
+
+/* ── Load folder list from server ── */
+function loadFoldersFromServer() {
+    return fetch('/questionnaires/workspace/folders/list/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            cachedFolders = data.folders || [];
+            cachedInWs    = new Set((data.question_ids_in_workspace || []).map(String));
+            updateBrowseBanner();
+            return cachedFolders;
+        })
+        .catch(function() { return []; });
+}
 
 function updateBrowseBanner() {
-    var s = loadStore();
-    var totalQ = s.folders.reduce(function(a,f){ return a+f.questions.length; }, 0);
+    var totalQ = cachedFolders.reduce(function(a,f){ return a + (f.question_count||0); }, 0);
     var el1 = document.getElementById('browse-ws-folders');
     var el2 = document.getElementById('browse-ws-count');
-    if (el1) el1.textContent = s.folders.length;
+    if (el1) el1.textContent = cachedFolders.length;
     if (el2) el2.textContent = totalQ;
     var badge = document.getElementById('ws-sidebar-badge');
     if (badge) badge.textContent = totalQ;
 }
-updateBrowseBanner();
+
+/* Load on page open */
+loadFoldersFromServer();
 
 /* ══════════════════════════════════════════════════
    DOWNLOAD DROPDOWN PORTAL
@@ -406,7 +430,6 @@ function buildMenuHTML(btn) {
     var uO  = btn.getAttribute('data-url-original');
     var uDx = btn.getAttribute('data-url-docx');
     var uPf = btn.getAttribute('data-url-pdf');
-
     var h = '<a href="'+uO+'" class="block px-4 py-3 hover:bg-gray-100 transition-colors rounded-t-lg">' +
         '<div class="flex items-center"><i class="bi bi-file-earmark text-blue-500 text-lg mr-3"></i>' +
         '<div><span class="font-semibold text-gray-800 block">Original File</span>' +
@@ -433,7 +456,6 @@ function openDropdown(btn) {
     activeBtn = btn;
 }
 function closeDropdown() { portal.style.display='none'; portal.innerHTML=''; activeBtn=null; }
-
 document.querySelectorAll('.download-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) { e.stopPropagation(); activeBtn===btn ? closeDropdown() : openDropdown(btn); });
 });
@@ -444,12 +466,12 @@ window.addEventListener('resize', closeDropdown);
 /* ══════════════════════════════════════════════════
    REVIEW MODAL  (Step 1)
 ════════════════════════════════════════════════ */
-var reviewModal     = document.getElementById('reviewModal');
-var modalList       = document.getElementById('modalQuestionsList');
-var modalFilterType = document.getElementById('modalFilterType');
-var modalFilterDiff = document.getElementById('modalFilterDiff');
-var currentQuestData  = null;
-var currentQuestId    = null;
+var reviewModal      = document.getElementById('reviewModal');
+var modalList        = document.getElementById('modalQuestionsList');
+var modalFilterType  = document.getElementById('modalFilterType');
+var modalFilterDiff  = document.getElementById('modalFilterDiff');
+var currentQuestData = null;
+var currentQuestId   = null;
 var currentSubjectCode = null;
 var currentSubjectName = null;
 
@@ -459,11 +481,9 @@ document.querySelectorAll('.review-btn').forEach(function(btn) {
         currentSubjectCode = btn.getAttribute('data-quest-subject-code');
         currentSubjectName = btn.getAttribute('data-quest-subject-name');
         document.getElementById('modalTitle').textContent = btn.getAttribute('data-quest-title');
-
-        document.getElementById('modalDownloadDocx').href     = '/questionnaires/download/'+currentQuestId+'/?type=generated&format=docx';
-        document.getElementById('modalDownloadPdf').href      = '/questionnaires/download/'+currentQuestId+'/?type=generated&format=pdf';
-        document.getElementById('modalDownloadOriginal').href = '/questionnaires/download/'+currentQuestId+'/?type=original';
-
+        document.getElementById('modalDownloadDocx').href     = '/questionnaires/' + currentQuestId + '/download/?type=generated&format=docx';
+        document.getElementById('modalDownloadPdf').href      = '/questionnaires/' + currentQuestId + '/download/?type=generated&format=pdf';
+        document.getElementById('modalDownloadOriginal').href = '/questionnaires/' + currentQuestId + '/download/?type=original';
         reviewModal.classList.remove('hidden');
         reviewModal.classList.add('flex');
         document.body.style.overflow = 'hidden';
@@ -483,13 +503,14 @@ function closeReviewModal() {
 document.getElementById('closeReviewModal').addEventListener('click', closeReviewModal);
 document.getElementById('closeReviewModalFooter').addEventListener('click', closeReviewModal);
 reviewModal.addEventListener('click', function(e){ if(e.target===reviewModal) closeReviewModal(); });
-document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeFolderPicker(); closeReviewModal(); } });
+document.addEventListener('keydown', function(e){
+    if (e.key==='Escape') { closeFolderPicker(); closeReviewModal(); }
+});
 
 function loadQuestions(qid) {
     modalList.innerHTML = '<div class="flex items-center justify-center py-10 text-gray-400"><div class="text-center">' +
         '<div style="width:40px;height:40px;border:4px solid #e0e7ff;border-top-color:#6366f1;border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite;"></div>' +
         '<p>Loading questions...</p></div></div>';
-
     fetch('/questionnaires/get-questions/' + qid + '/')
         .then(function(r){ return r.json(); })
         .then(function(data) {
@@ -510,13 +531,9 @@ function renderModalQuestions(questions) {
     var dBorder = {easy:'border-green-500',medium:'border-yellow-500',hard:'border-red-500'};
     var dBadge  = {easy:'bg-green-100 text-green-800',medium:'bg-yellow-100 text-yellow-800',hard:'bg-red-100 text-red-800'};
 
-    /* check which are already in any folder */
-    var inWs = new Set();
-    loadStore().folders.forEach(function(f){ f.questions.forEach(function(q){ inWs.add(String(q.id)); }); });
-
     var html = '';
     questions.forEach(function(q, i) {
-        var already = inWs.has(String(q.id));
+        var already = cachedInWs.has(String(q.id));
         html += '<div class="modal-question-card bg-white rounded-lg border-l-4 ' + (dBorder[q.difficulty]||'border-gray-300') + ' shadow-sm p-4"' +
             ' data-type="'+q.type+'" data-difficulty="'+q.difficulty+'" data-points="'+q.points+'">' +
             '<div class="flex items-start gap-3">' +
@@ -596,7 +613,6 @@ function getCheckedIds() {
     return Array.from(modalList.querySelectorAll('.modal-checkbox:checked'))
                 .map(function(cb){ return cb.getAttribute('data-question-id'); });
 }
-
 function updateModalStats() {
     var cards   = modalList.querySelectorAll('.modal-question-card');
     var checked = modalList.querySelectorAll('.modal-checkbox:checked');
@@ -607,19 +623,18 @@ function updateModalStats() {
     document.getElementById('modalPointsCount').textContent   = pts;
     document.getElementById('modalSelectionLabel').textContent = checked.length + ' question(s) selected';
 }
-
 function updateModalDownloadLinks() {
     var ids = getCheckedIds();
     var saveBtn = document.getElementById('modalSaveToFolder');
     var docxBtn = document.getElementById('modalDownloadDocx');
     var pdfBtn  = document.getElementById('modalDownloadPdf');
-    var base = '/questionnaires/download/'+currentQuestId+'/?type=generated';
+    var base = '/questionnaires/'+currentQuestId+'/download/?type=generated';
     if (ids.length > 0) {
         var qs = '&questions='+ids.join(',');
-        docxBtn.href = base + '&format=docx' + qs;
-        pdfBtn.href  = base + '&format=pdf'  + qs;
+        docxBtn.href = base+'&format=docx'+qs;
+        pdfBtn.href  = base+'&format=pdf'+qs;
         [saveBtn].forEach(function(b){ b.classList.remove('opacity-50','cursor-not-allowed'); b.onclick=null; });
-        [docxBtn, pdfBtn].forEach(function(b){ b.classList.remove('opacity-50','cursor-not-allowed'); b.onclick=null; });
+        [docxBtn,pdfBtn].forEach(function(b){ b.classList.remove('opacity-50','cursor-not-allowed'); b.onclick=null; });
     } else {
         docxBtn.href='#'; pdfBtn.href='#';
         [saveBtn,docxBtn,pdfBtn].forEach(function(b){
@@ -633,26 +648,12 @@ function updateModalDownloadLinks() {
    FOLDER PICKER MODAL  (Step 2)
 ════════════════════════════════════════════════ */
 var folderPickerModal = document.getElementById('folderPickerModal');
-var pendingQuestions  = [];   // questions to save once folder is chosen
+var pendingQuestionIds = [];  // just the IDs — server has the question data already
 
 document.getElementById('modalSaveToFolder').addEventListener('click', function() {
-    var ids = getCheckedIds();
-    if (!ids.length) { showToast('Select at least one question.','warning'); return; }
-
-    /* Build question objects from currentQuestData */
-    pendingQuestions = (currentQuestData||[])
-        .filter(function(q){ return ids.includes(String(q.id)); })
-        .map(function(q){
-            return Object.assign({}, q, {
-                subject_code: currentSubjectCode,
-                subject_name: currentSubjectName
-            });
-        });
-
-    /* Subtitle */
-    document.getElementById('fpModalSubtitle').textContent =
-        pendingQuestions.length + ' question(s) to save';
-
+    pendingQuestionIds = getCheckedIds();
+    if (!pendingQuestionIds.length) { showToast('Select at least one question.','warning'); return; }
+    document.getElementById('fpModalSubtitle').textContent = pendingQuestionIds.length + ' question(s) to save';
     renderFolderPicker();
     folderPickerModal.classList.remove('hidden');
     folderPickerModal.classList.add('flex');
@@ -667,11 +668,10 @@ document.getElementById('closeFolderPicker').addEventListener('click', closeFold
 folderPickerModal.addEventListener('click', function(e){ if(e.target===folderPickerModal) closeFolderPicker(); });
 
 function renderFolderPicker() {
-    var folders = loadStore().folders;
-    var list    = document.getElementById('fp-folder-list');
-    var nf      = document.getElementById('fp-no-folders');
+    var list = document.getElementById('fp-folder-list');
+    var nf   = document.getElementById('fp-no-folders');
 
-    if (folders.length === 0) {
+    if (cachedFolders.length === 0) {
         nf.classList.remove('hidden');
         list.innerHTML = '';
         return;
@@ -681,9 +681,8 @@ function renderFolderPicker() {
     var GRADS = ['from-indigo-400 to-purple-500','from-blue-400 to-cyan-500',
                  'from-emerald-400 to-teal-500','from-orange-400 to-amber-500',
                  'from-pink-400 to-rose-500'];
-
     list.innerHTML = '';
-    folders.forEach(function(folder, idx) {
+    cachedFolders.forEach(function(folder, idx) {
         var grad = GRADS[idx % GRADS.length];
         var btn  = document.createElement('button');
         btn.className = 'w-full flex items-center gap-3 p-3.5 rounded-xl border-2 border-gray-100 ' +
@@ -694,54 +693,71 @@ function renderFolderPicker() {
             '</div>' +
             '<div class="flex-1 min-w-0">' +
                 '<div class="font-bold text-gray-800 text-sm truncate">'+esc(folder.name)+'</div>' +
-                '<div class="text-xs text-gray-400">'+folder.questions.length+' question(s)</div>' +
+                '<div class="text-xs text-gray-400">'+(folder.question_count||0)+' question(s)</div>' +
             '</div>' +
             '<i class="bi bi-arrow-right text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"></i>';
-        btn.addEventListener('click', function(){
-            saveToFolder(folder.id);
-        });
+        btn.addEventListener('click', function(){ saveToFolder(folder.id, folder.name); });
         list.appendChild(btn);
     });
 }
 
-function saveToFolder(folderId) {
-    var s = loadStore();
-    var folder = s.folders.find(function(f){ return f.id === folderId; });
-    if (!folder) return;
-    var existingIds = folder.questions.map(function(q){ return String(q.id); });
-    var added = 0;
-    pendingQuestions.forEach(function(q){
-        if (!existingIds.includes(String(q.id))) { folder.questions.push(q); added++; }
-    });
-    saveStore(s);
-    updateBrowseBanner();
-    closeFolderPicker();
-    closeReviewModal();
+function saveToFolder(folderId, folderName) {
+    /* Disable buttons while saving */
+    document.getElementById('fp-folder-list').querySelectorAll('button').forEach(function(b){ b.disabled=true; });
 
-    if (added > 0) {
-        showToast(added+' question(s) saved to "'+folder.name+'"!','success');
-    } else {
-        showToast('All selected questions are already in "'+folder.name+'".','info');
-    }
+    postJSON(API.addQuestions(folderId), { question_ids: pendingQuestionIds.map(Number) })
+        .then(function(data) {
+            if (data.error) { showToast(data.error,'error'); return; }
+            /* Refresh server data */
+            loadFoldersFromServer();
+            closeFolderPicker();
+            closeReviewModal();
+            if (data.added > 0) {
+                showToast(data.added+' question(s) saved to "'+folderName+'"!','success');
+            } else {
+                showToast('All selected questions are already in "'+folderName+'".','info');
+            }
+        })
+        .catch(function(){ showToast('Failed to save questions.','error'); })
+        .finally(function(){
+            document.getElementById('fp-folder-list').querySelectorAll('button').forEach(function(b){ b.disabled=false; });
+        });
 }
 
-/* Create new folder inline and save */
+/* ── Create new folder inline & save ── */
 document.getElementById('fp-create-and-save').addEventListener('click', function(){
     var name = document.getElementById('fp-new-folder-name').value.trim();
     if (!name) { showToast('Please enter a folder name.','warning'); return; }
-    var s = loadStore();
-    var newFolder = { id: uid(), name: name, createdAt: Date.now(), questions: [] };
-    s.folders.push(newFolder);
-    saveStore(s);
-    showToast('Folder "'+name+'" created!','success');
-    saveToFolder(newFolder.id);
+
+    var createBtn = document.getElementById('fp-create-and-save');
+    createBtn.disabled = true;
+    createBtn.textContent = 'Creating...';
+
+    postJSON(API.createFolder(), { name: name })
+        .then(function(data) {
+            if (data.error) { showToast(data.error,'error'); return; }
+            showToast('Folder "'+data.name+'" created!','success');
+            /* now save questions into the new folder */
+            return postJSON(API.addQuestions(data.id), { question_ids: pendingQuestionIds.map(Number) });
+        })
+        .then(function(data) {
+            if (!data) return;
+            loadFoldersFromServer();
+            closeFolderPicker();
+            closeReviewModal();
+            showToast(data.added+' question(s) saved!','success');
+        })
+        .catch(function(){ showToast('Something went wrong.','error'); })
+        .finally(function(){
+            createBtn.disabled = false;
+            createBtn.innerHTML = '<i class="bi bi-folder-plus"></i> Create &amp; Save';
+        });
 });
 document.getElementById('fp-new-folder-name').addEventListener('keydown', function(e){
     if (e.key==='Enter') document.getElementById('fp-create-and-save').click();
 });
 
 /* ── utils ── */
-function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function esc(s) {
     if (!s) return '';
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -749,9 +765,5 @@ function esc(s) {
 
 })();
 </script>
-
-<style>
-@keyframes spin { to { transform:rotate(360deg); } }
-</style>
 
 {% endblock %}
