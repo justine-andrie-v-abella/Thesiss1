@@ -15,32 +15,11 @@
         overflow-y: auto;
         overflow-x: hidden;
     }
-    
-    .notification-dropdown::-webkit-scrollbar {
-        width: 6px;
-    }
-    
-    .notification-dropdown::-webkit-scrollbar-track {
-        background: #f1f5f9;
-    }
-    
-    .notification-dropdown::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 3px;
-    }
-    
-    .notification-dropdown::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-    }
-    
-    .notification-dropdown {
-        scrollbar-width: thin;
-        scrollbar-color: #cbd5e1 #f1f5f9;
-    }
-    
-    .notification-dropdown {
-        scroll-behavior: smooth;
-    }
+    .notification-dropdown::-webkit-scrollbar { width: 6px; }
+    .notification-dropdown::-webkit-scrollbar-track { background: #f1f5f9; }
+    .notification-dropdown::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .notification-dropdown::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .notification-dropdown { scrollbar-width: thin; scrollbar-color: #cbd5e1 #f1f5f9; scroll-behavior: smooth; }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -49,17 +28,17 @@
     <button id="mobileMenuBtn" class="lg:hidden fixed top-4 left-4 z-50 bg-white p-2 rounded-lg shadow-lg hover:bg-gray-50 transition-colors">
         <i class="bi bi-list text-2xl text-gray-700"></i>
     </button>
-    
+
     <!-- Sidebar Overlay -->
     <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden lg:hidden"></div>
-    
+
     <!-- Sidebar -->
-    <aside id="sidebar" class="fixed left-0 top-0 h-full w-72 bg-gradient-to-b from-blue-900 to-blue-800 text-white z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 shadow-2xl">
+    <aside id="sidebar" class="fixed left-0 top-0 h-full w-72 bg-gradient-to-b from-blue-900 to-blue-800 text-white z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 shadow-2xl flex flex-col">
         <!-- Brand -->
-        <div class="p-6 border-b border-blue-700">
-            <div class="flex items-center space-x-3">           
-                <img src="{% static 'images/bisulogo.png' %}" 
-                    alt="BISU Logo" 
+        <div class="p-6 border-b border-blue-700 flex-shrink-0">
+            <div class="flex items-center space-x-3">
+                <img src="{% static 'images/bisulogo.png' %}"
+                    alt="BISU Logo"
                     class="w-10 h-10 object-contain flex-shrink-0">
                 <div>
                     <h1 class="text-xl font-bold">BISU TEST BANK</h1>
@@ -67,74 +46,100 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Navigation -->
         <nav class="flex-1 overflow-y-auto py-6 px-3">
             {% if user.is_staff %}
-                <!-- Admin Navigation -->
-                <a href="{% url 'accounts:admin_dashboard' %}" class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'admin-dashboard' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                <!-- ── Admin Navigation ───────────────────────────────────────── -->
+                <a href="{% url 'accounts:admin_dashboard' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'admin-dashboard' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <i class="bi bi-speedometer2 text-xl"></i>
                     <span class="font-medium">Dashboard</span>
                 </a>
-                <a href="{% url 'accounts:manage_teachers' %}" class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'manage-teachers' in request.path or 'add-teacher' in request.path or 'edit-teacher' in request.path or 'delete-teacher' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                <a href="{% url 'accounts:manage_teachers' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'manage-teachers' in request.path or 'add-teacher' in request.path or 'edit-teacher' in request.path or 'delete-teacher' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <i class="bi bi-people text-xl"></i>
                     <span class="font-medium">Manage Teachers</span>
                 </a>
-                <a href="{% url 'accounts:manage_departments' %}" class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'manage-departments' in request.path or 'edit-department' in request.path or 'delete-department' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                <a href="{% url 'accounts:manage_departments' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'manage-departments' in request.path or 'edit-department' in request.path or 'delete-department' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <i class="bi bi-building text-xl"></i>
                     <span class="font-medium">Manage Departments</span>
                 </a>
-                <a href="{% url 'accounts:manage_subjects' %}" class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'manage-subjects' in request.path or 'edit-subject' in request.path or 'delete-subject' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                <a href="{% url 'accounts:manage_subjects' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'manage-subjects' in request.path or 'edit-subject' in request.path or 'delete-subject' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <i class="bi bi-book text-xl"></i>
                     <span class="font-medium">Manage Subjects</span>
                 </a>
-                <a href="{% url 'questionnaires:all_questionnaires' %}" class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if '/questionnaires/all' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                <a href="{% url 'questionnaires:all_questionnaires' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if '/questionnaires/all' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <i class="bi bi-file-earmark-text text-xl"></i>
                     <span class="font-medium">All Questionnaires</span>
                 </a>
+
             {% else %}
-                <!-- Teacher Navigation with Upload Dropdown -->
-                <a href="{% url 'accounts:teacher_dashboard' %}" class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'teacher-dashboard' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                <!-- ── Teacher Navigation ─────────────────────────────────────── -->
+                <a href="{% url 'accounts:teacher_dashboard' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'teacher-dashboard' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <i class="bi bi-speedometer2 text-xl"></i>
                     <span class="font-medium">Dashboard</span>
                 </a>
 
-                <!-- Upload Dropdown Menu -->
+                <!-- Upload Dropdown -->
                 <div class="relative mb-2">
-                    <button id="uploadDropdownBtn" class="flex items-center justify-between w-full space-x-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors {% if '/questionnaires/upload' in request.path or '/questionnaires/generate' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                    <button id="uploadDropdownBtn"
+                        class="flex items-center justify-between w-full space-x-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors {% if '/questionnaires/upload' in request.path or '/questionnaires/generate' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                         <div class="flex items-center space-x-3">
                             <i class="bi bi-upload text-xl"></i>
                             <span class="font-medium">Upload</span>
                         </div>
                         <i class="bi bi-chevron-down text-sm transition-transform duration-200" id="uploadDropdownIcon"></i>
                     </button>
-                    
-                    <!-- Dropdown Content -->
                     <div id="uploadDropdownContent" class="hidden mt-2 ml-4 space-y-1">
-                        <a href="{% url 'questionnaires:upload_questionnaire' %}" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors {% if '/questionnaires/upload' in request.path %}bg-blue-600{% endif %}">
+                        <a href="{% url 'questionnaires:upload_questionnaire' %}"
+                            class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors {% if '/questionnaires/upload' in request.path %}bg-blue-600{% endif %}">
                             <i class="bi bi-file-earmark-arrow-up text-lg"></i>
                             <span class="text-sm font-medium">Upload Module</span>
                         </a>
-                        <a href="{% url 'questionnaires:generate_questionnaire' %}" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors {% if '/questionnaires/generate' in request.path %}bg-blue-600{% endif %}">
+                        <a href="{% url 'questionnaires:generate_questionnaire' %}"
+                            class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors {% if '/questionnaires/generate' in request.path %}bg-blue-600{% endif %}">
                             <i class="bi bi-robot text-lg"></i>
                             <span class="text-sm font-medium">Generate with AI</span>
                         </a>
                     </div>
                 </div>
 
-                <a href="{% url 'questionnaires:my_uploads' %}" class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if '/questionnaires/my-uploads' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                <a href="{% url 'questionnaires:my_uploads' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if '/questionnaires/my-uploads' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <i class="bi bi-file-person text-xl"></i>
                     <span class="font-medium">My Uploads</span>
                 </a>
-                <a href="{% url 'questionnaires:browse_questionnaires' %}" class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if '/questionnaires/browse' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+
+                <a href="{% url 'questionnaires:browse_questionnaires' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if '/questionnaires/browse' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <i class="bi bi-search text-xl"></i>
                     <span class="font-medium">Browse</span>
                 </a>
+
+                <!-- ── Workspace ───────────────────────────────────────────────── -->
+                <a href="{% url 'questionnaires:workspace' %}"
+                    class="flex items-center justify-between px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors group {% if '/questionnaires/workspace' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                    <div class="flex items-center space-x-3">
+                        <i class="bi bi-collection-fill text-xl text-yellow-300 group-hover:text-yellow-200"></i>
+                        <span class="font-medium">My Workspace</span>
+                    </div>
+                    <!-- Live badge: count from localStorage, updated by JS -->
+                    <span id="ws-sidebar-badge"
+                        class="min-w-[22px] h-[22px] bg-yellow-400 text-blue-900 text-xs font-bold rounded-full flex items-center justify-center px-1 leading-none">
+                        0
+                    </span>
+                </a>
+                <!-- ─────────────────────────────────────────────────────────────── -->
             {% endif %}
         </nav>
-        
+
         <!-- User Info -->
-        <div class="p-4 border-t border-blue-700">
+        <div class="p-4 border-t border-blue-700 flex-shrink-0">
             <div class="bg-blue-700 rounded-lg p-4 mb-3">
                 <div class="flex items-center space-x-3 mb-2">
                     <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center">
@@ -146,13 +151,14 @@
                     </div>
                 </div>
             </div>
-            <a href="{% url 'accounts:logout' %}" class="flex items-center justify-center space-x-2 w-full bg-white text-blue-900 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium">
+            <a href="{% url 'accounts:logout' %}"
+                class="flex items-center justify-center space-x-2 w-full bg-white text-blue-900 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium">
                 <i class="bi bi-box-arrow-right"></i>
                 <span>Logout</span>
             </a>
         </div>
     </aside>
-    
+
     <!-- Main Content Area -->
     <div class="lg:ml-72 min-h-screen">
         <!-- Header -->
@@ -178,7 +184,7 @@
                                 </span>
                                 {% endif %}
                             </button>
-                            
+
                             <!-- Notification Dropdown -->
                             <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
                                 <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
@@ -200,25 +206,22 @@
                                     </div>
                                 </div>
 
-                                <!-- Tabs for switching between notifications and login history -->
+                                <!-- Tabs -->
                                 <div class="flex border-b border-gray-200 bg-gray-50">
                                     <button id="notificationsTab" class="flex-1 px-4 py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600 transition-colors">
-                                        <i class="bi bi-bell mr-1"></i>
-                                        Notifications
+                                        <i class="bi bi-bell mr-1"></i> Notifications
                                     </button>
                                     <button id="loginHistoryTab" class="flex-1 px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors">
-                                        <i class="bi bi-clock-history mr-1"></i>
-                                        Login History
+                                        <i class="bi bi-clock-history mr-1"></i> Login History
                                     </button>
                                 </div>
-                                
-                                <!-- Notifications Content - SHOWS ALL ACTIVITIES EXCEPT LOGIN -->
+
+                                <!-- Notifications Content -->
                                 <div id="notificationsContent" class="notification-dropdown divide-y divide-gray-100">
                                     {% for activity in recent_activities %}
                                     {% if 'login' not in activity.title|lower and 'logged in' not in activity.description|lower %}
                                     <div class="notification-item p-4 hover:bg-gray-50 transition-colors cursor-pointer {% if not activity.read %}bg-blue-50{% endif %}" data-notification-id="{{ activity.id|default:forloop.counter }}">
                                         <div class="flex items-start space-x-3">
-                                            <!-- Dynamic icon with fallback -->
                                             <div class="w-10 h-10 bg-gradient-to-br from-{{ activity.color|default:'blue' }}-400 to-{{ activity.color|default:'blue' }}-600 rounded-lg flex items-center justify-center flex-shrink-0">
                                                 <i class="{{ activity.icon|default:'bi bi-bell' }} text-white text-sm"></i>
                                             </div>
@@ -279,7 +282,7 @@
                                     </div>
                                     {% endfor %}
                                 </div>
-                                
+
                                 {% if recent_activities %}
                                 <div class="bg-gray-50 px-4 py-3 border-t border-gray-100">
                                     <a href="#" class="flex items-center justify-center text-blue-600 hover:text-blue-700 font-medium text-xs group">
@@ -290,7 +293,7 @@
                                 {% endif %}
                             </div>
                         </div>
-                        
+
                         <div class="hidden sm:flex items-center space-x-3 pl-4 border-l border-gray-200">
                             <div class="text-right">
                                 <p class="text-sm font-medium text-gray-900">{{ user.get_full_name }}</p>
@@ -304,16 +307,14 @@
                 </div>
             </div>
         </header>
-        
+
         <!-- Page Content -->
         <main class="p-4 sm:p-6 lg:p-8">
             {% block content %}{% endblock %}
         </main>
     </div>
     {% else %}
-    <!-- Logged Out View -->
-    <div class="container mx-auto px-4 mt-5">
-    </div>
+    <div class="container mx-auto px-4 mt-5"></div>
     {% endif %}
 
 <script>
@@ -326,26 +327,21 @@
             toastContainer.className = 'fixed top-4 right-4 z-50 space-y-2';
             document.body.appendChild(toastContainer);
         }
-
         const types = {
             success: { bg: 'bg-green-500', icon: 'bi-check-circle-fill', textColor: 'text-white' },
-            error: { bg: 'bg-red-500', icon: 'bi-x-circle-fill', textColor: 'text-white' },
+            error:   { bg: 'bg-red-500',   icon: 'bi-x-circle-fill',     textColor: 'text-white' },
             warning: { bg: 'bg-yellow-500', icon: 'bi-exclamation-triangle-fill', textColor: 'text-white' },
-            info: { bg: 'bg-blue-500', icon: 'bi-info-circle-fill', textColor: 'text-white' }
+            info:    { bg: 'bg-blue-500',   icon: 'bi-info-circle-fill',  textColor: 'text-white' }
         };
-
         const config = types[type] || types.info;
-        const toast = document.createElement('div');
+        const toast  = document.createElement('div');
         toast.className = `${config.bg} ${config.textColor} px-6 py-4 rounded-lg shadow-2xl flex items-center space-x-3 min-w-[300px] max-w-md transform translate-x-full transition-all duration-300 ease-out`;
-        
         toast.innerHTML = `
             <i class="bi ${config.icon} text-xl flex-shrink-0"></i>
             <span class="flex-1 font-medium">${message}</span>
             <button onclick="this.parentElement.remove()" class="ml-2 hover:bg-white hover:bg-opacity-20 rounded p-1 transition-colors">
                 <i class="bi bi-x-lg text-sm"></i>
-            </button>
-        `;
-
+            </button>`;
         toastContainer.appendChild(toast);
         setTimeout(() => { toast.classList.remove('translate-x-full'); toast.classList.add('translate-x-0'); }, 10);
         setTimeout(() => {
@@ -354,12 +350,11 @@
         }, duration);
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        // Mobile menu
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const sidebar = document.getElementById('sidebar');
-        const sidebarOverlay = document.getElementById('sidebarOverlay');
-        
+    document.addEventListener('DOMContentLoaded', function () {
+        // ── Mobile menu ───────────────────────────────────────────────────────
+        const mobileMenuBtn   = document.getElementById('mobileMenuBtn');
+        const sidebar         = document.getElementById('sidebar');
+        const sidebarOverlay  = document.getElementById('sidebarOverlay');
         if (mobileMenuBtn && sidebar && sidebarOverlay) {
             mobileMenuBtn.addEventListener('click', () => {
                 sidebar.classList.toggle('-translate-x-full');
@@ -371,44 +366,40 @@
             });
         }
 
-        // Notification dropdown
-        const notificationBtn = document.getElementById('notificationBtn');
+        // ── Notification dropdown ─────────────────────────────────────────────
+        const notificationBtn      = document.getElementById('notificationBtn');
         const notificationDropdown = document.getElementById('notificationDropdown');
-        const markAllReadBtn = document.getElementById('markAllReadBtn');
-        const notificationsTab = document.getElementById('notificationsTab');
-        const loginHistoryTab = document.getElementById('loginHistoryTab');
+        const markAllReadBtn       = document.getElementById('markAllReadBtn');
+        const notificationsTab     = document.getElementById('notificationsTab');
+        const loginHistoryTab      = document.getElementById('loginHistoryTab');
         const notificationsContent = document.getElementById('notificationsContent');
-        const loginHistoryContent = document.getElementById('loginHistoryContent');
-        
+        const loginHistoryContent  = document.getElementById('loginHistoryContent');
+
         if (notificationBtn && notificationDropdown) {
             notificationBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 notificationDropdown.classList.toggle('hidden');
             });
-
             document.addEventListener('click', (e) => {
-                if (!notificationDropdown.contains(e.target) && !notificationBtn.contains(e.target)) {
+                if (!notificationDropdown.contains(e.target) && !notificationBtn.contains(e.target))
                     notificationDropdown.classList.add('hidden');
-                }
             });
-
             notificationDropdown.addEventListener('click', (e) => e.stopPropagation());
 
-            if (notificationsTab && loginHistoryTab && loginHistoryContent) {
+            if (notificationsTab && loginHistoryTab) {
                 notificationsTab.addEventListener('click', () => {
-                    notificationsTab.classList.add('text-blue-600', 'border-blue-600');
-                    notificationsTab.classList.remove('text-gray-500', 'border-transparent');
-                    loginHistoryTab.classList.remove('text-blue-600', 'border-blue-600');
-                    loginHistoryTab.classList.add('text-gray-500', 'border-transparent');
+                    notificationsTab.classList.add('text-blue-600','border-blue-600');
+                    notificationsTab.classList.remove('text-gray-500','border-transparent');
+                    loginHistoryTab.classList.remove('text-blue-600','border-blue-600');
+                    loginHistoryTab.classList.add('text-gray-500','border-transparent');
                     notificationsContent.classList.remove('hidden');
                     loginHistoryContent.classList.add('hidden');
                 });
-
                 loginHistoryTab.addEventListener('click', () => {
-                    loginHistoryTab.classList.add('text-blue-600', 'border-blue-600');
-                    loginHistoryTab.classList.remove('text-gray-500', 'border-transparent');
-                    notificationsTab.classList.remove('text-blue-600', 'border-blue-600');
-                    notificationsTab.classList.add('text-gray-500', 'border-transparent');
+                    loginHistoryTab.classList.add('text-blue-600','border-blue-600');
+                    loginHistoryTab.classList.remove('text-gray-500','border-transparent');
+                    notificationsTab.classList.remove('text-blue-600','border-blue-600');
+                    notificationsTab.classList.add('text-gray-500','border-transparent');
                     loginHistoryContent.classList.remove('hidden');
                     notificationsContent.classList.add('hidden');
                 });
@@ -417,95 +408,85 @@
             if (markAllReadBtn) {
                 markAllReadBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    
                     function getCookie(name) {
-                        let cookieValue = null;
-                        if (document.cookie && document.cookie !== '') {
-                            const cookies = document.cookie.split(';');
-                            for (let i = 0; i < cookies.length; i++) {
-                                const cookie = cookies[i].trim();
-                                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                                    break;
-                                }
-                            }
-                        }
-                        return cookieValue;
+                        let v = null;
+                        if (document.cookie) document.cookie.split(';').forEach(c => {
+                            c = c.trim();
+                            if (c.startsWith(name+'=')) v = decodeURIComponent(c.substring(name.length+1));
+                        });
+                        return v;
                     }
-
                     document.querySelectorAll('.notification-item').forEach(item => {
                         item.classList.remove('bg-blue-50');
-                        const unreadDot = item.querySelector('.unread-dot');
-                        if (unreadDot) unreadDot.remove();
+                        const dot = item.querySelector('.unread-dot');
+                        if (dot) dot.remove();
                     });
-
                     const badge = notificationBtn.querySelector('span');
-                    if (badge) {
-                        badge.style.opacity = '0';
-                        setTimeout(() => badge.remove(), 300);
-                    }
-
+                    if (badge) { badge.style.opacity='0'; setTimeout(()=>badge.remove(),300); }
                     const countBadge = document.querySelector('#notificationDropdown .bg-white.text-blue-700');
                     if (countBadge) countBadge.textContent = '0';
-
                     markAllReadBtn.style.opacity = '0';
                     setTimeout(() => markAllReadBtn.style.display = 'none', 300);
 
                     fetch('/accounts/mark-all-notifications-read/', {
                         method: 'POST',
-                        headers: {
-                            'X-CSRFToken': getCookie('csrftoken'),
-                            'Content-Type': 'application/json',
-                        },
-                    })
-                    .then(response => response.json())
-                    .then(data => { if (data.success) console.log('All notifications marked as read:', data.message); })
-                    .catch(error => console.error('Error:', error));
+                        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' }
+                    }).then(r=>r.json()).then(d=>{ if(d.success) console.log('Marked read:', d.message); })
+                    .catch(err => console.error('Error:', err));
                 });
             }
         }
-        
-        // Convert Django messages to toasts
+
+        // ── Upload dropdown ───────────────────────────────────────────────────
+        const uploadDropdownBtn     = document.getElementById('uploadDropdownBtn');
+        const uploadDropdownContent = document.getElementById('uploadDropdownContent');
+        const uploadDropdownIcon    = document.getElementById('uploadDropdownIcon');
+        if (uploadDropdownBtn && uploadDropdownContent) {
+            uploadDropdownBtn.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                const isHidden = uploadDropdownContent.classList.contains('hidden');
+                if (isHidden) {
+                    uploadDropdownContent.classList.remove('hidden');
+                    uploadDropdownIcon.style.transform = 'rotate(180deg)';
+                } else {
+                    uploadDropdownContent.classList.add('hidden');
+                    uploadDropdownIcon.style.transform = 'rotate(0deg)';
+                }
+            });
+            const p = window.location.pathname;
+            if (p.includes('/questionnaires/upload') || p.includes('/questionnaires/generate')) {
+                uploadDropdownContent.classList.remove('hidden');
+                uploadDropdownIcon.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        // ── Workspace sidebar badge (reads localStorage) ──────────────────────
+        function refreshWorkspaceBadge() {
+            var badge = document.getElementById('ws-sidebar-badge');
+            if (!badge) return;
+            try {
+                var ws = JSON.parse(localStorage.getItem('bisu_workspace_questions') || '[]');
+                badge.textContent = ws.length;
+                badge.style.display = ws.length > 0 ? 'flex' : 'flex'; // always show
+            } catch(e) { badge.textContent = '0'; }
+        }
+        refreshWorkspaceBadge();
+        // Re-read on storage changes from other tabs / pages
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'bisu_workspace_questions') refreshWorkspaceBadge();
+        });
+
+        // ── Django messages → toasts ──────────────────────────────────────────
         {% if messages %}
             {% for message in messages %}
                 setTimeout(() => {
-                    showToast('{{ message|escapejs }}', '{% if message.tags == "success" %}success{% elif message.tags == "error" %}error{% elif message.tags == "warning" %}warning{% else %}info{% endif %}', 4000);
+                    showToast('{{ message|escapejs }}',
+                        '{% if message.tags == "success" %}success{% elif message.tags == "error" %}error{% elif message.tags == "warning" %}warning{% else %}info{% endif %}',
+                        4000);
                 }, {{ forloop.counter0 }} * 200);
             {% endfor %}
         {% endif %}
     });
-
-    // Upload Dropdown Toggle Script (add to existing scripts in base.html)
-document.addEventListener('DOMContentLoaded', function() {
-    const uploadDropdownBtn = document.getElementById('uploadDropdownBtn');
-    const uploadDropdownContent = document.getElementById('uploadDropdownContent');
-    const uploadDropdownIcon = document.getElementById('uploadDropdownIcon');
-    
-    if (uploadDropdownBtn && uploadDropdownContent) {
-        // Toggle dropdown on click
-        uploadDropdownBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const isHidden = uploadDropdownContent.classList.contains('hidden');
-            
-            if (isHidden) {
-                uploadDropdownContent.classList.remove('hidden');
-                uploadDropdownIcon.style.transform = 'rotate(180deg)';
-            } else {
-                uploadDropdownContent.classList.add('hidden');
-                uploadDropdownIcon.style.transform = 'rotate(0deg)';
-            }
-        });
-        
-        // Keep dropdown open if on upload or generate page
-        const currentPath = window.location.pathname;
-        if (currentPath.includes('/questionnaires/upload') || currentPath.includes('/questionnaires/generate')) {
-            uploadDropdownContent.classList.remove('hidden');
-            uploadDropdownIcon.style.transform = 'rotate(180deg)';
-        }
-    }
-});
 </script>
 {% block extra_js %}{% endblock %}
 </body>

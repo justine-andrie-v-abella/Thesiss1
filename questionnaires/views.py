@@ -1,6 +1,5 @@
 # ============================================================================
 # FILE: questionnaires/views.py
-# FIXED VERSION WITH MANUAL QUESTION SAVING + ACTIVITY LOGGING
 # ============================================================================
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -9,7 +8,11 @@ from django.contrib import messages
 from django.db.models import Q, Count
 from django.core.paginator import Paginator
 from django.http import FileResponse, Http404, JsonResponse
-from .models import Questionnaire, ExtractedQuestion, QuestionType
+from django.views.decorators.http import require_POST
+from .models import (
+    Questionnaire, ExtractedQuestion, QuestionType,
+    WorkspaceFolder, WorkspaceFolderQuestion,
+)
 from .forms import QuestionnaireUploadForm, QuestionnaireEditForm, QuestionnaireFilterForm
 from accounts.models import TeacherProfile, Department, Subject, ActivityLog
 from .services import QuestionnaireExtractor
@@ -32,6 +35,11 @@ def is_admin(user):
 def is_teacher(user):
     return user.is_authenticated and not user.is_staff and hasattr(user, 'teacher_profile')
 
+
+# ============================================================================
+# EXISTING VIEWS  (unchanged)
+# ============================================================================
+
 @login_required
 def upload_questionnaire(request):
     if request.user.is_staff:
@@ -44,7 +52,6 @@ def upload_questionnaire(request):
         form = QuestionnaireUploadForm(request.POST, request.FILES, user=request.user)
 
         if form.is_valid():
-            # Save to DB temporarily so the file is accessible for extraction
             questionnaire = form.save(commit=False)
             questionnaire.uploader = teacher
             questionnaire.department = teacher.department
@@ -59,14 +66,12 @@ def upload_questionnaire(request):
                 extractor = get_extractor()
                 created_questions = extractor.process_questionnaire(questionnaire, type_names, mode='extract')
 
-                # If no questions were extracted, delete the record and reject
                 if not created_questions:
                     questionnaire.file.delete(save=False)
                     questionnaire.delete()
                     messages.error(request, 'No questions were detected in your file. Please upload a file that contains questions.')
                     return render(request, 'teacher_dashboard/upload_questionnaire.html', {'form': form})
 
-                # Success — finalize the record
                 questionnaire.extraction_status = 'completed'
                 questionnaire.is_extracted = True
                 questionnaire.save()
@@ -89,7 +94,6 @@ def upload_questionnaire(request):
                 return redirect('questionnaires:review_extracted', pk=questionnaire.pk)
 
             except Exception as e:
-                # Extraction failed — delete the file and the DB record entirely
                 questionnaire.file.delete(save=False)
                 questionnaire.delete()
 
@@ -109,9 +113,9 @@ def upload_questionnaire(request):
 
     return render(request, 'teacher_dashboard/upload_questionnaire.html', {'form': form})
 
+
 @login_required
 def generate_questionnaire(request):
-    """Generate questionnaire WITH AI extraction"""
     if request.user.is_staff:
         messages.error(request, 'Admins cannot generate questionnaires')
         return redirect('accounts:admin_dashboard')
@@ -183,7 +187,6 @@ def generate_questionnaire(request):
 
 @login_required
 def review_extracted_questions(request, pk):
-    """Review and edit extracted questions before finalizing"""
     questionnaire = get_object_or_404(Questionnaire, pk=pk)
 
     if request.user.is_staff:
@@ -202,13 +205,9 @@ def review_extracted_questions(request, pk):
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        # ── Save selected questions (AI-extracted + manual) ───────────────────
         if action == 'save_selected':
-            selected_ids = request.POST.getlist('selected_questions')  # AI-extracted IDs
+            selected_ids = request.POST.getlist('selected_questions')
 
-            # ── Process manually-added questions ──────────────────────────────
-            # The frontend sends parallel lists, one entry per manual question.
-            # Only entries whose uid appears in manual_selected_uid[] were checked.
             manual_uids         = request.POST.getlist('manual_selected_uid[]')
             manual_texts        = request.POST.getlist('manual_question_text[]')
             manual_types        = request.POST.getlist('manual_question_type[]')
@@ -217,13 +216,11 @@ def review_extracted_questions(request, pk):
             manual_answers      = request.POST.getlist('manual_correct_answer[]')
             manual_explanations = request.POST.getlist('manual_explanation[]')
 
-            # MC option lists (one value per manual question that is MC type)
             manual_opts_a = request.POST.getlist('manual_option_A[]')
             manual_opts_b = request.POST.getlist('manual_option_B[]')
             manual_opts_c = request.POST.getlist('manual_option_C[]')
             manual_opts_d = request.POST.getlist('manual_option_D[]')
 
-            # Map frontend type names → model QuestionType.name values
             type_name_map = {
                 'fill_in_the_blank': 'fill_blank',
                 'multiple_choice':   'multiple_choice',
@@ -237,7 +234,6 @@ def review_extracted_questions(request, pk):
             newly_created_ids = []
 
             for i, uid in enumerate(manual_uids):
-                # Safely get each parallel field
                 q_text = manual_texts[i].strip()        if i < len(manual_texts)        else ''
                 q_type = manual_types[i].strip()        if i < len(manual_types)        else ''
                 q_diff = manual_difficulties[i].strip() if i < len(manual_difficulties) else 'medium'
@@ -245,28 +241,23 @@ def review_extracted_questions(request, pk):
                 q_ans  = manual_answers[i].strip()      if i < len(manual_answers)      else ''
                 q_expl = manual_explanations[i].strip() if i < len(manual_explanations) else ''
 
-                # Skip obviously broken entries
                 if not q_text or not q_type:
                     continue
 
-                # Safe int conversion for points
                 try:
                     q_pts = int(q_pts)
                 except (ValueError, TypeError):
                     q_pts = 1
 
-                # Resolve to model QuestionType name
                 resolved_type = type_name_map.get(q_type, q_type)
 
                 try:
                     question_type_obj = QuestionType.objects.get(name=resolved_type)
                 except QuestionType.DoesNotExist:
-                    # Fall back to first active type rather than silently dropping
                     question_type_obj = QuestionType.objects.filter(is_active=True).first()
                     if not question_type_obj:
                         continue
 
-                # Build MC options (only present if type is multiple_choice)
                 opt_a = manual_opts_a[i] if i < len(manual_opts_a) else None
                 opt_b = manual_opts_b[i] if i < len(manual_opts_b) else None
                 opt_c = manual_opts_c[i] if i < len(manual_opts_c) else None
@@ -280,7 +271,7 @@ def review_extracted_questions(request, pk):
                     explanation    = q_expl or None,
                     points         = q_pts,
                     difficulty     = q_diff,
-                    is_approved    = True,  # manual questions are always approved
+                    is_approved    = True,
                     option_a       = opt_a or None,
                     option_b       = opt_b or None,
                     option_c       = opt_c or None,
@@ -288,19 +279,15 @@ def review_extracted_questions(request, pk):
                 )
                 newly_created_ids.append(new_q.id)
 
-            # Combine AI-selected IDs + newly-saved manual IDs
             all_approved_ids = list(selected_ids) + [str(i) for i in newly_created_ids]
 
             if not all_approved_ids:
                 messages.error(request, 'Please select at least one question.')
                 return redirect('questionnaires:review_extracted', pk=pk)
 
-            # Approve selected AI questions; un-approve everything else
-            # (Newly created manual questions are already is_approved=True)
             extracted_questions.filter(id__in=selected_ids).update(is_approved=True)
             extracted_questions.exclude(id__in=all_approved_ids).update(is_approved=False)
 
-            # Update title if changed
             final_title = request.POST.get('final_title', '').strip()
             if final_title:
                 questionnaire.title = final_title
@@ -325,14 +312,12 @@ def review_extracted_questions(request, pk):
             messages.success(request, f'Saved {total_saved} question(s) successfully!')
             return redirect('questionnaires:my_uploads')
 
-        # ── Delete a single question ──────────────────────────────────────────
         elif action == 'delete_question':
             question_id = request.POST.get('question_id')
             ExtractedQuestion.objects.filter(id=question_id, questionnaire=questionnaire).delete()
             messages.info(request, 'Question deleted.')
             return redirect('questionnaires:review_extracted', pk=pk)
 
-        # ── Approve all ───────────────────────────────────────────────────────
         elif action == 'approve_all':
             extracted_questions.update(is_approved=True)
             ActivityLog.objects.create(
@@ -362,7 +347,6 @@ def review_extracted_questions(request, pk):
 
 @login_required
 def retry_extraction(request, pk):
-    """Retry question extraction for a questionnaire"""
     questionnaire = get_object_or_404(Questionnaire, pk=pk)
 
     if request.user.is_staff:
@@ -533,7 +517,6 @@ def browse_questionnaires(request):
 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
 
-    # Only show questionnaires from the teacher's own department
     questionnaires = Questionnaire.objects.select_related(
         'department', 'subject', 'uploader__user'
     ).filter(subject__departments=teacher.department)
@@ -551,7 +534,6 @@ def browse_questionnaires(request):
             Q(subject__code__icontains=search_query)
         )
 
-    # Only show subjects that belong to the teacher's department
     subjects = Subject.objects.filter(departments=teacher.department)
 
     paginator = Paginator(questionnaires, 12)
@@ -737,4 +719,311 @@ def get_questions_json(request, pk):
         'questionnaire_title': questionnaire.title,
         'total':               len(questions_data),
         'questions':           questions_data,
+    })
+
+
+# ============================================================================
+# WORKSPACE VIEWS  (now database-backed)
+# ============================================================================
+
+@login_required
+def workspace(request):
+    """Render the workspace page. All folder/question data is loaded from the DB."""
+    if request.user.is_staff:
+        messages.info(request, 'The workspace feature is for teachers only.')
+        return redirect('accounts:admin_dashboard')
+
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+
+    # Load all folders with their questions in one efficient query
+    folders = (
+        WorkspaceFolder.objects
+        .filter(teacher=teacher)
+        .prefetch_related(
+            'folder_questions__question__question_type',
+            'folder_questions__question__questionnaire__subject',
+        )
+        .order_by('-created_at')
+    )
+
+    # Serialize folders → JSON-safe structure for the template
+    folders_data = []
+    for folder in folders:
+        questions_data = []
+        for fq in folder.folder_questions.all():
+            q = fq.question
+            qd = {
+                'id':             q.pk,
+                'question_text':  q.question_text,
+                'type':           q.question_type.name,
+                'type_display':   q.question_type.get_name_display(),
+                'difficulty':     q.difficulty,
+                'points':         q.points,
+                'correct_answer': q.correct_answer,
+                'explanation':    q.explanation or '',
+                'subject_code':   q.questionnaire.subject.code,
+                'subject_name':   q.questionnaire.subject.name,
+            }
+            if q.question_type.name == 'multiple_choice':
+                qd['options'] = [
+                    q.option_a or '',
+                    q.option_b or '',
+                    q.option_c or '',
+                    q.option_d or '',
+                ]
+            questions_data.append(qd)
+
+        folders_data.append({
+            'id':         folder.pk,
+            'name':       folder.name,
+            'created_at': folder.created_at.isoformat(),
+            'questions':  questions_data,
+        })
+
+    import json
+    context = {
+        'folders_json': json.dumps(folders_data),
+    }
+    return render(request, 'teacher_dashboard/workspace.html', context)
+
+
+# ── Workspace API endpoints ───────────────────────────────────────────────────
+# All return JSON.  The workspace template calls these via fetch().
+
+@login_required
+@require_POST
+def workspace_create_folder(request):
+    """POST { name } → create a new folder, return { id, name }"""
+    if request.user.is_staff:
+        return JsonResponse({'error': 'Not allowed'}, status=403)
+
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+
+    import json as _json
+    try:
+        body = _json.loads(request.body)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    name = (body.get('name') or '').strip()[:80]
+    if not name:
+        return JsonResponse({'error': 'Folder name is required.'}, status=400)
+
+    folder = WorkspaceFolder.objects.create(teacher=teacher, name=name)
+    return JsonResponse({'id': folder.pk, 'name': folder.name})
+
+
+@login_required
+@require_POST
+def workspace_rename_folder(request, folder_id):
+    """POST { name } → rename folder"""
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+    folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher)
+
+    import json as _json
+    try:
+        body = _json.loads(request.body)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    name = (body.get('name') or '').strip()[:80]
+    if not name:
+        return JsonResponse({'error': 'Folder name is required.'}, status=400)
+
+    folder.name = name
+    folder.save()
+    return JsonResponse({'id': folder.pk, 'name': folder.name})
+
+
+@login_required
+@require_POST
+def workspace_delete_folder(request, folder_id):
+    """POST → delete folder and all its question links"""
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+    folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher)
+    name    = folder.name
+    folder.delete()    # cascades to WorkspaceFolderQuestion rows
+    return JsonResponse({'deleted': True, 'name': name})
+
+
+@login_required
+@require_POST
+def workspace_add_questions(request, folder_id):
+    """
+    POST { question_ids: [int, ...] } → add questions to folder.
+    Returns { added: N, already_existed: M }
+    """
+    if request.user.is_staff:
+        return JsonResponse({'error': 'Not allowed'}, status=403)
+
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+    folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher)
+
+    import json as _json
+    try:
+        body = _json.loads(request.body)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    question_ids = body.get('question_ids', [])
+    if not isinstance(question_ids, list):
+        return JsonResponse({'error': 'question_ids must be a list'}, status=400)
+
+    # Access control: only questions from questionnaires in the teacher's department
+    allowed_questions = ExtractedQuestion.objects.filter(
+        pk__in=question_ids,
+        questionnaire__subject__departments=teacher.department,
+    )
+
+    added = 0
+    already = 0
+    for q in allowed_questions:
+        _, created = WorkspaceFolderQuestion.objects.get_or_create(folder=folder, question=q)
+        if created:
+            added += 1
+        else:
+            already += 1
+
+    return JsonResponse({'added': added, 'already_existed': already})
+
+
+@login_required
+@require_POST
+def workspace_remove_question(request, folder_id, question_id):
+    """POST → remove a single question from a folder"""
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+    folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher)
+    WorkspaceFolderQuestion.objects.filter(folder=folder, question_id=question_id).delete()
+    return JsonResponse({'removed': True})
+
+
+@login_required
+def download_workspace(request):
+    """
+    Download a combined BISU-format document from a workspace folder selection.
+
+    Query-string parameters
+    -----------------------
+    format    : 'docx' (default) | 'pdf'
+    questions : comma-separated ExtractedQuestion PKs
+    """
+    import os
+    from .generators import generate_bisu_questionnaire
+
+    if request.user.is_staff:
+        messages.error(request, 'Admins cannot use the workspace download.')
+        return redirect('accounts:admin_dashboard')
+
+    question_ids_param = request.GET.get('questions', '').strip()
+
+    if not question_ids_param:
+        messages.error(request, 'No questions specified for download.')
+        return redirect('questionnaires:workspace')
+
+    try:
+        question_ids = [
+            int(i) for i in question_ids_param.split(',')
+            if i.strip().isdigit()
+        ]
+    except (ValueError, TypeError):
+        messages.error(request, 'Invalid question selection.')
+        return redirect('questionnaires:workspace')
+
+    if not question_ids:
+        messages.error(request, 'No valid question IDs provided.')
+        return redirect('questionnaires:workspace')
+
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+
+    selected_questions = ExtractedQuestion.objects.filter(
+        pk__in=question_ids,
+        questionnaire__subject__departments=teacher.department,
+    ).select_related(
+        'question_type',
+        'questionnaire',
+        'questionnaire__subject',
+        'questionnaire__department',
+    ).order_by(
+        'questionnaire__subject__code',
+        'question_type__name',
+        'created_at',
+    )
+
+    if not selected_questions.exists():
+        messages.error(request, 'None of the selected questions could be found.')
+        return redirect('questionnaires:workspace')
+
+    first_quest = selected_questions.first().questionnaire
+
+    class WorkspaceQuestionnaireProxy:
+        def __init__(self, base_questionnaire, questions):
+            self.pk          = None
+            self.title       = 'Workspace Selection'
+            self.description = (
+                f'Combined questionnaire — {questions.count()} question(s) '
+                f'from {questions.values("questionnaire__subject__code").distinct().count()} subject(s)'
+            )
+            self.department  = base_questionnaire.department
+            self.subject     = base_questionnaire.subject
+            self.uploader    = base_questionnaire.uploader
+
+    proxy = WorkspaceQuestionnaireProxy(first_quest, selected_questions)
+
+    try:
+        file_format = request.GET.get('format', 'docx').lower()
+        docx_path, pdf_path = generate_bisu_questionnaire(proxy, selected_questions)
+
+        if file_format == 'pdf' and pdf_path and os.path.exists(pdf_path):
+            filepath     = pdf_path
+            content_type = 'application/pdf'
+            filename     = 'BISU_Workspace_Questionnaire.pdf'
+        else:
+            filepath     = docx_path
+            content_type = (
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+            filename = 'BISU_Workspace_Questionnaire.docx'
+
+        ActivityLog.objects.create(
+            activity_type='questionnaire_downloaded',
+            user=request.user,
+            description=(
+                f'Downloaded workspace selection: '
+                f'{selected_questions.count()} question(s) from '
+                f'{selected_questions.values("questionnaire__subject__code").distinct().count()} subject(s)'
+            )
+        )
+
+        file_handle = open(filepath, 'rb')
+        response    = FileResponse(file_handle, content_type=content_type)
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    except Exception as e:
+        messages.error(request, f'Failed to generate workspace document: {str(e)}')
+        return redirect('questionnaires:workspace')
+    
+@login_required
+def workspace_list_folders(request):
+    """GET → return all folders + all question IDs in workspace (for browse page)"""
+    if request.user.is_staff:
+        return JsonResponse({'folders': [], 'question_ids_in_workspace': []})
+
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+    folders = WorkspaceFolder.objects.filter(teacher=teacher).prefetch_related('folder_questions').order_by('-created_at')
+
+    folders_data = []
+    all_question_ids = []
+    for folder in folders:
+        qids = list(folder.folder_questions.values_list('question_id', flat=True))
+        all_question_ids.extend(qids)
+        folders_data.append({
+            'id':             folder.pk,
+            'name':           folder.name,
+            'question_count': len(qids),
+        })
+
+    return JsonResponse({
+        'folders':                  folders_data,
+        'question_ids_in_workspace': list(set(all_question_ids)),
     })

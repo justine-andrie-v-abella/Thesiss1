@@ -199,7 +199,70 @@ class Download(models.Model):
     
     def __str__(self):
         return f"{self.questionnaire.title} - {self.downloaded_at.strftime('%Y-%m-%d %H:%M')}"
-    
+
+
+# ============================================================================
+# WORKSPACE MODELS
+# ============================================================================
+
+class WorkspaceFolder(models.Model):
+    """
+    A named folder inside a teacher's workspace.
+    Teachers must create a folder before they can save questions into it.
+    """
+    teacher    = models.ForeignKey(
+        TeacherProfile,
+        on_delete=models.CASCADE,
+        related_name='workspace_folders'
+    )
+    name       = models.CharField(max_length=80)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name        = 'Workspace Folder'
+        verbose_name_plural = 'Workspace Folders'
+
+    def __str__(self):
+        return f"{self.teacher.user.get_full_name()} — {self.name}"
+
+    def question_count(self):
+        return self.folder_questions.count()
+
+
+class WorkspaceFolderQuestion(models.Model):
+    """
+    A question pinned inside a workspace folder.
+    The unique_together constraint prevents the same question from being
+    added to the same folder twice.
+    """
+    folder   = models.ForeignKey(
+        WorkspaceFolder,
+        on_delete=models.CASCADE,
+        related_name='folder_questions'
+    )
+    question = models.ForeignKey(
+        ExtractedQuestion,
+        on_delete=models.CASCADE,
+        related_name='workspace_entries'
+    )
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering            = ['added_at']
+        unique_together     = ('folder', 'question')
+        verbose_name        = 'Workspace Folder Question'
+        verbose_name_plural = 'Workspace Folder Questions'
+
+    def __str__(self):
+        return f"{self.folder.name} → Q#{self.question.pk}"
+
+
+# ============================================================================
+# DATA MIGRATION HELPER  (keep as-is from original)
+# ============================================================================
+
 def populate_question_types(apps, schema_editor):
     QuestionType = apps.get_model('questionnaires', 'QuestionType')
     question_types = [
@@ -221,7 +284,7 @@ def reverse_question_types(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('questionnaires', '0003_questiontype_questionnaire_extraction_error_and_more'),  # your last migration
+        ('questionnaires', '0003_questiontype_questionnaire_extraction_error_and_more'),
     ]
 
     operations = [

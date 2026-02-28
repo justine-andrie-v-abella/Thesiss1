@@ -1,0 +1,849 @@
+{% extends 'base.html' %}
+
+{% block title %}My Workspace - Teacher{% endblock %}
+{% block header_title %}My Workspace{% endblock %}
+{% block header_subtitle %}Organize questions into folders, then download them as one document{% endblock %}
+
+{% block content %}
+
+<script id="ws-initial-data" type="application/json">{{ folders_json|safe }}</script>
+
+<!-- ══════════════════════════════════════════════════════════
+     OVERVIEW — Folder Grid
+════════════════════════════════════════════════════════════ -->
+<div id="ws-overview">
+
+    <!-- Global Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-xl shadow p-5 flex items-center gap-4">
+            <div class="w-11 h-11 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="bi bi-folder2-open text-indigo-600 text-xl"></i>
+            </div>
+            <div>
+                <div class="text-2xl font-bold text-gray-900" id="ws-stat-folders">0</div>
+                <div class="text-xs text-gray-500 font-medium">Folders</div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-5 flex items-center gap-4">
+            <div class="w-11 h-11 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="bi bi-collection-fill text-purple-600 text-xl"></i>
+            </div>
+            <div>
+                <div class="text-2xl font-bold text-gray-900" id="ws-stat-questions">0</div>
+                <div class="text-xs text-gray-500 font-medium">Total Questions</div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-5 flex items-center gap-4">
+            <div class="w-11 h-11 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="bi bi-book-fill text-blue-600 text-xl"></i>
+            </div>
+            <div>
+                <div class="text-2xl font-bold text-gray-900" id="ws-stat-subjects">0</div>
+                <div class="text-xs text-gray-500 font-medium">Subjects</div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-5 flex items-center gap-4">
+            <div class="w-11 h-11 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="bi bi-star-fill text-amber-500 text-xl"></i>
+            </div>
+            <div>
+                <div class="text-2xl font-bold text-gray-900" id="ws-stat-points">0</div>
+                <div class="text-xs text-gray-500 font-medium">Total Points</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Folder Grid Header -->
+    <div class="flex items-center justify-between mb-5">
+        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <i class="bi bi-folder2 text-indigo-500"></i> Your Folders
+        </h2>
+        <button id="btn-new-folder"
+            class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600
+                   hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-xl shadow-lg
+                   transition-all text-sm">
+            <i class="bi bi-folder-plus"></i> New Folder
+        </button>
+    </div>
+
+    <!-- Empty state -->
+    <div id="ws-no-folders" class="hidden bg-white rounded-2xl shadow p-16 text-center">
+        <div class="w-28 h-28 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i class="bi bi-folder2 text-6xl text-indigo-300"></i>
+        </div>
+        <h3 class="text-2xl font-bold text-gray-700 mb-2">No Folders Yet</h3>
+        <p class="text-gray-500 mb-8 max-w-sm mx-auto">
+            Create a folder first (e.g. "Midterm Exam", "Quiz 1"), then browse
+            questionnaires to pick questions and save them inside.
+        </p>
+        <button id="btn-new-folder-empty"
+            class="inline-flex items-center gap-2 px-7 py-3 bg-gradient-to-r from-indigo-500
+                   to-purple-600 text-white font-bold rounded-xl shadow-lg
+                   hover:from-indigo-600 hover:to-purple-700 transition-all">
+            <i class="bi bi-folder-plus"></i> Create Your First Folder
+        </button>
+    </div>
+
+    <!-- Folder Cards Grid -->
+    <div id="ws-folder-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     FOLDER DETAIL VIEW
+════════════════════════════════════════════════════════════ -->
+<div id="ws-folder-view" class="hidden">
+
+    <!-- Breadcrumb -->
+    <div class="flex items-center gap-3 mb-6">
+        <button id="btn-back-to-overview"
+            class="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200
+                   hover:border-indigo-400 text-gray-700 font-semibold rounded-xl
+                   transition-colors text-sm">
+            <i class="bi bi-arrow-left"></i> All Folders
+        </button>
+        <i class="bi bi-chevron-right text-gray-400 text-xs"></i>
+        <span class="font-bold text-gray-900" id="fv-folder-name-breadcrumb">—</span>
+    </div>
+
+    <!-- Folder Header -->
+    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl shadow-xl p-6 mb-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-folder2-open text-white text-2xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-2xl font-bold text-white" id="fv-folder-name">—</h2>
+                    <p class="text-white/70 text-sm mt-0.5" id="fv-folder-meta">0 questions • 0 subjects</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="{% url 'questionnaires:browse_questionnaires' %}"
+                    class="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30
+                           text-white font-semibold rounded-xl transition-colors text-sm">
+                    <i class="bi bi-search"></i> Browse &amp; Add Questions
+                </a>
+                <button id="fv-rename-btn"
+                    class="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30
+                           text-white font-semibold rounded-xl transition-colors text-sm">
+                    <i class="bi bi-pencil"></i> Rename
+                </button>
+                <button id="fv-delete-folder-btn"
+                    class="flex items-center gap-2 px-4 py-2 bg-red-500/70 hover:bg-red-500
+                           text-white font-semibold rounded-xl transition-colors text-sm">
+                    <i class="bi bi-trash"></i> Delete Folder
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Folder Stats -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="bg-white rounded-xl shadow p-4 text-center">
+            <div class="text-xl font-bold text-indigo-600" id="fv-stat-total">0</div>
+            <div class="text-xs text-gray-500">Total Questions</div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-4 text-center">
+            <div class="text-xl font-bold text-green-600" id="fv-stat-selected">0</div>
+            <div class="text-xs text-gray-500">Selected</div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-4 text-center">
+            <div class="text-xl font-bold text-amber-600" id="fv-stat-points">0</div>
+            <div class="text-xs text-gray-500">Total Points</div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="bg-white rounded-xl shadow p-4 mb-5 flex flex-wrap items-center gap-3">
+        <select id="fv-filter-subject"
+            class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:outline-none
+                   focus:border-indigo-500 transition-colors font-medium text-gray-700">
+            <option value="all">All Subjects</option>
+        </select>
+        <select id="fv-filter-type"
+            class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:outline-none
+                   focus:border-indigo-500 transition-colors font-medium text-gray-700">
+            <option value="all">All Types</option>
+        </select>
+        <select id="fv-filter-diff"
+            class="px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:outline-none
+                   focus:border-indigo-500 transition-colors font-medium text-gray-700">
+            <option value="all">All Difficulties</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+        </select>
+        <div class="relative flex-1 min-w-[160px]">
+            <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+            <input type="text" id="fv-search" placeholder="Search questions..."
+                class="w-full pl-9 pr-4 py-2 border-2 border-gray-200 rounded-lg text-sm
+                       focus:outline-none focus:border-indigo-500 transition-colors">
+        </div>
+        <div class="flex gap-2 ml-auto flex-wrap">
+            <button id="fv-select-all"
+                class="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors">
+                <i class="bi bi-check-all mr-1"></i> All
+            </button>
+            <button id="fv-deselect-all"
+                class="px-3 py-2 bg-gray-400 hover:bg-gray-500 text-white text-xs font-bold rounded-lg transition-colors">
+                <i class="bi bi-x-lg mr-1"></i> None
+            </button>
+            <button id="fv-remove-selected"
+                class="px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg
+                       transition-colors flex items-center gap-1">
+                <i class="bi bi-trash"></i> Remove Selected
+            </button>
+        </div>
+    </div>
+
+    <!-- Download Bar -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-xl p-4 mb-6
+                flex flex-wrap items-center gap-4">
+        <div class="flex items-center gap-3">
+            <i class="bi bi-download text-white text-xl"></i>
+            <div>
+                <div class="text-white font-bold text-sm" id="fv-download-label">0 questions selected</div>
+                <div class="text-white/70 text-xs">Download in BISU official format</div>
+            </div>
+        </div>
+        <div class="flex gap-3 ml-auto">
+            <button id="fv-download-docx"
+                class="flex items-center gap-2 px-5 py-2.5 bg-white text-indigo-700 font-bold
+                       rounded-lg hover:bg-indigo-50 transition-all shadow text-sm
+                       opacity-50 cursor-not-allowed">
+                <i class="bi bi-file-word text-blue-600"></i> BISU DOCX
+            </button>
+            <button id="fv-download-pdf"
+                class="flex items-center gap-2 px-5 py-2.5 bg-white text-indigo-700 font-bold
+                       rounded-lg hover:bg-indigo-50 transition-all shadow text-sm
+                       opacity-50 cursor-not-allowed">
+                <i class="bi bi-file-pdf text-red-600"></i> BISU PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- Empty folder state -->
+    <div id="fv-empty-state" class="hidden bg-white rounded-2xl shadow p-14 text-center">
+        <div class="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-5">
+            <i class="bi bi-inbox text-5xl text-indigo-300"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-700 mb-2">This folder is empty</h3>
+        <p class="text-gray-500 mb-6 max-w-xs mx-auto">
+            Browse questionnaires and select questions to save them into this folder.
+        </p>
+        <a href="{% url 'questionnaires:browse_questionnaires' %}"
+            class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-500
+                   to-purple-600 text-white font-bold rounded-xl shadow-lg
+                   hover:from-indigo-600 hover:to-purple-700 transition-all">
+            <i class="bi bi-search"></i> Browse Questionnaires
+        </a>
+    </div>
+
+    <!-- Questions list -->
+    <div id="fv-questions-container" class="space-y-5"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     MODALS
+════════════════════════════════════════════════════════════ -->
+
+<!-- Create / Rename Folder -->
+<div id="folderModal"
+    class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+        <div class="flex items-center gap-3 mb-6">
+            <div class="w-11 h-11 bg-indigo-100 rounded-xl flex items-center justify-center">
+                <i class="bi bi-folder-plus text-indigo-600 text-xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800" id="folderModalTitle">New Folder</h3>
+        </div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2">Folder Name</label>
+        <input type="text" id="folderNameInput" maxlength="80"
+            placeholder="e.g. Midterm Exam, Quiz 1, Finals..."
+            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none
+                   focus:border-indigo-500 transition-colors text-gray-800 font-medium mb-2">
+        <p class="text-xs text-gray-400 mb-6">Max 80 characters.</p>
+        <div class="flex gap-3 justify-end">
+            <button id="folderModalCancel"
+                class="px-5 py-2.5 border-2 border-gray-200 text-gray-600 font-semibold
+                       rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+            <button id="folderModalOk"
+                class="px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white
+                       font-bold rounded-xl hover:from-indigo-600 hover:to-purple-700
+                       transition-all shadow flex items-center gap-2">
+                <i class="bi bi-check-lg"></i>
+                <span id="folderModalOkLabel">Create</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Folder Confirm -->
+<div id="deleteFolderModal"
+    class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="bi bi-trash3 text-3xl text-red-500"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Delete Folder?</h3>
+        <p class="text-gray-500 mb-1">You are about to permanently delete</p>
+        <p class="font-bold text-gray-900 text-lg mb-2" id="deleteFolderName">"—"</p>
+        <p class="text-sm text-gray-400 mb-6">All questions inside will be removed from your workspace.</p>
+        <div class="flex gap-3 justify-center">
+            <button id="deleteFolderCancel"
+                class="px-6 py-2.5 border-2 border-gray-200 text-gray-600 font-semibold
+                       rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+            <button id="deleteFolderOk"
+                class="px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold
+                       rounded-xl transition-colors">Delete</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.ws-folder-card { transition: transform .18s ease, box-shadow .18s ease; cursor: pointer; }
+.ws-folder-card:hover { transform: translateY(-4px); box-shadow: 0 14px 36px rgba(99,102,241,.18); }
+.fv-question-card { transition: background .15s; }
+.fv-question-card:hover { background: #f8f7ff; }
+.diff-easy   { background:#dcfce7; color:#166534; }
+.diff-medium { background:#fef9c3; color:#854d0e; }
+.diff-hard   { background:#fee2e2; color:#991b1b; }
+.subj-header { background: linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%); }
+@keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+.ws-folder-card { animation: fadeUp .28s ease both; }
+.line-clamp-2 { display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
+</style>
+
+<script>
+(function () {
+'use strict';
+
+/* ══════════════════════════════════════════════════
+   CONFIG  — Django URL stubs injected via data attrs
+   (We build URLs manually to avoid reversing in JS)
+════════════════════════════════════════════════ */
+var BASE = '/questionnaires/workspace';
+
+var API = {
+    createFolder:   function()         { return BASE + '/folders/create/'; },
+    renameFolder:   function(id)       { return BASE + '/folders/' + id + '/rename/'; },
+    deleteFolder:   function(id)       { return BASE + '/folders/' + id + '/delete/'; },
+    addQuestions:   function(id)       { return BASE + '/folders/' + id + '/add-questions/'; },
+    removeQuestion: function(fid, qid) { return BASE + '/folders/' + fid + '/remove-question/' + qid + '/'; },
+    download:       function(ids, fmt) { return BASE + '/download/?questions=' + ids.join(',') + '&format=' + fmt; },
+};
+
+/* CSRF */
+function csrfToken() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+}
+function postJSON(url, data) {
+    return fetch(url, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+        body:    JSON.stringify(data),
+    }).then(function(r) { return r.json(); });
+}
+
+/* ══════════════════════════════════════════════════
+   IN-MEMORY STATE  — seeded from server on page load
+   Structure matches what workspace() view returns:
+   [ { id, name, created_at, questions: [...] } ]
+════════════════════════════════════════════════ */
+var state = { folders: [] };
+
+(function seedFromServer() {
+    var el = document.getElementById('ws-initial-data');
+    if (!el) return;
+    try {
+        var data = JSON.parse(el.textContent);
+        state.folders = data;
+    } catch(e) { console.error('workspace seed error', e); }
+})();
+
+/* ── sidebar badge ── */
+function refreshSidebarBadge() {
+    var total = state.folders.reduce(function(a,f){ return a + f.questions.length; }, 0);
+    var b = document.getElementById('ws-sidebar-badge');
+    if (b) b.textContent = total;
+}
+refreshSidebarBadge();
+
+/* Expose for browse_questionnaires.html */
+window.WS = {
+    getFolders: function() { return state.folders; },
+
+    /* Called by browse page after a successful addQuestions API call */
+    syncFolderQuestions: function(folderId, newQuestions) {
+        var folder = state.folders.find(function(f){ return String(f.id) === String(folderId); });
+        if (!folder) return;
+        newQuestions.forEach(function(q) {
+            if (!folder.questions.find(function(x){ return String(x.id) === String(q.id); })) {
+                folder.questions.push(q);
+            }
+        });
+        refreshSidebarBadge();
+    }
+};
+
+/* ══════════════════════════════════════════════════
+   DOM REFS
+════════════════════════════════════════════════ */
+var overview    = document.getElementById('ws-overview');
+var folderView  = document.getElementById('ws-folder-view');
+var folderGrid  = document.getElementById('ws-folder-grid');
+var noFolders   = document.getElementById('ws-no-folders');
+var fvContainer = document.getElementById('fv-questions-container');
+var fvEmpty     = document.getElementById('fv-empty-state');
+var currentFid  = null;
+
+/* ══════════════════════════════════════════════════
+   OVERVIEW
+════════════════════════════════════════════════ */
+function renderOverview() {
+    var folders  = state.folders;
+    var totalQ   = 0, totalPts = 0;
+    var allSubjs = new Set();
+    folders.forEach(function(f) {
+        f.questions.forEach(function(q) {
+            totalQ++;
+            totalPts += (q.points || 1);
+            allSubjs.add(q.subject_code || '?');
+        });
+    });
+    setText('ws-stat-folders',   folders.length);
+    setText('ws-stat-questions', totalQ);
+    setText('ws-stat-subjects',  allSubjs.size);
+    setText('ws-stat-points',    totalPts);
+
+    if (folders.length === 0) {
+        noFolders.classList.remove('hidden');
+        folderGrid.innerHTML = '';
+        return;
+    }
+    noFolders.classList.add('hidden');
+
+    var GRADS = [
+        'from-indigo-500 to-purple-600',
+        'from-blue-500 to-cyan-500',
+        'from-emerald-500 to-teal-600',
+        'from-orange-500 to-amber-500',
+        'from-pink-500 to-rose-500',
+        'from-violet-500 to-indigo-600',
+    ];
+
+    folderGrid.innerHTML = '';
+    folders.forEach(function(folder, idx) {
+        var grad  = GRADS[idx % GRADS.length];
+        var qCnt  = folder.questions.length;
+        var subs  = new Set(folder.questions.map(function(q){ return q.subject_code || '?'; }));
+        var pts   = folder.questions.reduce(function(a,q){ return a+(q.points||1); }, 0);
+
+        var card = document.createElement('div');
+        card.className = 'ws-folder-card bg-white rounded-2xl shadow-md overflow-hidden';
+        card.style.animationDelay = (idx * 55) + 'ms';
+        card.dataset.folderId = folder.id;
+
+        card.innerHTML =
+            '<div class="bg-gradient-to-br ' + grad + ' px-5 py-5">' +
+                '<div class="flex items-start justify-between mb-3">' +
+                    '<div class="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">' +
+                        '<i class="bi bi-folder2-open text-white text-2xl"></i>' +
+                    '</div>' +
+                    '<div class="flex gap-1.5 mt-0.5">' +
+                        '<button class="folder-rename-btn w-8 h-8 bg-white/20 hover:bg-white/35 rounded-lg flex items-center justify-center text-white transition-colors" data-folder-id="' + folder.id + '" title="Rename"><i class="bi bi-pencil text-xs"></i></button>' +
+                        '<button class="folder-delete-btn w-8 h-8 bg-white/20 hover:bg-red-400/70 rounded-lg flex items-center justify-center text-white transition-colors" data-folder-id="' + folder.id + '" title="Delete"><i class="bi bi-trash text-xs"></i></button>' +
+                    '</div>' +
+                '</div>' +
+                '<h3 class="text-white font-bold text-base line-clamp-2">' + esc(folder.name) + '</h3>' +
+            '</div>' +
+            '<div class="px-5 py-4">' +
+                '<div class="flex items-center justify-between text-sm mb-2.5">' +
+                    '<div class="flex items-center gap-1.5 text-gray-600"><i class="bi bi-collection text-indigo-400"></i> <span class="font-semibold">' + qCnt + '</span> <span class="text-gray-400">question' + (qCnt!==1?'s':'') + '</span></div>' +
+                    '<div class="flex items-center gap-1.5 text-gray-600"><i class="bi bi-star text-amber-400"></i> <span class="font-semibold">' + pts + '</span> <span class="text-gray-400">pts</span></div>' +
+                '</div>' +
+                '<div class="text-xs text-gray-400 mb-4"><i class="bi bi-book mr-1"></i>' + subs.size + ' subject' + (subs.size!==1?'s':'') + '</div>' +
+                '<button class="folder-open-btn w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg text-sm transition-colors flex items-center justify-center gap-2" data-folder-id="' + folder.id + '">' +
+                    '<i class="bi bi-folder2-open"></i> Open Folder' +
+                '</button>' +
+            '</div>';
+
+        folderGrid.appendChild(card);
+    });
+
+    folderGrid.querySelectorAll('.folder-open-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e){ e.stopPropagation(); openFolder(btn.dataset.folderId); });
+    });
+    folderGrid.querySelectorAll('.ws-folder-card').forEach(function(card) {
+        card.addEventListener('click', function(e) {
+            if (e.target.closest('.folder-rename-btn') || e.target.closest('.folder-delete-btn') || e.target.closest('.folder-open-btn')) return;
+            openFolder(card.dataset.folderId);
+        });
+    });
+    folderGrid.querySelectorAll('.folder-rename-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e){ e.stopPropagation(); showFolderModal('rename', btn.dataset.folderId); });
+    });
+    folderGrid.querySelectorAll('.folder-delete-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e){ e.stopPropagation(); showDeleteFolderModal(btn.dataset.folderId); });
+    });
+}
+
+/* ══════════════════════════════════════════════════
+   FOLDER DETAIL
+════════════════════════════════════════════════ */
+function openFolder(fid) {
+    var folder = state.folders.find(function(f){ return String(f.id) === String(fid); });
+    if (!folder) return;
+    currentFid = fid;
+    overview.classList.add('hidden');
+    folderView.classList.remove('hidden');
+    setText('fv-folder-name', folder.name);
+    setText('fv-folder-name-breadcrumb', folder.name);
+    renderFolderDetail(folder);
+}
+
+function renderFolderDetail(folder) {
+    var subs = new Set(folder.questions.map(function(q){ return q.subject_code || '?'; }));
+    document.getElementById('fv-folder-meta').textContent =
+        folder.questions.length + ' question' + (folder.questions.length!==1?'s':'') +
+        ' \u2022 ' + subs.size + ' subject' + (subs.size!==1?'s':'');
+    setText('fv-stat-total', folder.questions.length);
+
+    if (folder.questions.length === 0) {
+        fvEmpty.classList.remove('hidden');
+        fvContainer.innerHTML = '';
+        updateFolderStats();
+        updateFolderDownloadBar();
+        return;
+    }
+    fvEmpty.classList.add('hidden');
+
+    /* group by subject */
+    var groups = {};
+    folder.questions.forEach(function(q) {
+        var key = (q.subject_code||'Unknown') + '||' + (q.subject_name||'');
+        if (!groups[key]) groups[key] = { code: q.subject_code||'Unknown', name: q.subject_name||'', questions: [] };
+        groups[key].questions.push(q);
+    });
+
+    var html = '';
+    Object.keys(groups).forEach(function(key) {
+        var g = groups[key];
+        html += '<div class="fv-subject-group bg-white rounded-xl shadow overflow-hidden" data-subject-key="' + esc(key) + '">';
+        html += '<div class="subj-header px-5 py-3.5 flex items-center justify-between">' +
+            '<div class="flex items-center gap-2.5">' +
+                '<div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center"><i class="bi bi-book text-white"></i></div>' +
+                '<div><div class="text-white font-bold">' + esc(g.code) + '</div>' +
+                '<div class="text-white/60 text-xs">' + esc(g.name) + ' &mdash; ' + g.questions.length + ' question(s)</div></div>' +
+            '</div>' +
+            '<button class="fv-remove-group px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold rounded-lg transition-colors" data-subject-key="' + esc(key) + '">' +
+                '<i class="bi bi-trash mr-1"></i>Remove Group</button>' +
+        '</div><div class="divide-y divide-gray-100">';
+
+        g.questions.forEach(function(q, i) {
+            var dc = {easy:'diff-easy',medium:'diff-medium',hard:'diff-hard'}[q.difficulty]||'bg-gray-100 text-gray-700';
+            html += '<div class="fv-question-card p-4"' +
+                ' data-question-id="' + q.id + '"' +
+                ' data-subject="' + esc(q.subject_code||'') + '"' +
+                ' data-type="' + esc(q.type||'') + '"' +
+                ' data-difficulty="' + esc(q.difficulty||'') + '"' +
+                ' data-points="' + (q.points||1) + '">' +
+                '<div class="flex items-start gap-3">' +
+                    '<input type="checkbox" class="fv-checkbox w-5 h-5 text-indigo-600 rounded mt-0.5 cursor-pointer flex-shrink-0" data-question-id="' + q.id + '" checked>' +
+                    '<div class="flex-1 min-w-0">' +
+                        '<div class="flex flex-wrap gap-1.5 mb-2">' +
+                            '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">' + esc(q.type_display||q.type||'') + '</span>' +
+                            '<span class="px-2 py-0.5 text-xs font-semibold rounded-full ' + dc + '">' + esc(q.difficulty||'') + '</span>' +
+                            '<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">' + (q.points||1) + ' pt</span>' +
+                        '</div>' +
+                        '<p class="text-gray-800 font-medium text-sm mb-2">' + (i+1) + '. ' + esc(q.question_text||'') + '</p>';
+
+            if (q.type === 'multiple_choice' && q.options && q.options.length) {
+                var L=['A','B','C','D'];
+                html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-1 ml-2">';
+                q.options.forEach(function(opt,idx){
+                    var correct = q.correct_answer && q.correct_answer.toUpperCase()===L[idx];
+                    html += '<div class="flex items-center p-1.5 rounded text-xs ' +
+                        (correct?'bg-green-50 border border-green-400 text-green-800 font-semibold':'bg-gray-50 text-gray-700') + '">' +
+                        '<span class="font-bold mr-1">'+L[idx]+'.</span>'+esc(opt)+
+                        (correct?'<i class="bi bi-check-circle-fill ml-auto text-green-600"></i>':'')+
+                        '</div>';
+                });
+                html += '</div>';
+            } else if (q.correct_answer) {
+                html += '<div class="bg-green-50 border-l-4 border-green-400 p-2 rounded text-xs mt-1">' +
+                    '<span class="text-gray-500">Answer: </span><span class="text-green-800 font-semibold">'+esc(q.correct_answer)+'</span></div>';
+            }
+            if (q.explanation) {
+                html += '<div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300">' +
+                    '<i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>'+esc(q.explanation)+'</div>';
+            }
+            html += '</div>' +
+                '<button class="fv-remove-one flex-shrink-0 w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" data-question-id="' + q.id + '" title="Remove">' +
+                    '<i class="bi bi-x-lg text-sm"></i></button>' +
+            '</div></div>';
+        });
+        html += '</div></div>';
+    });
+
+    fvContainer.innerHTML = html;
+
+    fvContainer.querySelectorAll('.fv-remove-one').forEach(function(btn) {
+        btn.addEventListener('click', function(){ removeQFromFolder(currentFid, btn.dataset.questionId); });
+    });
+    fvContainer.querySelectorAll('.fv-remove-group').forEach(function(btn) {
+        btn.addEventListener('click', function(){
+            removeGroupFromFolder(currentFid, btn.dataset.subjectKey.split('||')[0]);
+        });
+    });
+    fvContainer.querySelectorAll('.fv-checkbox').forEach(function(cb) {
+        cb.addEventListener('change', function(){ updateFolderStats(); updateFolderDownloadBar(); });
+    });
+
+    rebuildFolderFilters(folder);
+    updateFolderStats();
+    updateFolderDownloadBar();
+}
+
+/* ── Remove question (API + state) ── */
+function removeQFromFolder(fid, qid) {
+    postJSON(API.removeQuestion(fid, qid), {})
+        .then(function() {
+            var folder = state.folders.find(function(f){ return String(f.id)===String(fid); });
+            if (!folder) return;
+            folder.questions = folder.questions.filter(function(q){ return String(q.id)!==String(qid); });
+            refreshSidebarBadge();
+            showToast('Question removed.','info');
+            renderFolderDetail(folder);
+        })
+        .catch(function(){ showToast('Failed to remove question.','error'); });
+}
+
+/* ── Remove subject group (API calls for each question) ── */
+function removeGroupFromFolder(fid, subCode) {
+    var folder = state.folders.find(function(f){ return String(f.id)===String(fid); });
+    if (!folder) return;
+    var toRemove = folder.questions.filter(function(q){ return (q.subject_code||'Unknown')===subCode; });
+    var promises = toRemove.map(function(q){ return postJSON(API.removeQuestion(fid, q.id), {}); });
+    Promise.all(promises).then(function() {
+        folder.questions = folder.questions.filter(function(q){ return (q.subject_code||'Unknown')!==subCode; });
+        refreshSidebarBadge();
+        showToast('Subject group removed.','info');
+        renderFolderDetail(folder);
+    }).catch(function(){ showToast('Failed to remove group.','error'); });
+}
+
+/* ── Stats + download bar ── */
+function updateFolderStats() {
+    var checked = fvContainer.querySelectorAll('.fv-checkbox:checked');
+    var pts = 0;
+    checked.forEach(function(cb){
+        var card = cb.closest('.fv-question-card');
+        if (card) pts += parseInt(card.dataset.points||1);
+    });
+    setText('fv-stat-selected', checked.length);
+    setText('fv-stat-points', pts);
+}
+function updateFolderDownloadBar() {
+    var ids = Array.from(fvContainer.querySelectorAll('.fv-checkbox:checked'))
+                  .map(function(cb){ return cb.dataset.questionId; });
+    document.getElementById('fv-download-label').textContent = ids.length + ' question(s) selected for download';
+    var docx = document.getElementById('fv-download-docx');
+    var pdf  = document.getElementById('fv-download-pdf');
+    if (ids.length > 0) {
+        docx.onclick = function(){ window.location.href = API.download(ids,'docx'); };
+        pdf.onclick  = function(){ window.location.href = API.download(ids,'pdf'); };
+        docx.classList.remove('opacity-50','cursor-not-allowed');
+        pdf.classList.remove('opacity-50','cursor-not-allowed');
+    } else {
+        docx.onclick = pdf.onclick = function(){ showToast('Select at least one question.','warning'); };
+        docx.classList.add('opacity-50','cursor-not-allowed');
+        pdf.classList.add('opacity-50','cursor-not-allowed');
+    }
+}
+
+/* ── Filters ── */
+function rebuildFolderFilters(folder) {
+    var subjects={}, types={};
+    folder.questions.forEach(function(q){
+        if (q.subject_code) subjects[q.subject_code]=q.subject_name||q.subject_code;
+        if (q.type)         types[q.type]=q.type_display||q.type;
+    });
+    var ss=document.getElementById('fv-filter-subject');
+    ss.innerHTML='<option value="all">All Subjects</option>';
+    Object.keys(subjects).forEach(function(k){ ss.innerHTML+='<option value="'+k+'">'+k+' \u2013 '+subjects[k]+'</option>'; });
+    var ts=document.getElementById('fv-filter-type');
+    ts.innerHTML='<option value="all">All Types</option>';
+    Object.keys(types).forEach(function(k){ ts.innerHTML+='<option value="'+k+'">'+types[k]+'</option>'; });
+}
+function applyFolderFilters(){
+    var sub=document.getElementById('fv-filter-subject').value;
+    var type=document.getElementById('fv-filter-type').value;
+    var diff=document.getElementById('fv-filter-diff').value;
+    var srch=document.getElementById('fv-search').value.toLowerCase().trim();
+    fvContainer.querySelectorAll('.fv-question-card').forEach(function(c){
+        var ok=(sub==='all'||c.dataset.subject===sub)&&(type==='all'||c.dataset.type===type)&&
+               (diff==='all'||c.dataset.difficulty===diff)&&(!srch||c.innerText.toLowerCase().includes(srch));
+        c.style.display=ok?'':'none';
+    });
+    fvContainer.querySelectorAll('.fv-subject-group').forEach(function(g){
+        g.style.display=Array.from(g.querySelectorAll('.fv-question-card')).some(function(c){return c.style.display!=='none';})?'':'none';
+    });
+    updateFolderStats(); updateFolderDownloadBar();
+}
+['fv-filter-subject','fv-filter-type','fv-filter-diff'].forEach(function(id){
+    document.getElementById(id).addEventListener('change',applyFolderFilters);
+});
+document.getElementById('fv-search').addEventListener('input',applyFolderFilters);
+
+/* ── Bulk actions ── */
+document.getElementById('fv-select-all').addEventListener('click',function(){
+    fvContainer.querySelectorAll('.fv-question-card').forEach(function(c){
+        if(c.style.display!=='none') c.querySelector('.fv-checkbox').checked=true;
+    });
+    updateFolderStats(); updateFolderDownloadBar();
+});
+document.getElementById('fv-deselect-all').addEventListener('click',function(){
+    fvContainer.querySelectorAll('.fv-checkbox').forEach(function(cb){cb.checked=false;});
+    updateFolderStats(); updateFolderDownloadBar();
+});
+document.getElementById('fv-remove-selected').addEventListener('click',function(){
+    var ids=Array.from(fvContainer.querySelectorAll('.fv-checkbox:checked')).map(function(cb){return cb.dataset.questionId;});
+    if(!ids.length){showToast('No questions selected.','warning');return;}
+    var folder=state.folders.find(function(f){return String(f.id)===String(currentFid);});
+    if(!folder) return;
+    var promises=ids.map(function(qid){return postJSON(API.removeQuestion(currentFid,qid),{});});
+    Promise.all(promises).then(function(){
+        folder.questions=folder.questions.filter(function(q){return !ids.includes(String(q.id));});
+        refreshSidebarBadge();
+        showToast(ids.length+' question(s) removed.','info');
+        renderFolderDetail(folder);
+    }).catch(function(){showToast('Error removing questions.','error');});
+});
+
+/* ── Back ── */
+document.getElementById('btn-back-to-overview').addEventListener('click',function(){
+    currentFid=null;
+    folderView.classList.add('hidden');
+    overview.classList.remove('hidden');
+    renderOverview();
+});
+
+/* ── Rename / delete from detail ── */
+document.getElementById('fv-rename-btn').addEventListener('click',function(){showFolderModal('rename',currentFid);});
+document.getElementById('fv-delete-folder-btn').addEventListener('click',function(){showDeleteFolderModal(currentFid);});
+
+/* ══════════════════════════════════════════════════
+   CREATE / RENAME FOLDER MODAL
+════════════════════════════════════════════════ */
+var folderModal      = document.getElementById('folderModal');
+var folderNameInput  = document.getElementById('folderNameInput');
+var folderModalMode  = 'create';
+var folderModalTarget= null;
+
+function showFolderModal(mode, fid) {
+    folderModalMode=mode; folderModalTarget=fid||null;
+    if (mode==='rename') {
+        var f=state.folders.find(function(x){return String(x.id)===String(fid);});
+        document.getElementById('folderModalTitle').textContent='Rename Folder';
+        document.getElementById('folderModalOkLabel').textContent='Save';
+        folderNameInput.value=f?f.name:'';
+    } else {
+        document.getElementById('folderModalTitle').textContent='New Folder';
+        document.getElementById('folderModalOkLabel').textContent='Create';
+        folderNameInput.value='';
+    }
+    folderModal.classList.remove('hidden'); folderModal.classList.add('flex');
+    setTimeout(function(){folderNameInput.focus();folderNameInput.select();},80);
+}
+function closeFolderModal(){ folderModal.classList.add('hidden'); folderModal.classList.remove('flex'); }
+
+document.getElementById('folderModalCancel').addEventListener('click',closeFolderModal);
+document.getElementById('folderModalOk').addEventListener('click',function(){
+    var name=folderNameInput.value.trim();
+    if(!name){showToast('Please enter a folder name.','warning');folderNameInput.focus();return;}
+
+    if (folderModalMode==='create') {
+        postJSON(API.createFolder(),{name:name})
+            .then(function(data){
+                if (data.error){showToast(data.error,'error');return;}
+                /* add to local state */
+                state.folders.unshift({id:data.id,name:data.name,created_at:new Date().toISOString(),questions:[]});
+                closeFolderModal();
+                renderOverview();
+                refreshSidebarBadge();
+                showToast('Folder "'+data.name+'" created!','success');
+            })
+            .catch(function(){showToast('Failed to create folder.','error');});
+    } else {
+        postJSON(API.renameFolder(folderModalTarget),{name:name})
+            .then(function(data){
+                if (data.error){showToast(data.error,'error');return;}
+                var f=state.folders.find(function(x){return String(x.id)===String(folderModalTarget);});
+                if(f) f.name=data.name;
+                closeFolderModal();
+                if(String(currentFid)===String(folderModalTarget)){
+                    setText('fv-folder-name',data.name);
+                    setText('fv-folder-name-breadcrumb',data.name);
+                }
+                renderOverview();
+                showToast('Folder renamed.','success');
+            })
+            .catch(function(){showToast('Failed to rename folder.','error');});
+    }
+});
+folderNameInput.addEventListener('keydown',function(e){
+    if(e.key==='Enter') document.getElementById('folderModalOk').click();
+    if(e.key==='Escape') closeFolderModal();
+});
+document.getElementById('btn-new-folder').addEventListener('click',function(){showFolderModal('create');});
+document.getElementById('btn-new-folder-empty').addEventListener('click',function(){showFolderModal('create');});
+
+/* ══════════════════════════════════════════════════
+   DELETE FOLDER MODAL
+════════════════════════════════════════════════ */
+var deleteFolderModal  = document.getElementById('deleteFolderModal');
+var deleteFolderTarget = null;
+
+function showDeleteFolderModal(fid){
+    var f=state.folders.find(function(x){return String(x.id)===String(fid);});
+    if(!f) return;
+    deleteFolderTarget=fid;
+    document.getElementById('deleteFolderName').textContent='"'+f.name+'"';
+    deleteFolderModal.classList.remove('hidden'); deleteFolderModal.classList.add('flex');
+}
+function closeDeleteFolderModal(){ deleteFolderModal.classList.add('hidden'); deleteFolderModal.classList.remove('flex'); }
+document.getElementById('deleteFolderCancel').addEventListener('click',closeDeleteFolderModal);
+document.getElementById('deleteFolderOk').addEventListener('click',function(){
+    postJSON(API.deleteFolder(deleteFolderTarget),{})
+        .then(function(data){
+            state.folders=state.folders.filter(function(f){return String(f.id)!==String(deleteFolderTarget);});
+            refreshSidebarBadge();
+            closeDeleteFolderModal();
+            showToast('"'+(data.name||'Folder')+'" deleted.','info');
+            if(String(currentFid)===String(deleteFolderTarget)){
+                currentFid=null;
+                folderView.classList.add('hidden');
+                overview.classList.remove('hidden');
+            }
+            renderOverview();
+        })
+        .catch(function(){showToast('Failed to delete folder.','error');});
+});
+
+/* ══════════════════════════════════════════════════
+   UTILS
+════════════════════════════════════════════════ */
+function esc(s){
+    if(!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function setText(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; }
+
+/* Init */
+renderOverview();
+})();
+</script>
+
+{% endblock %}
