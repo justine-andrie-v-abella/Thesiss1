@@ -18,6 +18,12 @@ from accounts.models import TeacherProfile, Department, Subject, ActivityLog
 from .services import QuestionnaireExtractor
 from django.conf import settings
 
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
 def get_extractor():
     """Get the appropriate AI extractor based on available API keys"""
     if hasattr(settings, 'GEMINI_API_KEY') and settings.GEMINI_API_KEY:
