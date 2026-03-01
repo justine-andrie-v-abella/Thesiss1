@@ -19,41 +19,60 @@ class Questionnaire(models.Model):
         ('xls', 'Excel Spreadsheet (Legacy)'),
         ('txt', 'Text File'),
     ]
-    
-    title = models.CharField(max_length=255)
+
+    EXAM_TYPE_CHOICES = [
+        ('short_quiz', 'Short Quiz'),
+        ('long_quiz',  'Long Quiz'),
+        ('prelim',     'Prelim Exam'),
+        ('midterm',    'Midterm Exam'),
+        ('prefinal',   'Pre-Final Exam'),
+        ('final',      'Final Exam'),
+        ('activity',   'Activity / Seatwork'),
+        ('others',     'Others'),
+    ]
+
+    title       = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='questionnaires')
-    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='questionnaires')
-    uploader = models.ForeignKey(TeacherProfile, on_delete=models.CASCADE, related_name='questionnaires')
-    file = models.FileField(upload_to=questionnaire_upload_path)
-    file_type = models.CharField(max_length=10, choices=FILE_TYPE_CHOICES)
-    file_size = models.IntegerField(help_text='File size in bytes')
+    department  = models.ForeignKey(Department,      on_delete=models.CASCADE, related_name='questionnaires')
+    subject     = models.ForeignKey(Subject,         on_delete=models.CASCADE, related_name='questionnaires')
+    uploader    = models.ForeignKey(TeacherProfile,  on_delete=models.CASCADE, related_name='questionnaires')
+    file        = models.FileField(upload_to=questionnaire_upload_path)
+    file_type   = models.CharField(max_length=10, choices=FILE_TYPE_CHOICES)
+    file_size   = models.IntegerField(help_text='File size in bytes')
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    # Exam type tag
+    exam_type = models.CharField(
+        max_length=20,
+        choices=EXAM_TYPE_CHOICES,
+        default='others',
+        help_text='Type of exam or test this questionnaire is intended for',
+    )
+
     # AI Extraction fields
-    is_extracted = models.BooleanField(default=False, help_text='Whether questions have been extracted')
+    is_extracted      = models.BooleanField(default=False, help_text='Whether questions have been extracted')
     extraction_status = models.CharField(
         max_length=20,
         choices=[
-            ('pending', 'Pending'),
+            ('pending',    'Pending'),
             ('processing', 'Processing'),
-            ('completed', 'Completed'),
-            ('failed', 'Failed')
+            ('completed',  'Completed'),
+            ('failed',     'Failed'),
         ],
-        default='pending'
+        default='pending',
     )
     extraction_error = models.TextField(blank=True, null=True)
-    
+
     class Meta:
         ordering = ['-uploaded_at']
-    
+
     def __str__(self):
         return f"{self.title} - {self.subject.code}"
-    
+
     def get_file_extension(self):
         return os.path.splitext(self.file.name)[1][1:].lower()
-    
+
     def get_file_size_display(self):
         size = self.file_size
         for unit in ['B', 'KB', 'MB', 'GB']:
@@ -61,7 +80,7 @@ class Questionnaire(models.Model):
                 return f"{size:.2f} {unit}"
             size /= 1024.0
         return f"{size:.2f} TB"
-    
+
     def save(self, *args, **kwargs):
         if self.file:
             self.file_size = self.file.size
@@ -72,28 +91,28 @@ class Questionnaire(models.Model):
 class QuestionType(models.Model):
     """Types of questions that can be extracted"""
     MULTIPLE_CHOICE = 'multiple_choice'
-    TRUE_FALSE = 'true_false'
-    IDENTIFICATION = 'identification'
-    ESSAY = 'essay'
-    FILL_BLANK = 'fill_blank'
-    MATCHING = 'matching'
-    
+    TRUE_FALSE       = 'true_false'
+    IDENTIFICATION   = 'identification'
+    ESSAY            = 'essay'
+    FILL_BLANK       = 'fill_blank'
+    MATCHING         = 'matching'
+
     TYPE_CHOICES = [
         (MULTIPLE_CHOICE, 'Multiple Choice'),
-        (TRUE_FALSE, 'True/False'),
-        (IDENTIFICATION, 'Identification'),
-        (ESSAY, 'Essay'),
-        (FILL_BLANK, 'Fill in the Blanks'),
-        (MATCHING, 'Matching Type'),
+        (TRUE_FALSE,       'True/False'),
+        (IDENTIFICATION,   'Identification'),
+        (ESSAY,            'Essay'),
+        (FILL_BLANK,       'Fill in the Blanks'),
+        (MATCHING,         'Matching Type'),
     ]
-    
-    name = models.CharField(max_length=50, choices=TYPE_CHOICES, unique=True)
+
+    name        = models.CharField(max_length=50, choices=TYPE_CHOICES, unique=True)
     description = models.TextField(blank=True)
-    is_active = models.BooleanField(default=True)
-    
+    is_active   = models.BooleanField(default=True)
+
     def __str__(self):
         return self.get_name_display()
-    
+
     class Meta:
         ordering = ['name']
 
@@ -101,43 +120,43 @@ class QuestionType(models.Model):
 class ExtractedQuestion(models.Model):
     """Questions extracted from uploaded questionnaire"""
     questionnaire = models.ForeignKey(
-        Questionnaire, 
-        on_delete=models.CASCADE, 
-        related_name='extracted_questions'
+        Questionnaire,
+        on_delete=models.CASCADE,
+        related_name='extracted_questions',
     )
     question_type = models.ForeignKey(QuestionType, on_delete=models.PROTECT)
     question_text = models.TextField()
-    
+
     # For multiple choice
     option_a = models.TextField(blank=True, null=True)
     option_b = models.TextField(blank=True, null=True)
     option_c = models.TextField(blank=True, null=True)
     option_d = models.TextField(blank=True, null=True)
-    
+
     # For various question types
     correct_answer = models.TextField()
-    explanation = models.TextField(blank=True, null=True)
-    points = models.IntegerField(default=1)
-    difficulty = models.CharField(
-        max_length=20, 
+    explanation    = models.TextField(blank=True, null=True)
+    points         = models.IntegerField(default=1)
+    difficulty     = models.CharField(
+        max_length=20,
         choices=[
-            ('easy', 'Easy'),
+            ('easy',   'Easy'),
             ('medium', 'Medium'),
-            ('hard', 'Hard')
-        ], 
-        default='medium'
+            ('hard',   'Hard'),
+        ],
+        default='medium',
     )
-    
+
     is_approved = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
     class Meta:
         ordering = ['created_at']
-    
+
     def __str__(self):
         return f"{self.question_type} - {self.question_text[:50]}"
-    
+
     @property
     def options_list(self):
         """Returns list of (letter, option) tuples for multiple choice"""
@@ -151,26 +170,26 @@ class ExtractedQuestion(models.Model):
 
 class GeneratedTest(models.Model):
     """Test generated from extracted questions"""
-    questionnaire = models.ForeignKey(
-        Questionnaire, 
-        on_delete=models.CASCADE, 
-        related_name='generated_tests'
+    questionnaire  = models.ForeignKey(
+        Questionnaire,
+        on_delete=models.CASCADE,
+        related_name='generated_tests',
     )
-    teacher = models.ForeignKey(User, on_delete=models.CASCADE)
-    title = models.CharField(max_length=200)
-    description = models.TextField(blank=True)
+    teacher        = models.ForeignKey(User, on_delete=models.CASCADE)
+    title          = models.CharField(max_length=200)
+    description    = models.TextField(blank=True)
     question_types = models.ManyToManyField(QuestionType)
-    questions = models.ManyToManyField(ExtractedQuestion)
-    
+    questions      = models.ManyToManyField(ExtractedQuestion)
+
     total_points = models.IntegerField(default=0)
-    time_limit = models.IntegerField(null=True, blank=True, help_text="Time limit in minutes")
-    
+    time_limit   = models.IntegerField(null=True, blank=True, help_text="Time limit in minutes")
+
     is_published = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    
+    created_at   = models.DateTimeField(auto_now_add=True)
+
     class Meta:
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return self.title
 
@@ -178,25 +197,25 @@ class GeneratedTest(models.Model):
 class Download(models.Model):
     """Track questionnaire downloads"""
     questionnaire = models.ForeignKey(
-        Questionnaire, 
+        Questionnaire,
         on_delete=models.CASCADE,
-        related_name='downloads'
+        related_name='downloads',
     )
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='questionnaire_downloads'
+        related_name='questionnaire_downloads',
     )
     downloaded_at = models.DateTimeField(auto_now_add=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-    
+    ip_address    = models.GenericIPAddressField(null=True, blank=True)
+
     class Meta:
-        ordering = ['-downloaded_at']
+        ordering     = ['-downloaded_at']
         verbose_name = 'Download'
         verbose_name_plural = 'Downloads'
-    
+
     def __str__(self):
         return f"{self.questionnaire.title} - {self.downloaded_at.strftime('%Y-%m-%d %H:%M')}"
 
@@ -213,14 +232,14 @@ class WorkspaceFolder(models.Model):
     teacher    = models.ForeignKey(
         TeacherProfile,
         on_delete=models.CASCADE,
-        related_name='workspace_folders'
+        related_name='workspace_folders',
     )
     name       = models.CharField(max_length=80)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering            = ['-created_at']
         verbose_name        = 'Workspace Folder'
         verbose_name_plural = 'Workspace Folders'
 
@@ -240,12 +259,12 @@ class WorkspaceFolderQuestion(models.Model):
     folder   = models.ForeignKey(
         WorkspaceFolder,
         on_delete=models.CASCADE,
-        related_name='folder_questions'
+        related_name='folder_questions',
     )
     question = models.ForeignKey(
         ExtractedQuestion,
         on_delete=models.CASCADE,
-        related_name='workspace_entries'
+        related_name='workspace_entries',
     )
     added_at = models.DateTimeField(auto_now_add=True)
 

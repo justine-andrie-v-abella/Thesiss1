@@ -8,7 +8,7 @@
 
 <!-- Filter Card -->
 <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
-    <form method="get" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <form method="get" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div>
             <label class="block text-sm font-semibold text-gray-700 mb-2">
                 <i class="bi bi-book text-purple-500 mr-1"></i> Subject
@@ -23,6 +23,21 @@
                 {% endfor %}
             </select>
         </div>
+
+        <!-- Exam Type Filter -->
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                <i class="bi bi-tag-fill text-orange-500 mr-1"></i> Exam Type
+            </label>
+            <select name="exam_type"
+                class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition-colors">
+                <option value="">All Exam Types</option>
+                {% for val, label in exam_type_choices %}
+                    <option value="{{ val }}" {% if exam_type == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
         <div class="lg:col-span-2">
             <label class="block text-sm font-semibold text-gray-700 mb-2">
                 <i class="bi bi-search text-green-500 mr-1"></i> Search
@@ -59,20 +74,98 @@
     </a>
 </div>
 
+<!-- Active filter chips -->
+{% if exam_type or selected_subject or search_query %}
+<div class="flex flex-wrap items-center gap-2 mb-4">
+    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Active filters:</span>
+    {% if exam_type %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-white
+        {% if exam_type == 'final' %}bg-red-600
+        {% elif exam_type == 'midterm' %}bg-orange-500
+        {% elif exam_type == 'prelim' %}bg-amber-500
+        {% elif exam_type == 'prefinal' %}bg-yellow-500
+        {% elif exam_type == 'long_quiz' %}bg-blue-600
+        {% elif exam_type == 'short_quiz' %}bg-cyan-500
+        {% elif exam_type == 'activity' %}bg-green-600
+        {% else %}bg-purple-600
+        {% endif %}">
+        <i class="bi bi-tag-fill"></i>
+        {% for val, label in exam_type_choices %}{% if val == exam_type %}{{ label }}{% endif %}{% endfor %}
+        <a href="?{% if selected_subject %}subject={{ selected_subject }}&{% endif %}{% if search_query %}search={{ search_query }}{% endif %}"
+           class="ml-1 hover:opacity-75">
+            <i class="bi bi-x-lg text-xs"></i>
+        </a>
+    </span>
+    {% endif %}
+    {% if selected_subject %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">
+        <i class="bi bi-book"></i>
+        {% for sub in subjects %}{% if sub.id|stringformat:"s" == selected_subject %}{{ sub.code }}{% endif %}{% endfor %}
+        <a href="?{% if exam_type %}exam_type={{ exam_type }}&{% endif %}{% if search_query %}search={{ search_query }}{% endif %}"
+           class="ml-1 hover:opacity-75">
+            <i class="bi bi-x-lg text-xs"></i>
+        </a>
+    </span>
+    {% endif %}
+    {% if search_query %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">
+        <i class="bi bi-search"></i> "{{ search_query }}"
+        <a href="?{% if selected_subject %}subject={{ selected_subject }}&{% endif %}{% if exam_type %}exam_type={{ exam_type }}{% endif %}"
+           class="ml-1 hover:opacity-75">
+            <i class="bi bi-x-lg text-xs"></i>
+        </a>
+    </span>
+    {% endif %}
+    <a href="{% url 'questionnaires:browse_questionnaires' %}"
+       class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors">
+        <i class="bi bi-x-circle"></i> Clear all
+    </a>
+</div>
+{% endif %}
+
 <!-- Questionnaires Grid -->
 {% if page_obj %}
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
     {% for quest in page_obj %}
     <div class="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1">
 
-        <!-- Card Header -->
-        <div class="bg-gradient-to-r from-purple-500 to-pink-600 px-5 py-4 rounded-t-xl">
+        <!-- Card Header — color-coded by exam type -->
+        <div class="
+            {% if quest.exam_type == 'final' %}bg-gradient-to-r from-red-600 to-rose-700
+            {% elif quest.exam_type == 'midterm' %}bg-gradient-to-r from-orange-500 to-red-600
+            {% elif quest.exam_type == 'prelim' %}bg-gradient-to-r from-amber-500 to-orange-600
+            {% elif quest.exam_type == 'prefinal' %}bg-gradient-to-r from-yellow-500 to-amber-600
+            {% elif quest.exam_type == 'long_quiz' %}bg-gradient-to-r from-blue-600 to-indigo-700
+            {% elif quest.exam_type == 'short_quiz' %}bg-gradient-to-r from-cyan-500 to-blue-600
+            {% elif quest.exam_type == 'activity' %}bg-gradient-to-r from-green-500 to-emerald-600
+            {% else %}bg-gradient-to-r from-purple-500 to-pink-600
+            {% endif %}
+            px-5 py-4 rounded-t-xl">
+
             <h3 class="text-white font-bold text-lg line-clamp-2">{{ quest.title }}</h3>
-            {% if quest.is_extracted %}
-                <span class="inline-block mt-2 px-3 py-1 bg-white/20 text-white text-xs font-semibold rounded-full">
+
+            <div class="flex flex-wrap gap-1.5 mt-2">
+                {% if quest.is_extracted %}
+                <span class="inline-flex items-center px-3 py-1 bg-white/20 text-white text-xs font-semibold rounded-full">
                     <i class="bi bi-check-circle mr-1"></i> {{ quest.extracted_questions.count }} Questions Available
                 </span>
-            {% endif %}
+                {% endif %}
+
+                {% if quest.exam_type %}
+                <span class="inline-flex items-center px-3 py-1 text-white text-xs font-semibold rounded-full
+                    {% if quest.exam_type == 'final' %}bg-red-800/40
+                    {% elif quest.exam_type == 'midterm' %}bg-red-700/40
+                    {% elif quest.exam_type == 'prelim' %}bg-orange-700/40
+                    {% elif quest.exam_type == 'prefinal' %}bg-amber-700/40
+                    {% elif quest.exam_type == 'long_quiz' %}bg-blue-800/40
+                    {% elif quest.exam_type == 'short_quiz' %}bg-cyan-700/40
+                    {% elif quest.exam_type == 'activity' %}bg-green-700/40
+                    {% else %}bg-white/20
+                    {% endif %}">
+                    <i class="bi bi-tag-fill mr-1"></i> {{ quest.get_exam_type_display }}
+                </span>
+                {% endif %}
+            </div>
         </div>
 
         <!-- Card Body -->
@@ -172,7 +265,7 @@
 <div class="flex justify-center mt-2">
     <nav class="flex items-center space-x-2">
         {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
+            <a href="?page={{ page_obj.previous_page_number }}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if exam_type %}&exam_type={{ exam_type }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
                 class="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors font-semibold text-gray-700">
                 <i class="bi bi-chevron-left"></i> Previous
             </a>
@@ -181,14 +274,14 @@
             {% if page_obj.number == num %}
                 <span class="px-4 py-2 bg-blue-500 text-white font-bold rounded-lg">{{ num }}</span>
             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                <a href="?page={{ num }}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
+                <a href="?page={{ num }}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if exam_type %}&exam_type={{ exam_type }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
                     class="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors font-semibold text-gray-700">
                     {{ num }}
                 </a>
             {% endif %}
         {% endfor %}
         {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
+            <a href="?page={{ page_obj.next_page_number }}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if exam_type %}&exam_type={{ exam_type }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
                 class="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors font-semibold text-gray-700">
                 Next <i class="bi bi-chevron-right"></i>
             </a>
@@ -369,16 +462,13 @@
 ════════════════════════════════════════════════ */
 var BASE = '/questionnaires/workspace';
 var API = {
-    getFolders:     function()    { return BASE + '/'; },   // workspace view returns folders_json — we use a dedicated fetch below
+    getFolders:     function()    { return BASE + '/'; },
     createFolder:   function()    { return BASE + '/folders/create/'; },
     addQuestions:   function(id)  { return BASE + '/folders/' + id + '/add-questions/'; },
 };
 
-/* We need a lightweight folders endpoint.
-   We'll fetch the workspace page and parse? No — simpler:
-   we keep a local cache refreshed on page load and after mutations. */
-var cachedFolders = [];   // [ { id, name, question_count } ]
-var cachedInWs    = new Set();  // question ids already in ANY folder
+var cachedFolders = [];
+var cachedInWs    = new Set();
 
 function csrfToken() {
     var m = document.cookie.match(/csrftoken=([^;]+)/);
@@ -415,7 +505,6 @@ function updateBrowseBanner() {
     if (badge) badge.textContent = totalQ;
 }
 
-/* Load on page open */
 loadFoldersFromServer();
 
 /* ══════════════════════════════════════════════════
@@ -648,7 +737,7 @@ function updateModalDownloadLinks() {
    FOLDER PICKER MODAL  (Step 2)
 ════════════════════════════════════════════════ */
 var folderPickerModal = document.getElementById('folderPickerModal');
-var pendingQuestionIds = [];  // just the IDs — server has the question data already
+var pendingQuestionIds = [];
 
 document.getElementById('modalSaveToFolder').addEventListener('click', function() {
     pendingQuestionIds = getCheckedIds();
@@ -702,13 +791,11 @@ function renderFolderPicker() {
 }
 
 function saveToFolder(folderId, folderName) {
-    /* Disable buttons while saving */
     document.getElementById('fp-folder-list').querySelectorAll('button').forEach(function(b){ b.disabled=true; });
 
     postJSON(API.addQuestions(folderId), { question_ids: pendingQuestionIds.map(Number) })
         .then(function(data) {
             if (data.error) { showToast(data.error,'error'); return; }
-            /* Refresh server data */
             loadFoldersFromServer();
             closeFolderPicker();
             closeReviewModal();
@@ -724,7 +811,6 @@ function saveToFolder(folderId, folderName) {
         });
 }
 
-/* ── Create new folder inline & save ── */
 document.getElementById('fp-create-and-save').addEventListener('click', function(){
     var name = document.getElementById('fp-new-folder-name').value.trim();
     if (!name) { showToast('Please enter a folder name.','warning'); return; }
@@ -737,7 +823,6 @@ document.getElementById('fp-create-and-save').addEventListener('click', function
         .then(function(data) {
             if (data.error) { showToast(data.error,'error'); return; }
             showToast('Folder "'+data.name+'" created!','success');
-            /* now save questions into the new folder */
             return postJSON(API.addQuestions(data.id), { question_ids: pendingQuestionIds.map(Number) });
         })
         .then(function(data) {
@@ -757,7 +842,6 @@ document.getElementById('fp-new-folder-name').addEventListener('keydown', functi
     if (e.key==='Enter') document.getElementById('fp-create-and-save').click();
 });
 
-/* ── utils ── */
 function esc(s) {
     if (!s) return '';
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

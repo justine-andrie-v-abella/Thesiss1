@@ -53,8 +53,9 @@ def upload_questionnaire(request):
 
         if form.is_valid():
             questionnaire = form.save(commit=False)
-            questionnaire.uploader = teacher
-            questionnaire.department = teacher.department
+            questionnaire.uploader         = teacher
+            questionnaire.department       = teacher.department
+            questionnaire.exam_type        = form.cleaned_data['exam_type']   # ← new
             questionnaire.extraction_status = 'processing'
             questionnaire.save()
 
@@ -64,32 +65,49 @@ def upload_questionnaire(request):
                 )
 
                 extractor = get_extractor()
-                created_questions = extractor.process_questionnaire(questionnaire, type_names, mode='extract')
+                created_questions = extractor.process_questionnaire(
+                    questionnaire, type_names, mode='extract'
+                )
 
                 if not created_questions:
                     questionnaire.file.delete(save=False)
                     questionnaire.delete()
-                    messages.error(request, 'No questions were detected in your file. Please upload a file that contains questions.')
-                    return render(request, 'teacher_dashboard/upload_questionnaire.html', {'form': form})
+                    messages.error(
+                        request,
+                        'No questions were detected in your file. '
+                        'Please upload a file that contains questions.',
+                    )
+                    return render(
+                        request,
+                        'teacher_dashboard/upload_questionnaire.html',
+                        {'form': form},
+                    )
 
                 questionnaire.extraction_status = 'completed'
-                questionnaire.is_extracted = True
+                questionnaire.is_extracted      = True
                 questionnaire.save()
 
                 ActivityLog.objects.create(
                     activity_type='questionnaire_uploaded',
                     user=request.user,
-                    description=f'You uploaded "{questionnaire.title}" for {questionnaire.subject.code}'
+                    description=(
+                        f'You uploaded "{questionnaire.title}" '
+                        f'for {questionnaire.subject.code}'
+                    ),
                 )
                 ActivityLog.objects.create(
                     activity_type='questions_extracted',
                     user=request.user,
-                    description=f'Extracted {len(created_questions)} questions from "{questionnaire.title}"'
+                    description=(
+                        f'Extracted {len(created_questions)} questions '
+                        f'from "{questionnaire.title}"'
+                    ),
                 )
 
                 messages.success(
                     request,
-                    f'Extracted {len(created_questions)} questions! Now select the ones you want to keep.'
+                    f'Extracted {len(created_questions)} questions! '
+                    f'Now select the ones you want to keep.',
                 )
                 return redirect('questionnaires:review_extracted', pk=questionnaire.pk)
 
@@ -100,18 +118,30 @@ def upload_questionnaire(request):
                 ActivityLog.objects.create(
                     activity_type='extraction_failed',
                     user=request.user,
-                    description=f'Extraction failed — file was not saved.'
+                    description='Extraction failed — file was not saved.',
                 )
 
-                messages.error(request, f'AI extraction failed: {str(e)}. Your file was not saved. Please try again.')
-                return render(request, 'teacher_dashboard/upload_questionnaire.html', {'form': form})
+                messages.error(
+                    request,
+                    f'AI extraction failed: {str(e)}. '
+                    f'Your file was not saved. Please try again.',
+                )
+                return render(
+                    request,
+                    'teacher_dashboard/upload_questionnaire.html',
+                    {'form': form},
+                )
         else:
             messages.error(request, 'Please correct the errors below.')
 
     else:
         form = QuestionnaireUploadForm(user=request.user)
 
-    return render(request, 'teacher_dashboard/upload_questionnaire.html', {'form': form})
+    return render(
+        request,
+        'teacher_dashboard/upload_questionnaire.html',
+        {'form': form},
+    )
 
 
 @login_required
@@ -521,14 +551,20 @@ def browse_questionnaires(request):
         'department', 'subject', 'uploader__user'
     ).filter(subject__departments=teacher.department)
 
-    subject_id = request.GET.get('subject')
+    # ── filters ──────────────────────────────────────────────────────────────
+    subject_id   = request.GET.get('subject', '')
+    exam_type    = request.GET.get('exam_type', '')          # ← new
     search_query = request.GET.get('search', '')
 
     if subject_id:
         questionnaires = questionnaires.filter(subject_id=subject_id)
+
+    if exam_type:                                             # ← new
+        questionnaires = questionnaires.filter(exam_type=exam_type)
+
     if search_query:
         questionnaires = questionnaires.filter(
-            Q(title__icontains=search_query) |
+            Q(title__icontains=search_query)       |
             Q(description__icontains=search_query) |
             Q(subject__name__icontains=search_query) |
             Q(subject__code__icontains=search_query)
@@ -536,66 +572,79 @@ def browse_questionnaires(request):
 
     subjects = Subject.objects.filter(departments=teacher.department)
 
-    paginator = Paginator(questionnaires, 12)
+    paginator   = Paginator(questionnaires, 12)
     page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj    = paginator.get_page(page_number)
 
     context = {
-        'page_obj': page_obj,
-        'subjects': subjects,
+        'page_obj':         page_obj,
+        'subjects':         subjects,
         'selected_subject': subject_id,
-        'search_query': search_query,
+        'search_query':     search_query,
+        'exam_type':        exam_type,                        # ← new
+        'exam_type_choices': Questionnaire.EXAM_TYPE_CHOICES, # ← new
     }
     return render(request, 'teacher_dashboard/browse_questionnaires.html', context)
 
 
+
+# ============================================================================
+# FILE: questionnaires/views.py  — updated all_questionnaires() view only
+#
+# Replace your existing all_questionnaires() with this one.
+# Everything else in your views.py stays the same.
+# ============================================================================
+
 @login_required
-@user_passes_test(is_admin)
 def all_questionnaires(request):
-    questionnaires = Questionnaire.objects.select_related('department', 'subject', 'uploader__user').all()
+    if not request.user.is_staff:
+        return redirect('questionnaires:browse_questionnaires')
 
-    department_id = request.GET.get('department')
-    subject_id = request.GET.get('subject')
-    search_query = request.GET.get('search', '')
+    questionnaires = Questionnaire.objects.select_related(
+        'department', 'subject', 'uploader__user'
+    ).all()
 
-    if department_id:
-        questionnaires = questionnaires.filter(department_id=department_id)
-    if subject_id:
-        questionnaires = questionnaires.filter(subject_id=subject_id)
+    # ── filters ──────────────────────────────────────────────────────────────
+    selected_department = request.GET.get('department', '')
+    selected_subject    = request.GET.get('subject', '')
+    exam_type           = request.GET.get('exam_type', '')   # ← new
+    search_query        = request.GET.get('search', '')
+
+    if selected_department:
+        questionnaires = questionnaires.filter(department_id=selected_department)
+
+    if selected_subject:
+        questionnaires = questionnaires.filter(subject_id=selected_subject)
+
+    if exam_type:                                            # ← new
+        questionnaires = questionnaires.filter(exam_type=exam_type)
+
     if search_query:
         questionnaires = questionnaires.filter(
-            Q(title__icontains=search_query) |
-            Q(description__icontains=search_query) |
+            Q(title__icontains=search_query)         |
+            Q(description__icontains=search_query)   |
             Q(subject__name__icontains=search_query) |
-            Q(uploader__user__first_name__icontains=search_query) |
-            Q(uploader__user__last_name__icontains=search_query)
+            Q(subject__code__icontains=search_query)
         )
 
     departments = Department.objects.all()
-    subjects = Subject.objects.all()
+    subjects    = Subject.objects.all()
 
-    paginator = Paginator(questionnaires, 12)
+    paginator   = Paginator(questionnaires, 12)
     page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj    = paginator.get_page(page_number)
 
     context = {
-        'page_obj': page_obj,
-        'departments': departments,
-        'subjects': subjects,
-        'selected_department': department_id,
-        'selected_subject': subject_id,
-        'search_query': search_query,
+        'page_obj':            page_obj,
+        'departments':         departments,
+        'subjects':            subjects,
+        'selected_department': selected_department,
+        'selected_subject':    selected_subject,
+        'search_query':        search_query,
+        'exam_type':           exam_type,                    # ← new
+        'exam_type_choices':   Questionnaire.EXAM_TYPE_CHOICES,  # ← new
     }
     return render(request, 'admin_dashboard/all_questionnaires.html', context)
-
-
-def get_client_ip(request):
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0]
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-    return ip
 
 
 @login_required

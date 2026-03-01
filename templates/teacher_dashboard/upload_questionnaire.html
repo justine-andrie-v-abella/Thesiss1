@@ -80,6 +80,37 @@
                     </div>
                 </div>
 
+                <!-- Exam Type -->
+                <div>
+                    <label for="id_exam_type" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-tag-fill text-orange-500 mr-1"></i> Exam Type *
+                    </label>
+                    <select name="exam_type" id="id_exam_type" required
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition-colors">
+                        <option value="" disabled {% if not form.exam_type.value %}selected{% endif %}>-- Select Exam Type --</option>
+                        <option value="short_quiz"  {% if form.exam_type.value == 'short_quiz'  %}selected{% endif %}>Short Quiz</option>
+                        <option value="long_quiz"   {% if form.exam_type.value == 'long_quiz'   %}selected{% endif %}>Long Quiz</option>
+                        <option value="prelim"      {% if form.exam_type.value == 'prelim'      %}selected{% endif %}>Prelim Exam</option>
+                        <option value="midterm"     {% if form.exam_type.value == 'midterm'     %}selected{% endif %}>Midterm Exam</option>
+                        <option value="prefinal"    {% if form.exam_type.value == 'prefinal'    %}selected{% endif %}>Pre-Final Exam</option>
+                        <option value="final"       {% if form.exam_type.value == 'final'       %}selected{% endif %}>Final Exam</option>
+                        <option value="activity"    {% if form.exam_type.value == 'activity'    %}selected{% endif %}>Activity / Seatwork</option>
+                        <option value="others"      {% if form.exam_type.value == 'others'      %}selected{% endif %}>Others</option>
+                    </select>
+                    {% if form.exam_type.errors %}
+                        <p class="text-red-500 text-sm mt-1"><i class="bi bi-exclamation-circle mr-1"></i>{{ form.exam_type.errors.0 }}</p>
+                    {% endif %}
+
+                    <!-- Exam type color preview -->
+                    <div id="examTypePreview" class="mt-2 hidden">
+                        <div id="examTypeBadge" class="inline-flex items-center px-3 py-1.5 rounded-full text-white text-xs font-semibold">
+                            <i class="bi bi-tag-fill mr-1.5"></i>
+                            <span id="examTypeBadgeText"></span>
+                        </div>
+                        <span class="text-xs text-gray-400 ml-2">— this badge will appear on your questionnaire card</span>
+                    </div>
+                </div>
+
                 <!-- File Upload -->
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
@@ -207,6 +238,10 @@
                 </li>
                 <li class="flex items-start">
                     <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
+                    <span>Choose the correct <strong>Exam Type</strong> so others can filter and find your questionnaire easily</span>
+                </li>
+                <li class="flex items-start">
+                    <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
                     <span>Maximum file size is 10MB</span>
                 </li>
             </ul>
@@ -229,15 +264,47 @@
         subjSelect.className = 'w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors';
     }
 
-    // File input + preview + clear button
-    var fileInput      = document.getElementById('id_file');
-    var filePreview    = document.getElementById('filePreview');
+    // ── Exam Type badge preview ──────────────────────────────────────────────
+    var EXAM_COLORS = {
+        short_quiz: { bg: '#0891b2', label: 'Short Quiz' },
+        long_quiz:  { bg: '#2563eb', label: 'Long Quiz' },
+        prelim:     { bg: '#d97706', label: 'Prelim Exam' },
+        midterm:    { bg: '#dc2626', label: 'Midterm Exam' },
+        prefinal:   { bg: '#ca8a04', label: 'Pre-Final Exam' },
+        final:      { bg: '#9f1239', label: 'Final Exam' },
+        activity:   { bg: '#16a34a', label: 'Activity / Seatwork' },
+        others:     { bg: '#7c3aed', label: 'Others' },
+    };
+
+    var examTypeSelect  = document.getElementById('id_exam_type');
+    var examTypePreview = document.getElementById('examTypePreview');
+    var examTypeBadge   = document.getElementById('examTypeBadge');
+    var examTypeBadgeText = document.getElementById('examTypeBadgeText');
+
+    function updateExamPreview() {
+        var val = examTypeSelect.value;
+        if (val && EXAM_COLORS[val]) {
+            examTypeBadge.style.backgroundColor = EXAM_COLORS[val].bg;
+            examTypeBadgeText.textContent = EXAM_COLORS[val].label;
+            examTypePreview.classList.remove('hidden');
+        } else {
+            examTypePreview.classList.add('hidden');
+        }
+    }
+    if (examTypeSelect) {
+        examTypeSelect.addEventListener('change', updateExamPreview);
+        updateExamPreview(); // run on load in case of form re-render with value
+    }
+
+    // ── File input + preview + clear button ─────────────────────────────────
+    var fileInput       = document.getElementById('id_file');
+    var filePreview     = document.getElementById('filePreview');
     var filePreviewName = document.getElementById('filePreviewName');
     var filePreviewSize = document.getElementById('filePreviewSize');
-    var clearFileBtn   = document.getElementById('clearFileBtn');
-    var dropZone       = document.getElementById('dropZone');
-    var fileIcon       = document.getElementById('fileIcon');
-    var fileName       = document.getElementById('fileName');
+    var clearFileBtn    = document.getElementById('clearFileBtn');
+    var dropZone        = document.getElementById('dropZone');
+    var fileIcon        = document.getElementById('fileIcon');
+    var fileName        = document.getElementById('fileName');
 
     function formatSize(bytes) {
         if (bytes < 1024) return bytes + ' B';
@@ -253,32 +320,24 @@
     }
 
     function clearFile() {
-        // Reset the file input
         fileInput.value = '';
         filePreview.style.display = 'none';
         dropZone.style.display    = 'block';
         fileIcon.className  = 'bi bi-cloud-upload text-5xl text-gray-400 mb-3 block';
         fileName.textContent = 'Click to browse or drag & drop your file here';
         fileName.className   = 'text-sm text-gray-500 mb-2';
-        // Re-add required since resetting loses validation state
         fileInput.setAttribute('required', '');
     }
 
     if (fileInput) {
         fileInput.addEventListener('change', function () {
-            if (this.files.length > 0) {
-                showFilePreview(this.files[0]);
-            } else {
-                clearFile();
-            }
+            if (this.files.length > 0) showFilePreview(this.files[0]);
+            else clearFile();
         });
     }
+    if (clearFileBtn) clearFileBtn.addEventListener('click', clearFile);
 
-    if (clearFileBtn) {
-        clearFileBtn.addEventListener('click', clearFile);
-    }
-
-    // Show loading overlay on submit
+    // ── Loading overlay on submit ────────────────────────────────────────────
     var form      = document.getElementById('uploadForm');
     var loading   = document.getElementById('loadingOverlay');
     var submitBtn = document.getElementById('submitBtn');
@@ -290,7 +349,7 @@
         });
     }
 
-    // Guidelines Modal
+    // ── Guidelines Modal ─────────────────────────────────────────────────────
     var guidelinesBtn = document.getElementById('guidelinesBtn');
     var modal         = document.getElementById('guidelinesModal');
     var closeModal    = document.getElementById('closeModal');
