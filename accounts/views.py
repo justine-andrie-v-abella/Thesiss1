@@ -9,22 +9,58 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Q, Count
-from .models import ActivityLog, TeacherProfile, Department, Subject
-from .forms import TeacherCreationForm, TeacherEditForm, DepartmentForm, SubjectForm
+from .models import ActivityLog, TeacherProfile, Department, Subject, SubAdminProfile
+from .forms import (
+    TeacherCreationForm, TeacherEditForm,
+    DepartmentForm, SubjectForm,
+    SubAdminCreationForm, SubAdminEditForm,
+    SubAdminTeacherCreationForm, SubAdminTeacherEditForm,
+)
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from .forms import DepartmentForm, SubjectForm 
 from django.db import OperationalError
 
 import logging
 logger = logging.getLogger(__name__)
 
+
+# ============================================================================
+# ROLE HELPER FUNCTIONS
+# ============================================================================
+
 def is_admin(user):
+    """Superadmin check — existing function, do NOT rename."""
     return user.is_authenticated and user.is_staff
 
+
+def is_subadmin(user):
+    """Sub-admin check — has an active SubAdminProfile."""
+    return (
+        user.is_authenticated
+        and not user.is_staff
+        and hasattr(user, 'subadmin_profile')
+        and user.subadmin_profile.is_active
+    )
+
+
+def is_any_admin(user):
+    """Either superadmin or sub-admin."""
+    return is_admin(user) or is_subadmin(user)
+
+
+def get_subadmin_department(user):
+    """Safely get the sub-admin's department. Returns None if not a sub-admin."""
+    try:
+        return user.subadmin_profile.department
+    except SubAdminProfile.DoesNotExist:
+        return None
+
+
+# ============================================================================
+# ACTIVITY LOG HELPERS
+# ============================================================================
+
 def log_activity(activity_type, description, user=None, metadata=None):
-    """Helper function to log activities"""
-    from .models import ActivityLog
     ActivityLog.objects.create(
         activity_type=activity_type,
         user=user,
@@ -32,61 +68,52 @@ def log_activity(activity_type, description, user=None, metadata=None):
         metadata=metadata or {}
     )
 
-def log_teacher_activity(teacher, action, user=None):
-    """Log teacher-related activities"""
-    description = f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) was {action}"
-    log_activity(f'teacher_{action}', description, user)
 
-def log_department_activity(department, action, user=None):
-    """Log department-related activities"""
-    description = f"Department {department.name} ({department.code}) was {action}"
-    log_activity(f'department_{action}', description, user)
-
-def log_subject_activity(subject, action, user=None):
-    """Log subject-related activities"""
-    description = f"Subject {subject.name} ({subject.code}) was {action}"
-    log_activity(f'subject_{action}', description, user)
-
-# accounts/views.py - Updated login_view function
+# ============================================================================
+# AUTH VIEWS
+# ============================================================================
 
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('home')
-    
+
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
-        
+
         try:
             user = authenticate(request, username=username, password=password)
-            
+
             if user is not None:
                 login(request, user)
-                
-                from .models import ActivityLog
+
                 user_role = "Administrator" if user.is_staff else "Teacher"
+                if hasattr(user, 'subadmin_profile'):
+                    user_role = "Sub-Admin"
+
                 ActivityLog.objects.create(
                     activity_type='user_login',
                     user=user,
                     description=f"{user_role} {user.get_full_name()} logged in to the system"
                 )
-                
+
+                # ── Role-based redirect ──
                 if user.is_staff:
                     return redirect('accounts:admin_dashboard')
+                elif hasattr(user, 'subadmin_profile') and user.subadmin_profile.is_active:
+                    return redirect('accounts:subadmin_dashboard')
                 else:
                     return redirect('accounts:teacher_dashboard')
             else:
                 messages.error(request, 'Invalid username or password')
 
         except OperationalError:
-            messages.error(
-                request,
-                'Please check your internet connection and try again.'
-            )
+            messages.error(request, 'Please check your internet connection and try again.')
         except Exception:
             messages.error(request, 'An unexpected error occurred. Please try again.')
-    
+
     return render(request, 'accounts/login.html')
+
 
 @login_required
 def logout_view(request):
@@ -94,79 +121,71 @@ def logout_view(request):
     messages.success(request, 'Logged out successfully')
     return redirect('home')
 
+
+# ============================================================================
+# SUPERADMIN DASHBOARD
+# ============================================================================
+
 @login_required
 @user_passes_test(is_admin)
 def admin_dashboard(request):
     from questionnaires.models import Questionnaire, Download
-    from django.db.models import Count
-    from django.db.models.functions import TruncDate
     import json
-    
-    # Basic stats
+
     total_teachers = TeacherProfile.objects.count()
     active_teachers = TeacherProfile.objects.filter(is_active=True).count()
     total_departments = Department.objects.count()
     total_subjects = Subject.objects.count()
-    
-    # Get department filter if provided
+    total_subadmins = SubAdminProfile.objects.filter(is_active=True).count()  # NEW
+
     selected_department = request.GET.get('department', 'all')
-    
-    # Filter questionnaires by department if selected
+
     questionnaires_qs = Questionnaire.objects.all()
     if selected_department != 'all':
         questionnaires_qs = questionnaires_qs.filter(department_id=selected_department)
-    
-    # Activity stats
+
     total_uploads = questionnaires_qs.count()
     total_downloads = Download.objects.filter(
         questionnaire__in=questionnaires_qs
     ).count() if selected_department != 'all' else Download.objects.count()
     total_questionnaires = questionnaires_qs.count()
-    
-    # Get all departments for dropdown
+
     departments = Department.objects.all().order_by('name')
-    
-    # Department statistics for table
+
     department_stats = []
-    max_downloads = 1  # For calculating popularity percentage
-    
+    max_downloads = 1
+
     for dept in departments:
         dept_questionnaires = Questionnaire.objects.filter(department=dept)
         upload_count = dept_questionnaires.count()
-        download_count = Download.objects.filter(
-            questionnaire__in=dept_questionnaires
-        ).count()
-        
+        download_count = Download.objects.filter(questionnaire__in=dept_questionnaires).count()
+
         if download_count > max_downloads:
             max_downloads = download_count
-        
+
         department_stats.append({
             'department_name': dept.name,
             'questionnaire_count': upload_count,
             'upload_count': upload_count,
             'download_count': download_count,
-            'popularity_percent': 0  # Will calculate after loop
+            'popularity_percent': 0
         })
-    
-    # Calculate popularity percentages
+
     for stat in department_stats:
         if max_downloads > 0:
             stat['popularity_percent'] = int((stat['download_count'] / max_downloads) * 100)
-    
-    # Sort by questionnaire count descending
+
     department_stats.sort(key=lambda x: x['questionnaire_count'], reverse=True)
-    
-    # Activity chart data (last 7 days)
+
     activity_chart_data = get_activity_chart_data(selected_department)
-    
-    # Department distribution chart data
     department_chart_data = get_department_chart_data()
-    
+
     context = {
         'total_teachers': total_teachers,
         'active_teachers': active_teachers,
         'total_departments': total_departments,
         'total_subjects': total_subjects,
+        'total_subadmins': total_subadmins,
         'total_uploads': total_uploads,
         'total_downloads': total_downloads,
         'total_questionnaires': total_questionnaires,
@@ -178,11 +197,16 @@ def admin_dashboard(request):
     }
     return render(request, 'admin_dashboard/dashboard.html', context)
 
+
+# ============================================================================
+# SUPERADMIN — TEACHER MANAGEMENT (unchanged, scoped to all departments)
+# ============================================================================
+
 @login_required
 @user_passes_test(is_admin)
 def manage_teachers(request):
     teachers = TeacherProfile.objects.select_related('user', 'department').all()
-    
+
     search_query = request.GET.get('search', '')
     if search_query:
         teachers = teachers.filter(
@@ -190,9 +214,10 @@ def manage_teachers(request):
             Q(user__last_name__icontains=search_query) |
             Q(employee_id__icontains=search_query)
         )
-    
+
     context = {'teachers': teachers, 'search_query': search_query}
     return render(request, 'admin_dashboard/manage_teachers.html', context)
+
 
 @login_required
 @user_passes_test(is_admin)
@@ -201,36 +226,23 @@ def add_teacher(request):
         form = TeacherCreationForm(request.POST)
         if form.is_valid():
             teacher = form.save()
-            logger.info(f"Teacher created: {teacher.user.get_full_name()}")
-            
-            # DIRECT ACTIVITY LOGGING - SIMPLE VERSION
-            try:
-                from .models import ActivityLog
-                logger.info(f"Before creating activity - ActivityLog model imported")
-                
-                activity = ActivityLog.objects.create(
-                    activity_type='teacher_created',
-                    user=request.user,
-                    description=f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) was created"
-                )
-                logger.info(f"Activity created: {activity.id} - {activity.description}")
-                logger.info(f"Total activities now: {ActivityLog.objects.count()}")
-                
-            except Exception as e:
-                logger.error(f"Error creating activity: {e}")
-            
+            ActivityLog.objects.create(
+                activity_type='teacher_created',
+                user=request.user,
+                description=f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) was created"
+            )
             messages.success(request, 'Teacher added successfully')
             return redirect('accounts:manage_teachers')
     else:
         form = TeacherCreationForm()
-    
     return render(request, 'admin_dashboard/add_teacher.html', {'form': form})
+
 
 @login_required
 @user_passes_test(is_admin)
 def edit_teacher(request, pk):
     teacher = get_object_or_404(TeacherProfile, pk=pk)
-    
+
     if request.method == 'POST':
         form = TeacherEditForm(request.POST, instance=teacher)
         if form.is_valid():
@@ -239,20 +251,16 @@ def edit_teacher(request, pk):
             teacher.user.last_name = form.cleaned_data['last_name']
             teacher.user.email = form.cleaned_data['email']
             teacher.user.save()
-            
-            # LOG ACTIVITY
-            from .models import ActivityLog
+
             ActivityLog.objects.create(
                 activity_type='teacher_updated',
                 user=request.user,
                 description=f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) profile was updated"
             )
-            
             messages.success(request, 'Teacher updated successfully')
             return redirect('accounts:manage_teachers')
     else:
         form = TeacherEditForm(instance=teacher)
-    
     return render(request, 'admin_dashboard/edit_teacher.html', {'form': form, 'teacher': teacher})
 
 
@@ -263,279 +271,514 @@ def delete_teacher(request, pk):
     if request.method == 'POST':
         teacher_name = f"{teacher.user.get_full_name()} ({teacher.employee_id})"
         user = teacher.user
-        
-        # LOG ACTIVITY BEFORE DELETING
-        from .models import ActivityLog
+
         ActivityLog.objects.create(
             activity_type='teacher_deleted',
             user=request.user,
             description=f"Teacher {teacher_name} was deleted from the system"
         )
-        
         teacher.delete()
         user.delete()
         messages.success(request, 'Teacher deleted successfully')
         return redirect('accounts:manage_teachers')
-    
     return render(request, 'admin_dashboard/delete_teacher.html', {'teacher': teacher})
+
+
+# ============================================================================
+# SUPERADMIN — DEPARTMENT MANAGEMENT
+# ============================================================================
 
 @login_required
 @user_passes_test(is_admin)
 def manage_departments(request):
-    departments = Department.objects.all()
-    
+    departments = Department.objects.all().order_by('name')
+
     if request.method == 'POST':
         form = DepartmentForm(request.POST)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Department added successfully')
+            department = form.save()
+            ActivityLog.objects.create(
+                activity_type='department_created',
+                user=request.user,
+                description=f"Department {department.name} ({department.code}) was created"
+            )
+            messages.success(request, f'Department "{department.name}" has been added successfully!')
             return redirect('accounts:manage_departments')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
     else:
         form = DepartmentForm()
-    
+
     context = {'departments': departments, 'form': form}
     return render(request, 'admin_dashboard/manage_departments.html', context)
+
+
+@login_required
+@user_passes_test(is_admin)
+def add_department(request):
+    if request.method == 'POST':
+        form = DepartmentForm(request.POST)
+        if form.is_valid():
+            department = form.save()
+            ActivityLog.objects.create(
+                activity_type='department_created',
+                user=request.user,
+                description=f"Department {department.name} ({department.code}) was created"
+            )
+            messages.success(request, f'Department "{department.name}" has been added successfully!')
+            return redirect('accounts:manage_departments')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+    else:
+        form = DepartmentForm()
+    return render(request, 'admin_dashboard/add_department.html', {'form': form})
+
 
 @login_required
 @user_passes_test(is_admin)
 def edit_department(request, pk):
     department = get_object_or_404(Department, pk=pk)
-    
+    old_name = department.name
+    old_code = department.code
+
     if request.method == 'POST':
         form = DepartmentForm(request.POST, instance=department)
         if form.is_valid():
-            department = form.save()
-            
-            # LOG ACTIVITY
-            from .models import ActivityLog
+            updated_department = form.save()
             ActivityLog.objects.create(
                 activity_type='department_updated',
                 user=request.user,
-                description=f"Department {department.name} ({department.code}) was updated"
+                description=f"Department {old_name} ({old_code}) was updated to {updated_department.name} ({updated_department.code})"
             )
-            
-            messages.success(request, 'Department updated successfully')
+            messages.success(request, f'Department "{updated_department.name}" has been updated successfully!')
             return redirect('accounts:manage_departments')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
     else:
         form = DepartmentForm(instance=department)
-    
+
     return render(request, 'admin_dashboard/edit_department.html', {'form': form, 'department': department})
+
 
 @login_required
 @user_passes_test(is_admin)
 def delete_department(request, pk):
     department = get_object_or_404(Department, pk=pk)
+
     if request.method == 'POST':
-        department_name = f"{department.name} ({department.code})"
-        
-        # LOG ACTIVITY BEFORE DELETING
-        from .models import ActivityLog
+        department_name = department.name
+        department_code = department.code
+
         ActivityLog.objects.create(
             activity_type='department_deleted',
             user=request.user,
-            description=f"Department {department_name} was deleted"
+            description=f"Department {department_name} ({department_code}) was deleted"
         )
-        
         department.delete()
-        messages.success(request, 'Department deleted successfully')
+        messages.success(request, f'Department "{department_name}" has been deleted successfully!')
         return redirect('accounts:manage_departments')
-    
+
     return render(request, 'admin_dashboard/delete_department.html', {'department': department})
 
-@login_required
-@user_passes_test(is_admin)
-def delete_subject(request, pk):
-    subject = get_object_or_404(Subject, pk=pk)
-    
-    print("=== DELETE SUBJECT START ===")
-    print(f"Subject to delete: {subject.name} ({subject.code})")
-    print(f"Request method: {request.method}")
-    print(f"User: {request.user}")
-    
-    if request.method == 'POST':
-        print("POST request confirmed - proceeding with deletion")
-        
-        subject_name = f"{subject.name} ({subject.code})"
-        
-        # LOG ACTIVITY BEFORE DELETING
-        try:
-            from .models import ActivityLog
-            print("1. ActivityLog model imported successfully")
-            
-            # Check current activity count
-            current_count = ActivityLog.objects.count()
-            print(f"2. Current ActivityLog count: {current_count}")
-            
-            # Create the activity
-            print("3. Creating activity...")
-            activity = ActivityLog.objects.create(
-                activity_type='subject_deleted',
-                user=request.user,
-                description=f"Subject {subject_name} was deleted"
-            )
-            print(f"4. Activity created successfully! ID: {activity.id}")
-            print(f"5. Activity description: {activity.description}")
-            
-            # Verify it was saved
-            new_count = ActivityLog.objects.count()
-            print(f"6. New ActivityLog count: {new_count}")
-            
-        except Exception as e:
-            print(f"ERROR creating activity: {str(e)}")
-            import traceback
-            traceback.print_exc()
-        
-        # Delete the subject
-        print("7. Deleting subject from database...")
-        subject.delete()
-        print("8. Subject deleted successfully")
-        
-        messages.success(request, 'Subject deleted successfully')
-        print("9. Redirecting to manage_subjects")
-        return redirect('accounts:manage_subjects')
-    
-    print("Rendering delete confirmation page")
-    return render(request, 'admin_dashboard/delete_subject.html', {'subject': subject})
+
+# ============================================================================
+# SUPERADMIN — SUBJECT MANAGEMENT
+# ============================================================================
 
 @login_required
 @user_passes_test(is_admin)
 def manage_subjects(request):
-    subjects = Subject.objects.prefetch_related('departments').all()
-    
+    subjects = Subject.objects.prefetch_related('departments').all().order_by('name')
+
     if request.method == 'POST':
         form = SubjectForm(request.POST)
         if form.is_valid():
             subject = form.save()
-            
-            print("=== SUBJECT CREATION DEBUG ===")
-            print(f"Subject created: {subject.name} ({subject.code})")
-            
-            # LOG ACTIVITY - DIRECT APPROACH
-            from .models import ActivityLog
-            try:
-                activity = ActivityLog.objects.create(
-                    activity_type='subject_created',
-                    user=request.user,
-                    description=f"Subject {subject.name} ({subject.code}) was created"
-                )
-                print(f"Activity logged: {activity.description}")
-            except Exception as e:
-                print(f"Error logging activity: {e}")
-            
-            messages.success(request, 'Subject added successfully')
+            ActivityLog.objects.create(
+                activity_type='subject_created',
+                user=request.user,
+                description=f"Subject {subject.name} ({subject.code}) was created"
+            )
+            messages.success(request, f'Subject "{subject.name}" ({subject.code}) has been added successfully!')
             return redirect('accounts:manage_subjects')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
     else:
         form = SubjectForm()
-    
+
     context = {'subjects': subjects, 'form': form}
     return render(request, 'admin_dashboard/manage_subjects.html', context)
+
+
+@login_required
+@user_passes_test(is_admin)
+def add_subject(request):
+    if request.method == 'POST':
+        form = SubjectForm(request.POST)
+        if form.is_valid():
+            subject = form.save()
+            ActivityLog.objects.create(
+                activity_type='subject_created',
+                user=request.user,
+                description=f"Subject {subject.name} ({subject.code}) was created"
+            )
+            messages.success(request, f'Subject "{subject.name}" ({subject.code}) has been added successfully!')
+            return redirect('accounts:manage_subjects')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+    else:
+        form = SubjectForm()
+    return render(request, 'admin_dashboard/add_subject.html', {'form': form})
+
 
 @login_required
 @user_passes_test(is_admin)
 def edit_subject(request, pk):
     subject = get_object_or_404(Subject, pk=pk)
-    
-    print("=== EDIT SUBJECT DEBUG ===")
-    print(f"Editing subject: {subject.name} ({subject.code})")
-    
+    old_name = subject.name
+    old_code = subject.code
+
     if request.method == 'POST':
         form = SubjectForm(request.POST, instance=subject)
         if form.is_valid():
-            subject = form.save()
-            
-            print("Subject updated successfully")
-            
-            # LOG ACTIVITY - DIRECT APPROACH
-            from .models import ActivityLog
-            try:
-                activity = ActivityLog.objects.create(
-                    activity_type='subject_updated',
-                    user=request.user,
-                    description=f"Subject {subject.name} ({subject.code}) was updated"
-                )
-                print(f"Activity logged: {activity.description}")
-            except Exception as e:
-                print(f"Error logging activity: {e}")
-            
-            messages.success(request, 'Subject updated successfully')
+            updated_subject = form.save()
+            ActivityLog.objects.create(
+                activity_type='subject_updated',
+                user=request.user,
+                description=f"Subject {old_name} ({old_code}) was updated to {updated_subject.name} ({updated_subject.code})"
+            )
+            messages.success(request, f'Subject "{updated_subject.name}" ({updated_subject.code}) has been updated successfully!')
             return redirect('accounts:manage_subjects')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
     else:
         form = SubjectForm(instance=subject)
-    
+
     return render(request, 'admin_dashboard/edit_subject.html', {'form': form, 'subject': subject})
+
 
 @login_required
 @user_passes_test(is_admin)
 def delete_subject(request, pk):
     subject = get_object_or_404(Subject, pk=pk)
-    
-    print("=== DELETE SUBJECT DEBUG ===")
-    print(f"Subject to delete: {subject.name} ({subject.code})")
-    
+
     if request.method == 'POST':
-        print("POST request received - processing deletion")
-        
-        subject_name = f"{subject.name} ({subject.code})"
-        
-        # LOG ACTIVITY - DIRECT APPROACH
-        from .models import ActivityLog
-        try:
-            activity = ActivityLog.objects.create(
-                activity_type='subject_deleted',
-                user=request.user,
-                description=f"Subject {subject_name} was deleted"
-            )
-            print(f"Activity logged: {activity.description}")
-        except Exception as e:
-            print(f"Error logging activity: {e}")
-        
+        subject_name = subject.name
+        subject_code = subject.code
+
+        ActivityLog.objects.create(
+            activity_type='subject_deleted',
+            user=request.user,
+            description=f"Subject {subject_name} ({subject_code}) was deleted"
+        )
         subject.delete()
-        print("Subject deleted from database")
-        
-        messages.success(request, 'Subject deleted successfully')
+        messages.success(request, f'Subject "{subject_name}" ({subject_code}) has been deleted successfully!')
         return redirect('accounts:manage_subjects')
-    
+
     return render(request, 'admin_dashboard/delete_subject.html', {'subject': subject})
+
+
+# ============================================================================
+# SUPERADMIN — SUB-ADMIN MANAGEMENT  (NEW)
+# ============================================================================
+
+@login_required
+@user_passes_test(is_admin)
+def manage_subadmins(request):
+    """List all sub-admins across all departments."""
+    subadmins = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
+
+    context = {'subadmins': subadmins}
+    return render(request, 'admin_dashboard/manage_subadmins.html', context)
+
+
+@login_required
+@user_passes_test(is_admin)
+def add_subadmin(request):
+    """Superadmin creates a new sub-admin and assigns them to a department."""
+    if request.method == 'POST':
+        form = SubAdminCreationForm(request.POST)
+        if form.is_valid():
+            subadmin = form.save(assigned_by=request.user)
+            ActivityLog.objects.create(
+                activity_type='subadmin_created',
+                user=request.user,
+                description=(
+                    f"Sub-Admin {subadmin.user.get_full_name()} was created "
+                    f"and assigned to {subadmin.department.name}"
+                )
+            )
+            messages.success(
+                request,
+                f'Sub-Admin "{subadmin.user.get_full_name()}" has been created and assigned to {subadmin.department.name}.'
+            )
+            return redirect('accounts:manage_subadmins')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+    else:
+        form = SubAdminCreationForm()
+
+    return render(request, 'admin_dashboard/add_subadmin.html', {'form': form})
+
+
+@login_required
+@user_passes_test(is_admin)
+def edit_subadmin(request, pk):
+    """Superadmin edits a sub-admin's details or re-assigns their department."""
+    subadmin = get_object_or_404(SubAdminProfile, pk=pk)
+    old_dept = subadmin.department.name if subadmin.department else "None"
+
+    if request.method == 'POST':
+        form = SubAdminEditForm(request.POST, instance=subadmin)
+        if form.is_valid():
+            updated = form.save()
+            new_dept = updated.department.name if updated.department else "None"
+            ActivityLog.objects.create(
+                activity_type='subadmin_updated',
+                user=request.user,
+                description=(
+                    f"Sub-Admin {updated.user.get_full_name()} was updated. "
+                    f"Department: {old_dept} → {new_dept}"
+                )
+            )
+            messages.success(request, f'Sub-Admin "{updated.user.get_full_name()}" has been updated.')
+            return redirect('accounts:manage_subadmins')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+    else:
+        form = SubAdminEditForm(instance=subadmin)
+
+    return render(request, 'admin_dashboard/edit_subadmin.html', {'form': form, 'subadmin': subadmin})
+
+
+@login_required
+@user_passes_test(is_admin)
+def delete_subadmin(request, pk):
+    """Superadmin removes a sub-admin (deletes profile + user account)."""
+    subadmin = get_object_or_404(SubAdminProfile, pk=pk)
+
+    if request.method == 'POST':
+        name = subadmin.user.get_full_name()
+        dept_name = subadmin.department.name if subadmin.department else "N/A"
+        user = subadmin.user
+
+        ActivityLog.objects.create(
+            activity_type='subadmin_deleted',
+            user=request.user,
+            description=f"Sub-Admin {name} (Department: {dept_name}) was removed"
+        )
+        subadmin.delete()
+        user.delete()
+        messages.success(request, f'Sub-Admin "{name}" has been removed.')
+        return redirect('accounts:manage_subadmins')
+
+    return render(request, 'admin_dashboard/delete_subadmin.html', {'subadmin': subadmin})
+
+
+# ============================================================================
+# SUB-ADMIN DASHBOARD  (NEW)
+# ============================================================================
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_dashboard(request):
+    """
+    Sub-admin's home page. Shows only their department's data.
+    """
+    subadmin = request.user.subadmin_profile
+    department = subadmin.department
+
+    # Teachers in this department only
+    total_teachers = TeacherProfile.objects.filter(department=department).count()
+    active_teachers = TeacherProfile.objects.filter(department=department, is_active=True).count()
+
+    # Recent activities — only teacher actions performed by this sub-admin
+    recent_activities = ActivityLog.objects.filter(
+        user=request.user
+    ).exclude(
+        activity_type='user_login'
+    ).order_by('-created_at')[:15]
+
+    context = {
+        'subadmin': subadmin,
+        'department': department,
+        'total_teachers': total_teachers,
+        'active_teachers': active_teachers,
+        'recent_activities': recent_activities,
+    }
+    return render(request, 'subadmin_dashboard/dashboard.html', context)
+
+
+# ============================================================================
+# SUB-ADMIN — TEACHER MANAGEMENT  (NEW)
+# All views are scoped to the sub-admin's department only.
+# ============================================================================
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_manage_teachers(request):
+    """List teachers in the sub-admin's department only."""
+    department = request.user.subadmin_profile.department
+
+    teachers = TeacherProfile.objects.select_related('user', 'department').filter(
+        department=department
+    )
+
+    search_query = request.GET.get('search', '')
+    if search_query:
+        teachers = teachers.filter(
+            Q(user__first_name__icontains=search_query) |
+            Q(user__last_name__icontains=search_query) |
+            Q(employee_id__icontains=search_query)
+        )
+
+    context = {
+        'teachers': teachers,
+        'search_query': search_query,
+        'department': department,
+    }
+    return render(request, 'subadmin_dashboard/manage_teachers.html', context)
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_add_teacher(request):
+    """Sub-admin adds a teacher — department is automatically their own."""
+    department = request.user.subadmin_profile.department
+
+    if request.method == 'POST':
+        form = SubAdminTeacherCreationForm(request.POST, department=department)
+        if form.is_valid():
+            teacher = form.save()
+            ActivityLog.objects.create(
+                activity_type='teacher_created',
+                user=request.user,
+                description=(
+                    f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) "
+                    f"was added to {department.name} by Sub-Admin {request.user.get_full_name()}"
+                )
+            )
+            messages.success(request, 'Teacher added successfully.')
+            return redirect('accounts:subadmin_manage_teachers')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+    else:
+        form = SubAdminTeacherCreationForm(department=department)
+
+    context = {
+        'form': form,
+        'department': department,
+    }
+    return render(request, 'subadmin_dashboard/add_teacher.html', context)
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_edit_teacher(request, pk):
+    """Sub-admin edits a teacher — only if the teacher belongs to their department."""
+    department = request.user.subadmin_profile.department
+
+    # 404 if the teacher doesn't belong to this sub-admin's department
+    teacher = get_object_or_404(TeacherProfile, pk=pk, department=department)
+
+    if request.method == 'POST':
+        form = SubAdminTeacherEditForm(request.POST, instance=teacher)
+        if form.is_valid():
+            teacher = form.save()
+            teacher.user.first_name = form.cleaned_data['first_name']
+            teacher.user.last_name = form.cleaned_data['last_name']
+            teacher.user.email = form.cleaned_data['email']
+            teacher.user.save()
+
+            ActivityLog.objects.create(
+                activity_type='teacher_updated',
+                user=request.user,
+                description=(
+                    f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) "
+                    f"was updated by Sub-Admin {request.user.get_full_name()}"
+                )
+            )
+            messages.success(request, 'Teacher updated successfully.')
+            return redirect('accounts:subadmin_manage_teachers')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+    else:
+        form = SubAdminTeacherEditForm(instance=teacher)
+
+    context = {
+        'form': form,
+        'teacher': teacher,
+        'department': department,
+    }
+    return render(request, 'subadmin_dashboard/edit_teacher.html', context)
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_delete_teacher(request, pk):
+    """Sub-admin deletes a teacher — only if the teacher belongs to their department."""
+    department = request.user.subadmin_profile.department
+
+    # 404 if the teacher doesn't belong to this sub-admin's department
+    teacher = get_object_or_404(TeacherProfile, pk=pk, department=department)
+
+    if request.method == 'POST':
+        teacher_name = f"{teacher.user.get_full_name()} ({teacher.employee_id})"
+        user = teacher.user
+
+        ActivityLog.objects.create(
+            activity_type='teacher_deleted',
+            user=request.user,
+            description=(
+                f"Teacher {teacher_name} was removed from {department.name} "
+                f"by Sub-Admin {request.user.get_full_name()}"
+            )
+        )
+        teacher.delete()
+        user.delete()
+        messages.success(request, 'Teacher deleted successfully.')
+        return redirect('accounts:subadmin_manage_teachers')
+
+    context = {
+        'teacher': teacher,
+        'department': department,
+    }
+    return render(request, 'subadmin_dashboard/delete_teacher.html', context)
+
+
+# ============================================================================
+# TEACHER DASHBOARD
+# ============================================================================
 
 @login_required
 def teacher_dashboard(request):
     if request.user.is_staff:
         return redirect('accounts:admin_dashboard')
-    
+    if hasattr(request.user, 'subadmin_profile'):
+        return redirect('accounts:subadmin_dashboard')
+
     teacher = get_object_or_404(TeacherProfile, user=request.user)
-    
-    # Import here to avoid circular imports
+
     from questionnaires.models import Questionnaire, Download
-    
-    # Basic stats
+
     my_uploads = teacher.questionnaires.count()
-    
-    # Calculate total downloads of teacher's questionnaires
-    total_downloads = Download.objects.filter(
-        questionnaire__uploader=teacher
-    ).count()
-    
-    # Calculate uploads this month
+    total_downloads = Download.objects.filter(questionnaire__uploader=teacher).count()
+
     current_month = timezone.now().month
     current_year = timezone.now().year
     uploads_this_month = teacher.questionnaires.filter(
         uploaded_at__month=current_month,
         uploaded_at__year=current_year
     ).count()
-    
-    # Get upload statistics for last 6 months
+
     upload_stats = get_teacher_upload_stats(teacher)
-    
-    # Get top 3 most downloaded questionnaires
+
     top_downloads = Questionnaire.objects.filter(
         uploader=teacher
-    ).annotate(
-        download_count=Count('downloads')
-    ).order_by('-download_count')[:3]
-    
-    # Get recent activities (last 15)
+    ).annotate(download_count=Count('downloads')).order_by('-download_count')[:3]
+
     recent_activities = get_teacher_recent_activities(teacher)[:15]
-    
+
     context = {
         'teacher': teacher,
         'my_uploads': my_uploads,
@@ -550,38 +793,26 @@ def teacher_dashboard(request):
 
 def get_teacher_upload_stats(teacher):
     from questionnaires.models import Questionnaire
-    from django.utils import timezone
-    from dateutil.relativedelta import relativedelta  # more precise than timedelta
+    from dateutil.relativedelta import relativedelta
 
     stats = []
     today = timezone.now()
 
-    for i in range(5, -1, -1):  # oldest to newest
-        # Use relativedelta for accurate month subtraction
+    for i in range(5, -1, -1):
         month_date = today - relativedelta(months=i)
-        month = month_date.month
-        year = month_date.year
-
         count = Questionnaire.objects.filter(
             uploader=teacher,
-            uploaded_at__month=month,
-            uploaded_at__year=year
+            uploaded_at__month=month_date.month,
+            uploaded_at__year=month_date.year
         ).count()
+        stats.append({'label': month_date.strftime('%b'), 'count': count, 'percentage': 0})
 
-        stats.append({
-            'label': month_date.strftime('%b'),
-            'count': count,
-            'percentage': 0  # placeholder
-        })
-
-    # Calculate percentages
     max_count = max(s['count'] for s in stats) if stats else 0
-
     for stat in stats:
         if max_count == 0:
-            stat['percentage'] = 10  # flat baseline so bars are visible
+            stat['percentage'] = 10
         elif stat['count'] == 0:
-            stat['percentage'] = 5   # small nub to show the bar exists
+            stat['percentage'] = 5
         else:
             stat['percentage'] = max(10, int((stat['count'] / max_count) * 100))
 
@@ -589,424 +820,104 @@ def get_teacher_upload_stats(teacher):
 
 
 def get_teacher_recent_activities(teacher):
-    """
-    Get recent activities related to the teacher
-    Returns a list of activity dictionaries
-    """
     from questionnaires.models import Questionnaire, Download
-    
+
     activities = []
-    
-    # Get teacher's recent uploads (last 5)
-    recent_uploads = Questionnaire.objects.filter(
-        uploader=teacher
-    ).order_by('-uploaded_at')[:5]
-    
+
+    recent_uploads = Questionnaire.objects.filter(uploader=teacher).order_by('-uploaded_at')[:5]
     for quest in recent_uploads:
-        activities.append({
-            'type': 'upload',
-            'message': f'You uploaded "{quest.title}"',
-            'timestamp': quest.uploaded_at,
-        })
-    
-    # Get recent downloads of teacher's questionnaires (last 5)
+        activities.append({'type': 'upload', 'message': f'You uploaded "{quest.title}"', 'timestamp': quest.uploaded_at})
+
     recent_downloads = Download.objects.filter(
         questionnaire__uploader=teacher
     ).select_related('user', 'questionnaire').order_by('-downloaded_at')[:5]
-    
+
     for download in recent_downloads:
-        # Handle case where user might be None or teacher themselves
-        if download.user:
-            if download.user == teacher.user:
-                downloader_name = "You"
-            else:
-                downloader_name = download.user.get_full_name()
-        else:
-            downloader_name = "Someone"
-        
-        # Only show if it's not the teacher downloading their own file
-        if download.user != teacher.user:
+        if download.user and download.user != teacher.user:
+            downloader_name = download.user.get_full_name()
             activities.append({
                 'type': 'download',
                 'message': f'{downloader_name} downloaded your "{download.questionnaire.title}"',
                 'timestamp': download.downloaded_at,
             })
-    
-    # Get system activity logs related to the teacher (exclude login activities)
+
     activity_logs = ActivityLog.objects.filter(
         user=teacher.user
-    ).exclude(
-        activity_type='user_login'  # Exclude login activities from feed
-    ).order_by('-created_at')[:5]
-    
+    ).exclude(activity_type='user_login').order_by('-created_at')[:5]
+
     for log in activity_logs:
-        activities.append({
-            'type': 'system',
-            'message': log.description,
-            'timestamp': log.created_at,
-        })
-    
-    # Sort all activities by timestamp (most recent first)
+        activities.append({'type': 'system', 'message': log.description, 'timestamp': log.created_at})
+
     activities.sort(key=lambda x: x['timestamp'], reverse=True)
-    
     return activities
 
-@login_required
-@user_passes_test(is_admin)
-def test_activity(request):
-    """Test view to manually create an activity"""
-    from .models import ActivityLog
-    
-    print("=== TEST ACTIVITY START ===")
-    
-    # Create a test activity
-    activity = ActivityLog.objects.create(
-        activity_type='system',
-        user=request.user,
-        description='Test activity created manually'
-    )
-    
-    print(f"Test activity created: {activity.id}")
-    print(f"Total activities now: {ActivityLog.objects.count()}")
-    
-    # Redirect to dashboard to see if it appears
-    return redirect('accounts:admin_dashboard')
 
+# ============================================================================
+# NOTIFICATIONS
+# ============================================================================
 
 @login_required
 @require_POST
 def mark_all_notifications_read(request):
-    """Mark all unread notifications as read for the current user"""
     try:
         if request.user.is_staff:
-            # Admin: Mark ALL activities as read
-            updated_count = ActivityLog.objects.filter(
-                is_read=False
-            ).update(is_read=True)
+            updated_count = ActivityLog.objects.filter(is_read=False).update(is_read=True)
         else:
-            # Teacher: Mark only their activities as read
             updated_count = ActivityLog.objects.filter(
-                user=request.user,
-                is_read=False
+                user=request.user, is_read=False
             ).update(is_read=True)
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'{updated_count} notifications marked as read'
-        })
+
+        return JsonResponse({'success': True, 'message': f'{updated_count} notifications marked as read'})
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
-        
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# ============================================================================
+# CHART HELPERS
+# ============================================================================
+
 def get_activity_chart_data(department_filter='all'):
-    """Get upload/download activity data for the chart"""
     from questionnaires.models import Questionnaire, Download
-    from django.db.models.functions import TruncDate
-    
-    # Get data for last 7 days
+
     today = timezone.now().date()
     date_range = [today - timedelta(days=i) for i in range(6, -1, -1)]
-    
     labels = [d.strftime('%b %d') for d in date_range]
     uploads = []
     downloads = []
-    
+
     for date in date_range:
-        # Count uploads for this date
-        upload_qs = Questionnaire.objects.filter(
-            uploaded_at__date=date
-        )
+        upload_qs = Questionnaire.objects.filter(uploaded_at__date=date)
         if department_filter != 'all':
             upload_qs = upload_qs.filter(department_id=department_filter)
-        
-        upload_count = upload_qs.count()
-        uploads.append(upload_count)
-        
-        # Count downloads for this date
-        download_qs = Download.objects.filter(
-            downloaded_at__date=date
-        )
+        uploads.append(upload_qs.count())
+
+        download_qs = Download.objects.filter(downloaded_at__date=date)
         if department_filter != 'all':
-            download_qs = download_qs.filter(
-                questionnaire__department_id=department_filter
-            )
-        
-        download_count = download_qs.count()
-        downloads.append(download_count)
-    
-    return {
-        'labels': labels,
-        'uploads': uploads,
-        'downloads': downloads
-    }
+            download_qs = download_qs.filter(questionnaire__department_id=department_filter)
+        downloads.append(download_qs.count())
+
+    return {'labels': labels, 'uploads': uploads, 'downloads': downloads}
 
 
 def get_department_chart_data():
-    """Get questionnaire distribution by department for pie chart"""
     from questionnaires.models import Questionnaire
-    from django.db.models import Count
-    
+
     departments = Department.objects.annotate(
         questionnaire_count=Count('questionnaires')
     ).filter(questionnaire_count__gt=0).order_by('-questionnaire_count')
-    
-    labels = [dept.name for dept in departments]
-    values = [dept.questionnaire_count for dept in departments]
-    
+
     return {
-        'labels': labels,
-        'values': values
+        'labels': [dept.name for dept in departments],
+        'values': [dept.questionnaire_count for dept in departments],
     }
-# ============================================================================
-# CLEANED UP DEPARTMENT AND SUBJECT VIEWS WITH ACTIVITY LOGGING
-# Replace the duplicate department/subject functions in your views.py with these
-# ============================================================================
-
-# ============================================================================
-# DEPARTMENT VIEWS (Remove all duplicate department functions and use these)
-# ============================================================================
-
-@login_required
-@user_passes_test(is_admin)
-def add_department(request):
-    """View to add a new department (separate page)"""
-    if request.method == 'POST':
-        form = DepartmentForm(request.POST)
-        if form.is_valid():
-            department = form.save()
-            
-            # LOG ACTIVITY
-            ActivityLog.objects.create(
-                activity_type='department_created',
-                user=request.user,
-                description=f"Department {department.name} ({department.code}) was created"
-            )
-            
-            messages.success(request, f'Department "{department.name}" has been added successfully!')
-            return redirect('accounts:manage_departments')
-        else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = DepartmentForm()
-    
-    context = {'form': form}
-    return render(request, 'admin_dashboard/add_department.html', context)
 
 
 @login_required
 @user_passes_test(is_admin)
-def manage_departments(request):
-    """View to list all departments"""
-    departments = Department.objects.all().order_by('name')
-    
-    if request.method == 'POST':
-        form = DepartmentForm(request.POST)
-        if form.is_valid():
-            department = form.save()
-            
-            # LOG ACTIVITY
-            ActivityLog.objects.create(
-                activity_type='department_created',
-                user=request.user,
-                description=f"Department {department.name} ({department.code}) was created"
-            )
-            
-            messages.success(request, f'Department "{department.name}" has been added successfully!')
-            return redirect('accounts:manage_departments')
-        else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = DepartmentForm()
-    
-    context = {
-        'departments': departments,
-        'form': form
-    }
-    return render(request, 'admin_dashboard/manage_departments.html', context)
-
-
-@login_required
-@user_passes_test(is_admin)
-def edit_department(request, pk):
-    """View to edit a department"""
-    department = get_object_or_404(Department, pk=pk)
-    old_name = department.name
-    old_code = department.code
-    
-    if request.method == 'POST':
-        form = DepartmentForm(request.POST, instance=department)
-        if form.is_valid():
-            updated_department = form.save()
-            
-            # LOG ACTIVITY
-            ActivityLog.objects.create(
-                activity_type='department_updated',
-                user=request.user,
-                description=f"Department {old_name} ({old_code}) was updated to {updated_department.name} ({updated_department.code})"
-            )
-            
-            messages.success(request, f'Department "{updated_department.name}" has been updated successfully!')
-            return redirect('accounts:manage_departments')
-        else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = DepartmentForm(instance=department)
-    
-    context = {
-        'form': form,
-        'department': department
-    }
-    return render(request, 'admin_dashboard/edit_department.html', context)
-
-
-@login_required
-@user_passes_test(is_admin)
-def delete_department(request, pk):
-    """View to delete a department"""
-    department = get_object_or_404(Department, pk=pk)
-    
-    if request.method == 'POST':
-        department_name = department.name
-        department_code = department.code
-        
-        # LOG ACTIVITY BEFORE DELETING
-        ActivityLog.objects.create(
-            activity_type='department_deleted',
-            user=request.user,
-            description=f"Department {department_name} ({department_code}) was deleted"
-        )
-        
-        department.delete()
-        messages.success(request, f'Department "{department_name}" has been deleted successfully!')
-        return redirect('accounts:manage_departments')
-    
-    context = {
-        'department': department
-    }
-    return render(request, 'admin_dashboard/delete_department.html', context)
-
-
-# ============================================================================
-# SUBJECT VIEWS (Remove all duplicate subject functions and use these)
-# ============================================================================
-
-@login_required
-@user_passes_test(is_admin)
-def add_subject(request):
-    """View to add a new subject (separate page)"""
-    if request.method == 'POST':
-        form = SubjectForm(request.POST)
-        if form.is_valid():
-            subject = form.save()
-            
-            # LOG ACTIVITY
-            ActivityLog.objects.create(
-                activity_type='subject_created',
-                user=request.user,
-                description=f"Subject {subject.name} ({subject.code}) was created"
-            )
-            
-            messages.success(request, f'Subject "{subject.name}" ({subject.code}) has been added successfully!')
-            return redirect('accounts:manage_subjects')
-        else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = SubjectForm()
-    
-    context = {'form': form}
-    return render(request, 'admin_dashboard/add_subject.html', context)
-
-
-@login_required
-@user_passes_test(is_admin)
-def manage_subjects(request):
-    """View to list all subjects"""
-    subjects = Subject.objects.prefetch_related('departments').all().order_by('name')
-    
-    if request.method == 'POST':
-        form = SubjectForm(request.POST)
-        if form.is_valid():
-            subject = form.save()
-            
-            # LOG ACTIVITY
-            ActivityLog.objects.create(
-                activity_type='subject_created',
-                user=request.user,
-                description=f"Subject {subject.name} ({subject.code}) was created"
-            )
-            
-            messages.success(request, f'Subject "{subject.name}" ({subject.code}) has been added successfully!')
-            return redirect('accounts:manage_subjects')
-        else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = SubjectForm()
-    
-    context = {
-        'subjects': subjects,
-        'form': form
-    }
-    return render(request, 'admin_dashboard/manage_subjects.html', context)
-
-
-@login_required
-@user_passes_test(is_admin)
-def edit_subject(request, pk):
-    """View to edit a subject"""
-    subject = get_object_or_404(Subject, pk=pk)
-    old_name = subject.name
-    old_code = subject.code
-    
-    if request.method == 'POST':
-        form = SubjectForm(request.POST, instance=subject)
-        if form.is_valid():
-            updated_subject = form.save()
-            
-            # LOG ACTIVITY
-            ActivityLog.objects.create(
-                activity_type='subject_updated',
-                user=request.user,
-                description=f"Subject {old_name} ({old_code}) was updated to {updated_subject.name} ({updated_subject.code})"
-            )
-            
-            messages.success(request, f'Subject "{updated_subject.name}" ({updated_subject.code}) has been updated successfully!')
-            return redirect('accounts:manage_subjects')
-        else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = SubjectForm(instance=subject)
-    
-    context = {
-        'form': form,
-        'subject': subject
-    }
-    return render(request, 'admin_dashboard/edit_subject.html', context)
-
-
-@login_required
-@user_passes_test(is_admin)
-def delete_subject(request, pk):
-    """View to delete a subject"""
-    subject = get_object_or_404(Subject, pk=pk)
-    
-    if request.method == 'POST':
-        subject_name = subject.name
-        subject_code = subject.code
-        
-        # LOG ACTIVITY BEFORE DELETING
-        ActivityLog.objects.create(
-            activity_type='subject_deleted',
-            user=request.user,
-            description=f"Subject {subject_name} ({subject_code}) was deleted"
-        )
-        
-        subject.delete()
-        messages.success(request, f'Subject "{subject_name}" ({subject_code}) has been deleted successfully!')
-        return redirect('accounts:manage_subjects')
-    
-    context = {
-        'subject': subject
-    }
-    return render(request, 'admin_dashboard/delete_subject.html', context)
+def test_activity(request):
+    ActivityLog.objects.create(
+        activity_type='system',
+        user=request.user,
+        description='Test activity created manually'
+    )
+    return redirect('accounts:admin_dashboard')

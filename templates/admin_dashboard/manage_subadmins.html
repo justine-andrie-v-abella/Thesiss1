@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Sub-Admins - Test Banking System{% endblock %}
+
+{% block header_title %}Manage Sub-Admins{% endblock %}
+{% block header_subtitle %}Assign and manage department sub-administrators{% endblock %}
+
+{% block content %}
+<!-- Header Actions -->
+<div class="flex items-center justify-between mb-6">
+    <div class="flex items-center space-x-3">
+        <div class="w-12 h-12 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-xl flex items-center justify-center">
+            <i class="bi bi-person-gear text-white text-2xl"></i>
+        </div>
+        <div>
+            <h3 class="text-xl font-bold text-gray-800">Sub-Admin Accounts</h3>
+            <p class="text-sm text-gray-500">{{ subadmins.count }} sub-admin{{ subadmins.count|pluralize }} registered</p>
+        </div>
+    </div>
+    <a href="{% url 'accounts:add_subadmin' %}"
+       class="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-5 py-3 rounded-xl hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg font-medium">
+        <i class="bi bi-person-plus text-lg"></i>
+        <span>Add Sub-Admin</span>
+    </a>
+</div>
+
+<!-- Sub-Admins Table -->
+<div class="bg-white rounded-xl shadow-lg overflow-hidden">
+    <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+        <h4 class="text-lg font-bold text-gray-800 flex items-center">
+            <i class="bi bi-table text-indigo-500 mr-2"></i>
+            All Sub-Admins
+        </h4>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Sub-Admin</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Department</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Username</th>
+                    <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Assigned By</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Date Assigned</th>
+                    <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for subadmin in subadmins %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <!-- Name + Email -->
+                    <td class="px-6 py-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                {{ subadmin.user.first_name.0|upper }}{{ subadmin.user.last_name.0|upper }}
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-800">{{ subadmin.user.get_full_name }}</p>
+                                <p class="text-xs text-gray-500">{{ subadmin.user.email }}</p>
+                            </div>
+                        </div>
+                    </td>
+
+                    <!-- Department -->
+                    <td class="px-6 py-4">
+                        {% if subadmin.department %}
+                        <div class="flex items-center space-x-2">
+                            <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i class="bi bi-building text-blue-600 text-sm"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-800 text-sm">{{ subadmin.department.name }}</p>
+                                <p class="text-xs text-gray-500">{{ subadmin.department.code }}</p>
+                            </div>
+                        </div>
+                        {% else %}
+                        <span class="text-gray-400 text-sm italic">Unassigned</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Username -->
+                    <td class="px-6 py-4">
+                        <span class="font-mono text-sm text-gray-700 bg-gray-100 px-2 py-1 rounded">{{ subadmin.user.username }}</span>
+                    </td>
+
+                    <!-- Status -->
+                    <td class="px-6 py-4 text-center">
+                        {% if subadmin.is_active %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>Active
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                            <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>Inactive
+                        </span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Assigned By -->
+                    <td class="px-6 py-4">
+                        <span class="text-sm text-gray-700">
+                            {{ subadmin.assigned_by.get_full_name|default:"—" }}
+                        </span>
+                    </td>
+
+                    <!-- Date -->
+                    <td class="px-6 py-4">
+                        <span class="text-sm text-gray-500">{{ subadmin.created_at|date:"M d, Y" }}</span>
+                    </td>
+
+                    <!-- Actions -->
+                    <td class="px-6 py-4">
+                        <div class="flex items-center justify-center space-x-2">
+                            <a href="{% url 'accounts:edit_subadmin' subadmin.pk %}"
+                               class="flex items-center space-x-1 bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
+                                <i class="bi bi-pencil"></i>
+                                <span>Edit</span>
+                            </a>
+                            <a href="{% url 'accounts:delete_subadmin' subadmin.pk %}"
+                               class="flex items-center space-x-1 bg-red-100 text-red-700 hover:bg-red-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
+                                <i class="bi bi-trash"></i>
+                                <span>Remove</span>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="px-6 py-16 text-center">
+                        <div class="flex flex-col items-center">
+                            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
+                                <i class="bi bi-person-gear text-4xl text-indigo-400"></i>
+                            </div>
+                            <h4 class="text-lg font-semibold text-gray-700 mb-2">No Sub-Admins Yet</h4>
+                            <p class="text-sm text-gray-500 mb-6">Create a sub-admin and assign them to a department.</p>
+                            <a href="{% url 'accounts:add_subadmin' %}"
+                               class="flex items-center space-x-2 bg-indigo-500 text-white px-5 py-3 rounded-xl hover:bg-indigo-600 transition-colors font-medium">
+                                <i class="bi bi-person-plus"></i>
+                                <span>Add First Sub-Admin</span>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

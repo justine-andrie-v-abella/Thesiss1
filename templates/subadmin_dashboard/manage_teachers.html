@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Teachers - {{ department.name }}{% endblock %}
+
+{% block header_title %}Manage Teachers{% endblock %}
+{% block header_subtitle %}{{ department.name }} ({{ department.code }}) — Teachers under your department{% endblock %}
+
+{% block content %}
+<!-- Header Actions -->
+<div class="flex items-center justify-between mb-6">
+    <div class="flex items-center space-x-3">
+        <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center">
+            <i class="bi bi-people text-white text-2xl"></i>
+        </div>
+        <div>
+            <h3 class="text-xl font-bold text-gray-800">{{ department.name }} Teachers</h3>
+            <p class="text-sm text-gray-500">{{ teachers.count }} teacher{{ teachers.count|pluralize }} in this department</p>
+        </div>
+    </div>
+    <a href="{% url 'accounts:subadmin_add_teacher' %}"
+       class="flex items-center space-x-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-5 py-3 rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-md font-medium">
+        <i class="bi bi-person-plus text-lg"></i>
+        <span>Add Teacher</span>
+    </a>
+</div>
+
+<!-- Search -->
+<form method="get" class="mb-6">
+    <div class="flex items-center bg-white rounded-xl shadow-md overflow-hidden border-2 border-transparent focus-within:border-green-400 transition-colors">
+        <div class="pl-4 text-gray-400">
+            <i class="bi bi-search text-lg"></i>
+        </div>
+        <input type="text" name="search" value="{{ search_query }}"
+               placeholder="Search by name or employee ID..."
+               class="flex-1 px-4 py-4 focus:outline-none text-gray-700">
+        {% if search_query %}
+        <a href="{% url 'accounts:subadmin_manage_teachers' %}"
+           class="px-4 text-gray-400 hover:text-gray-600 transition-colors">
+            <i class="bi bi-x-lg"></i>
+        </a>
+        {% endif %}
+        <button type="submit"
+                class="bg-green-500 hover:bg-green-600 text-white px-6 py-4 font-medium transition-colors">
+            Search
+        </button>
+    </div>
+</form>
+
+<!-- Teachers Table -->
+<div class="bg-white rounded-xl shadow-lg overflow-hidden">
+    <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+        <h4 class="text-lg font-bold text-gray-800 flex items-center">
+            <i class="bi bi-table text-green-500 mr-2"></i>
+            Teachers — {{ department.code }}
+            {% if search_query %}
+            <span class="ml-3 text-sm font-normal text-gray-500">Results for "{{ search_query }}"</span>
+            {% endif %}
+        </h4>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Teacher</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Employee ID</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Phone</th>
+                    <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for teacher in teachers %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                {{ teacher.user.first_name.0|upper }}{{ teacher.user.last_name.0|upper }}
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-800">{{ teacher.user.get_full_name }}</p>
+                                <p class="text-xs text-gray-500">@{{ teacher.user.username }}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="font-mono text-sm text-gray-700 bg-gray-100 px-2 py-1 rounded">{{ teacher.employee_id }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-sm text-gray-700">{{ teacher.user.email }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-sm text-gray-600">{{ teacher.phone|default:"—" }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        {% if teacher.is_active %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>Active
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                            <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>Inactive
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center justify-center space-x-2">
+                            <a href="{% url 'accounts:subadmin_edit_teacher' teacher.pk %}"
+                               class="flex items-center space-x-1 bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
+                                <i class="bi bi-pencil"></i>
+                                <span>Edit</span>
+                            </a>
+                            <a href="{% url 'accounts:subadmin_delete_teacher' teacher.pk %}"
+                               class="flex items-center space-x-1 bg-red-100 text-red-700 hover:bg-red-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
+                                <i class="bi bi-trash"></i>
+                                <span>Delete</span>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-6 py-16 text-center">
+                        <div class="flex flex-col items-center">
+                            <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                                <i class="bi bi-people text-4xl text-green-400"></i>
+                            </div>
+                            <h4 class="text-lg font-semibold text-gray-700 mb-2">
+                                {% if search_query %}No results for "{{ search_query }}"{% else %}No Teachers Yet{% endif %}
+                            </h4>
+                            <p class="text-sm text-gray-500 mb-6">
+                                {% if search_query %}Try a different search term.{% else %}Add the first teacher to {{ department.name }}.{% endif %}
+                            </p>
+                            {% if not search_query %}
+                            <a href="{% url 'accounts:subadmin_add_teacher' %}"
+                               class="flex items-center space-x-2 bg-green-500 text-white px-5 py-3 rounded-xl hover:bg-green-600 transition-colors font-medium">
+                                <i class="bi bi-person-plus"></i>
+                                <span>Add First Teacher</span>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

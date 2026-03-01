@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+
+{% block title %}Sub-Admin Dashboard - Test Banking System{% endblock %}
+
+{% block header_title %}Welcome, {{ request.user.get_full_name }}!{% endblock %}
+{% block header_subtitle %}{{ department.name }} — Sub-Admin Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats Overview -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <!-- Department Card -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                    <i class="bi bi-building text-white text-2xl"></i>
+                </div>
+                <span class="text-xs font-semibold text-blue-600 bg-blue-100 px-3 py-1 rounded-full">DEPT</span>
+            </div>
+            <div class="text-2xl font-bold text-gray-800 mb-1">{{ department.code }}</div>
+            <div class="text-sm text-gray-500 font-medium">{{ department.name }}</div>
+        </div>
+        <div class="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-3">
+            <div class="flex items-center text-xs text-blue-700">
+                <i class="bi bi-buildings mr-1"></i>
+                <span>Your assigned department</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Teachers Card -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center">
+                    <i class="bi bi-people-fill text-white text-2xl"></i>
+                </div>
+                <span class="text-xs font-semibold text-green-600 bg-green-100 px-3 py-1 rounded-full">TOTAL</span>
+            </div>
+            <div class="text-3xl font-bold text-gray-800 mb-1">{{ total_teachers }}</div>
+            <div class="text-sm text-gray-500 font-medium">Teachers in Department</div>
+        </div>
+        <div class="bg-gradient-to-r from-green-50 to-green-100 px-6 py-3">
+            <div class="flex items-center text-xs text-green-700">
+                <i class="bi bi-person-check mr-1"></i>
+                <span>Registered under {{ department.code }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Teachers Card -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-lg flex items-center justify-center">
+                    <i class="bi bi-person-check-fill text-white text-2xl"></i>
+                </div>
+                <span class="text-xs font-semibold text-purple-600 bg-purple-100 px-3 py-1 rounded-full">ACTIVE</span>
+            </div>
+            <div class="text-3xl font-bold text-gray-800 mb-1">{{ active_teachers }}</div>
+            <div class="text-sm text-gray-500 font-medium">Active Teachers</div>
+        </div>
+        <div class="bg-gradient-to-r from-purple-50 to-purple-100 px-6 py-3">
+            <div class="flex items-center text-xs text-purple-700">
+                <i class="bi bi-circle-fill mr-1 text-green-400"></i>
+                <span>Currently active</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions + Recent Activity -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+    <!-- Quick Actions — 2 columns -->
+    <div class="lg:col-span-2">
+        <div class="flex items-center mb-6">
+            <i class="bi bi-lightning-fill text-yellow-500 text-2xl mr-3"></i>
+            <h3 class="text-2xl font-bold text-gray-800">Quick Actions</h3>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <!-- Manage Teachers -->
+            <a href="{% url 'accounts:subadmin_manage_teachers' %}"
+               class="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all p-6 border-2 border-transparent hover:border-green-500">
+                <div class="flex items-start space-x-4">
+                    <div class="w-14 h-14 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="bi bi-people text-white text-2xl"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="text-lg font-bold text-gray-800 mb-1 group-hover:text-green-600 transition-colors">Manage Teachers</h4>
+                        <p class="text-sm text-gray-500">View and manage {{ department.code }} teachers</p>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Add Teacher -->
+            <a href="{% url 'accounts:subadmin_add_teacher' %}"
+               class="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all p-6 border-2 border-transparent hover:border-blue-500">
+                <div class="flex items-start space-x-4">
+                    <div class="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="bi bi-person-plus text-white text-2xl"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="text-lg font-bold text-gray-800 mb-1 group-hover:text-blue-600 transition-colors">Add Teacher</h4>
+                        <p class="text-sm text-gray-500">Create a new teacher in {{ department.code }}</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Department Info Card -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden mt-6">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <h4 class="text-lg font-bold text-gray-800 flex items-center">
+                    <i class="bi bi-building text-blue-500 mr-2"></i>
+                    Department Information
+                </h4>
+            </div>
+            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                        <i class="bi bi-building text-blue-600"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">Department Name</p>
+                        <p class="font-semibold text-gray-800">{{ department.name }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                    <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mr-3">
+                        <i class="bi bi-hash text-indigo-600"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">Department Code</p>
+                        <p class="font-semibold text-gray-800">{{ department.code }}</p>
+                    </div>
+                </div>
+                {% if department.description %}
+                <div class="flex items-start p-4 bg-gray-50 rounded-lg sm:col-span-2">
+                    <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                        <i class="bi bi-card-text text-purple-600"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">Description</p>
+                        <p class="text-gray-800 text-sm">{{ department.description }}</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity Feed — 1 column -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-4">
+            <h2 class="text-lg font-bold text-white flex items-center">
+                <i class="bi bi-activity text-xl mr-2"></i>
+                Recent Activity
+            </h2>
+        </div>
+        <div class="p-4 max-h-96 overflow-y-auto">
+            <div class="space-y-3">
+                {% for activity in recent_activities %}
+                <div class="flex items-start pb-3 border-b border-gray-100 last:border-0">
+                    <div class="w-9 h-9 rounded-lg flex items-center justify-center mr-3 flex-shrink-0
+                        {% if 'created' in activity.activity_type %}bg-green-100
+                        {% elif 'updated' in activity.activity_type %}bg-blue-100
+                        {% elif 'deleted' in activity.activity_type %}bg-red-100
+                        {% else %}bg-gray-100{% endif %}">
+                        <i class="bi
+                            {% if 'created' in activity.activity_type %}bi-plus-circle text-green-600
+                            {% elif 'updated' in activity.activity_type %}bi-pencil text-blue-600
+                            {% elif 'deleted' in activity.activity_type %}bi-trash text-red-600
+                            {% else %}bi-bell text-gray-600{% endif %} text-sm">
+                        </i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-gray-800">{{ activity.description }}</p>
+                        <p class="text-xs text-gray-400 mt-1">{{ activity.created_at|timesince }} ago</p>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-8 text-gray-500">
+                    <i class="bi bi-clock-history text-3xl mb-2 block"></i>
+                    <p class="text-sm">No recent activity</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

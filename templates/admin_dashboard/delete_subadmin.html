@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Remove Sub-Admin - Test Banking System{% endblock %}
+
+{% block header_title %}Remove Sub-Admin{% endblock %}
+{% block header_subtitle %}Confirm removal of sub-admin account{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <a href="{% url 'accounts:manage_subadmins' %}"
+       class="flex items-center space-x-2 text-gray-600 hover:text-gray-800 mb-6 group w-fit">
+        <i class="bi bi-arrow-left group-hover:-translate-x-1 transition-transform"></i>
+        <span class="font-medium">Back to Sub-Admins</span>
+    </a>
+
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <!-- Warning Header -->
+        <div class="bg-gradient-to-r from-red-500 to-red-600 px-8 py-6 text-center">
+            <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="bi bi-person-dash text-white text-3xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Remove Sub-Admin?</h2>
+            <p class="text-red-200 text-sm mt-1">This action cannot be undone</p>
+        </div>
+
+        <div class="p-8">
+            <!-- Sub-Admin Info Card -->
+            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-6 mb-6">
+                <div class="flex items-center space-x-4">
+                    <div class="w-14 h-14 bg-red-200 rounded-full flex items-center justify-center text-red-700 font-bold text-xl flex-shrink-0">
+                        {{ subadmin.user.first_name.0|upper }}{{ subadmin.user.last_name.0|upper }}
+                    </div>
+                    <div>
+                        <p class="font-bold text-gray-800 text-lg">{{ subadmin.user.get_full_name }}</p>
+                        <p class="text-sm text-gray-600">{{ subadmin.user.email }}</p>
+                        <p class="text-sm text-gray-500 mt-1">
+                            <i class="bi bi-building mr-1"></i>
+                            {% if subadmin.department %}{{ subadmin.department.name }}{% else %}Unassigned{% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Warning Message -->
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <div class="flex items-start space-x-3">
+                    <i class="bi bi-exclamation-triangle-fill text-yellow-500 text-lg flex-shrink-0 mt-0.5"></i>
+                    <div>
+                        <p class="text-sm font-semibold text-yellow-800 mb-1">This will permanently:</p>
+                        <ul class="text-sm text-yellow-700 space-y-1">
+                            <li>• Delete their sub-admin account and login access</li>
+                            <li>• Free up their department for a new sub-admin</li>
+                            <li>• Remove them from the system entirely</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <form method="post">
+                {% csrf_token %}
+                <div class="flex items-center space-x-4">
+                    <a href="{% url 'accounts:manage_subadmins' %}"
+                       class="flex-1 text-center px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
+                        Cancel
+                    </a>
+                    <button type="submit"
+                            class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-md font-medium">
+                        <i class="bi bi-trash"></i>
+                        <span>Yes, Remove</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

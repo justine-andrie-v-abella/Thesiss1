@@ -50,7 +50,7 @@
         <!-- Navigation -->
         <nav class="flex-1 overflow-y-auto py-6 px-3">
             {% if user.is_staff %}
-                <!-- ── Admin Navigation ───────────────────────────────────────── -->
+                <!-- ── Superadmin Navigation ──────────────────────────────────── -->
                 <a href="{% url 'accounts:admin_dashboard' %}"
                     class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'admin-dashboard' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <i class="bi bi-speedometer2 text-xl"></i>
@@ -71,11 +71,43 @@
                     <i class="bi bi-book text-xl"></i>
                     <span class="font-medium">Manage Subjects</span>
                 </a>
+                <a href="{% url 'accounts:manage_subadmins' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'manage-subadmins' in request.path or 'add-subadmin' in request.path or 'edit-subadmin' in request.path or 'delete-subadmin' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                    <i class="bi bi-person-gear text-xl"></i>
+                    <span class="font-medium">Manage Sub-Admins</span>
+                </a>
                 <a href="{% url 'questionnaires:all_questionnaires' %}"
                     class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if '/questionnaires/all' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <i class="bi bi-file-earmark-text text-xl"></i>
                     <span class="font-medium">All Questionnaires</span>
                 </a>
+
+            {% elif user_is_subadmin %}
+                <!-- ── Sub-Admin Navigation ────────────────────────────────────── -->
+                <a href="{% url 'accounts:subadmin_dashboard' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'subadmin-dashboard' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                    <i class="bi bi-speedometer2 text-xl"></i>
+                    <span class="font-medium">Dashboard</span>
+                </a>
+                <a href="{% url 'accounts:subadmin_manage_teachers' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'subadmin/teachers' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                    <i class="bi bi-people text-xl"></i>
+                    <span class="font-medium">Manage Teachers</span>
+                </a>
+                <a href="{% url 'accounts:subadmin_add_teacher' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'subadmin/teachers/add' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                    <i class="bi bi-person-plus text-xl"></i>
+                    <span class="font-medium">Add Teacher</span>
+                </a>
+
+                {% if subadmin_department %}
+                <!-- Department badge -->
+                <div class="mx-3 mt-4 p-3 bg-blue-700 rounded-lg">
+                    <p class="text-xs text-blue-300 font-medium uppercase tracking-wider mb-1">Your Department</p>
+                    <p class="text-white font-semibold text-sm">{{ subadmin_department.code }}</p>
+                    <p class="text-blue-200 text-xs truncate">{{ subadmin_department.name }}</p>
+                </div>
+                {% endif %}
 
             {% else %}
                 <!-- ── Teacher Navigation ─────────────────────────────────────── -->
@@ -121,20 +153,17 @@
                     <span class="font-medium">Browse</span>
                 </a>
 
-                <!-- ── Workspace ───────────────────────────────────────────────── -->
                 <a href="{% url 'questionnaires:workspace' %}"
                     class="flex items-center justify-between px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors group {% if '/questionnaires/workspace' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <div class="flex items-center space-x-3">
                         <i class="bi bi-collection-fill text-xl text-yellow-300 group-hover:text-yellow-200"></i>
                         <span class="font-medium">My Workspace</span>
                     </div>
-                    <!-- Live badge: count from localStorage, updated by JS -->
                     <span id="ws-sidebar-badge"
                         class="min-w-[22px] h-[22px] bg-yellow-400 text-blue-900 text-xs font-bold rounded-full flex items-center justify-center px-1 leading-none">
                         0
                     </span>
                 </a>
-                <!-- ─────────────────────────────────────────────────────────────── -->
             {% endif %}
         </nav>
 
@@ -297,7 +326,11 @@
                         <div class="hidden sm:flex items-center space-x-3 pl-4 border-l border-gray-200">
                             <div class="text-right">
                                 <p class="text-sm font-medium text-gray-900">{{ user.get_full_name }}</p>
-                                <p class="text-xs text-gray-500">{% if user.is_staff %}Administrator{% else %}Teacher{% endif %}</p>
+                                <p class="text-xs text-gray-500">
+                                    {% if user.is_staff %}Administrator
+                                    {% elif user_is_subadmin %}Sub-Admin
+                                    {% else %}Teacher{% endif %}
+                                </p>
                             </div>
                             <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white font-bold">
                                 {{ user.first_name.0|upper }}{{ user.last_name.0|upper }}
