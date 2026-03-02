@@ -1,11 +1,31 @@
 {% extends 'base.html' %}
 
 {% block title %}Manage Sub-Admins - Test Banking System{% endblock %}
-
 {% block header_title %}Manage Sub-Admins{% endblock %}
 {% block header_subtitle %}Assign and manage department sub-administrators{% endblock %}
 
 {% block content %}
+
+<!-- ── Django Messages (validation errors / success from redirects) ── -->
+{% if messages %}
+<div id="messagesContainer" class="mb-6 space-y-2">
+    {% for message in messages %}
+    <div class="flex items-start justify-between px-5 py-4 rounded-xl shadow-sm border
+        {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+        {% elif message.tags == 'success' %}bg-green-50 border-green-200 text-green-800
+        {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+        <div class="flex items-center space-x-3">
+            <i class="bi {% if message.tags == 'error' %}bi-exclamation-circle-fill text-red-500
+                         {% elif message.tags == 'success' %}bi-check-circle-fill text-green-500
+                         {% else %}bi-info-circle-fill text-blue-500{% endif %} text-lg"></i>
+            <span class="text-sm font-medium">{{ message }}</span>
+        </div>
+        <button onclick="this.parentElement.remove()" class="ml-4 opacity-50 hover:opacity-100 transition-opacity text-xl leading-none">&times;</button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 <!-- Header Actions -->
 <div class="flex items-center justify-between mb-6">
     <div class="flex items-center space-x-3">
@@ -17,11 +37,11 @@
             <p class="text-sm text-gray-500">{{ subadmins.count }} sub-admin{{ subadmins.count|pluralize }} registered</p>
         </div>
     </div>
-    <a href="{% url 'accounts:add_subadmin' %}"
-       class="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-5 py-3 rounded-xl hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg font-medium">
+    <button onclick="openAddModal()"
+        class="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-5 py-3 rounded-xl hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-md font-medium">
         <i class="bi bi-person-plus text-lg"></i>
         <span>Add Sub-Admin</span>
-    </a>
+    </button>
 </div>
 
 <!-- Sub-Admins Table -->
@@ -48,7 +68,6 @@
             <tbody class="divide-y divide-gray-200">
                 {% for subadmin in subadmins %}
                 <tr class="hover:bg-gray-50 transition-colors">
-                    <!-- Name + Email -->
                     <td class="px-6 py-4">
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
@@ -60,8 +79,6 @@
                             </div>
                         </div>
                     </td>
-
-                    <!-- Department -->
                     <td class="px-6 py-4">
                         {% if subadmin.department %}
                         <div class="flex items-center space-x-2">
@@ -77,13 +94,9 @@
                         <span class="text-gray-400 text-sm italic">Unassigned</span>
                         {% endif %}
                     </td>
-
-                    <!-- Username -->
                     <td class="px-6 py-4">
                         <span class="font-mono text-sm text-gray-700 bg-gray-100 px-2 py-1 rounded">{{ subadmin.user.username }}</span>
                     </td>
-
-                    <!-- Status -->
                     <td class="px-6 py-4 text-center">
                         {% if subadmin.is_active %}
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
@@ -95,32 +108,37 @@
                         </span>
                         {% endif %}
                     </td>
-
-                    <!-- Assigned By -->
                     <td class="px-6 py-4">
-                        <span class="text-sm text-gray-700">
-                            {{ subadmin.assigned_by.get_full_name|default:"—" }}
-                        </span>
+                        <span class="text-sm text-gray-700">{{ subadmin.assigned_by.get_full_name|default:"—" }}</span>
                     </td>
-
-                    <!-- Date -->
                     <td class="px-6 py-4">
                         <span class="text-sm text-gray-500">{{ subadmin.created_at|date:"M d, Y" }}</span>
                     </td>
-
-                    <!-- Actions -->
                     <td class="px-6 py-4">
                         <div class="flex items-center justify-center space-x-2">
-                            <a href="{% url 'accounts:edit_subadmin' subadmin.pk %}"
-                               class="flex items-center space-x-1 bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
+                            <button onclick="openEditModal(
+                                        '{{ subadmin.pk }}',
+                                        '{{ subadmin.user.first_name|escapejs }}',
+                                        '{{ subadmin.user.last_name|escapejs }}',
+                                        '{{ subadmin.user.email|escapejs }}',
+                                        '{{ subadmin.department.pk|default:'' }}',
+                                        '{{ subadmin.department.name|default:''|escapejs }}',
+                                        {{ subadmin.is_active|yesno:'true,false' }}
+                                    )"
+                                class="flex items-center space-x-1 bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
                                 <i class="bi bi-pencil"></i>
                                 <span>Edit</span>
-                            </a>
-                            <a href="{% url 'accounts:delete_subadmin' subadmin.pk %}"
-                               class="flex items-center space-x-1 bg-red-100 text-red-700 hover:bg-red-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
+                            </button>
+                            <button onclick="openDeleteModal(
+                                        '{{ subadmin.pk }}',
+                                        '{{ subadmin.user.get_full_name|escapejs }}',
+                                        '{{ subadmin.user.email|escapejs }}',
+                                        '{{ subadmin.department.name|default:''|escapejs }}'
+                                    )"
+                                class="flex items-center space-x-1 bg-red-100 text-red-700 hover:bg-red-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
                                 <i class="bi bi-trash"></i>
                                 <span>Remove</span>
-                            </a>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -133,11 +151,11 @@
                             </div>
                             <h4 class="text-lg font-semibold text-gray-700 mb-2">No Sub-Admins Yet</h4>
                             <p class="text-sm text-gray-500 mb-6">Create a sub-admin and assign them to a department.</p>
-                            <a href="{% url 'accounts:add_subadmin' %}"
-                               class="flex items-center space-x-2 bg-indigo-500 text-white px-5 py-3 rounded-xl hover:bg-indigo-600 transition-colors font-medium">
+                            <button onclick="openAddModal()"
+                                class="flex items-center space-x-2 bg-indigo-500 text-white px-5 py-3 rounded-xl hover:bg-indigo-600 transition-colors font-medium">
                                 <i class="bi bi-person-plus"></i>
                                 <span>Add First Sub-Admin</span>
-                            </a>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -146,4 +164,374 @@
         </table>
     </div>
 </div>
+
+
+<!-- ===================== MODAL BACKDROP ===================== -->
+<div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
+
+
+<!-- ===================== ADD SUB-ADMIN MODAL ===================== -->
+<div id="addModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeAllModals();">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl transform transition-all duration-200 scale-95 opacity-0"
+         id="addModalContent">
+
+        <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 px-8 py-5 rounded-t-2xl">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                        <i class="bi bi-person-gear text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">New Sub-Admin</h2>
+                        <p class="text-indigo-200 text-xs">Fill in the details to create a sub-admin account</p>
+                    </div>
+                </div>
+                <button onclick="closeAllModals()" class="text-white hover:text-indigo-200 transition-colors">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <form method="post" action="{% url 'accounts:add_subadmin' %}" class="p-6 space-y-5">
+            {% csrf_token %}
+
+            <!-- Personal Info -->
+            <div>
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                    <i class="bi bi-person text-indigo-500 mr-2"></i>Personal Information
+                </h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">First Name <span class="text-red-500">*</span></label>
+                        <input type="text" name="first_name" value="{{ form.first_name.value|default:'' }}"
+                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
+                               placeholder="Juan">
+                        {% if form.first_name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.first_name.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Last Name <span class="text-red-500">*</span></label>
+                        <input type="text" name="last_name" value="{{ form.last_name.value|default:'' }}"
+                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
+                               placeholder="Dela Cruz">
+                        {% if form.last_name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.last_name.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Email Address <span class="text-red-500">*</span></label>
+                    <input type="email" name="email" value="{{ form.email.value|default:'' }}"
+                           class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
+                           placeholder="juan@example.com">
+                    {% if form.email.errors %}<p class="text-red-500 text-xs mt-1">{{ form.email.errors.0 }}</p>{% endif %}
+                </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- Credentials -->
+            <div>
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                    <i class="bi bi-shield-lock text-indigo-500 mr-2"></i>Account Credentials
+                </h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Username <span class="text-red-500">*</span></label>
+                        <input type="text" name="username" value="{{ form.username.value|default:'' }}"
+                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors font-mono"
+                               placeholder="jdelacruz">
+                        {% if form.username.errors %}<p class="text-red-500 text-xs mt-1">{{ form.username.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Password <span class="text-red-500">*</span></label>
+                        <input type="password" name="password"
+                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
+                               placeholder="••••••••">
+                        {% if form.password.errors %}<p class="text-red-500 text-xs mt-1">{{ form.password.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- Department -->
+            <div>
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                    <i class="bi bi-building text-indigo-500 mr-2"></i>Department Assignment
+                </h3>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Assign to Department <span class="text-red-500">*</span></label>
+                <select name="department"
+                        class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors bg-white">
+                    <option value="">— Select a Department —</option>
+                    {% for dept in form.department.field.queryset %}
+                    <option value="{{ dept.pk }}" {% if form.department.value == dept.pk|stringformat:"s" %}selected{% endif %}>
+                        {{ dept.code }} — {{ dept.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs text-gray-400 mt-1.5">
+                    <i class="bi bi-info-circle mr-1"></i>Only departments without an existing sub-admin are shown.
+                </p>
+                {% if form.department.errors %}<p class="text-red-500 text-xs mt-1">{{ form.department.errors.0 }}</p>{% endif %}
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-2 border-t border-gray-200">
+                <button type="button" onclick="closeAllModals()"
+                        class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-8 py-2.5 rounded-xl hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-md font-medium">
+                    <i class="bi bi-person-plus"></i>
+                    <span>Create Sub-Admin</span>
+                </button>
+            </div>
+        </form>
+    </div>
+    </div>
+</div>
+
+
+<!-- ===================== EDIT SUB-ADMIN MODAL ===================== -->
+<div id="editModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeAllModals();">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl transform transition-all duration-200 scale-95 opacity-0"
+         id="editModalContent">
+
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-8 py-5 rounded-t-2xl">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div id="editAvatar"
+                         class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-white font-bold text-lg">--</div>
+                    <div>
+                        <h2 id="editSubAdminName" class="text-xl font-bold text-white">Edit Sub-Admin</h2>
+                        <p id="editSubAdminDept" class="text-blue-200 text-xs"></p>
+                    </div>
+                </div>
+                <button onclick="closeAllModals()" class="text-white hover:text-blue-200 transition-colors">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <form id="editForm" method="post" action="" class="p-6 space-y-5">
+            {% csrf_token %}
+
+            <!-- Personal Info -->
+            <div>
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                    <i class="bi bi-person text-blue-500 mr-2"></i>Personal Information
+                </h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">First Name <span class="text-red-500">*</span></label>
+                        <input type="text" name="first_name" id="edit_first_name"
+                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Last Name <span class="text-red-500">*</span></label>
+                        <input type="text" name="last_name" id="edit_last_name"
+                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Email Address <span class="text-red-500">*</span></label>
+                    <input type="email" name="email" id="edit_email"
+                           class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- Department + Status -->
+            <div>
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                    <i class="bi bi-building text-blue-500 mr-2"></i>Department & Status
+                </h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Department <span class="text-red-500">*</span></label>
+                        <select name="department" id="edit_department"
+                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors bg-white">
+                            <option value="">— Select a Department —</option>
+                            {% for dept in all_departments %}
+                            <option value="{{ dept.pk }}">{{ dept.code }} — {{ dept.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Account Status</label>
+                        <div class="flex items-center h-11 px-4 border-2 border-gray-200 rounded-xl">
+                            <input type="checkbox" name="is_active" id="edit_is_active"
+                                   class="w-5 h-5 text-blue-600 rounded cursor-pointer">
+                            <label for="edit_is_active" class="ml-3 text-sm font-medium text-gray-700 cursor-pointer">Active Account</label>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">Unchecking prevents login.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end space-x-3 pt-2 border-t border-gray-200">
+                <button type="button" onclick="closeAllModals()"
+                        class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-2.5 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-md font-medium">
+                    <i class="bi bi-check-lg"></i>
+                    <span>Save Changes</span>
+                </button>
+            </div>
+        </form>
+    </div>
+    </div>
+</div>
+
+
+<!-- ===================== DELETE SUB-ADMIN MODAL ===================== -->
+<div id="deleteModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeAllModals();">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0"
+         id="deleteModalContent">
+
+        <div class="bg-gradient-to-r from-red-500 to-red-600 px-8 py-6 rounded-t-2xl text-center relative">
+            <button onclick="closeAllModals()" class="absolute top-4 right-4 text-white hover:text-red-200 transition-colors">
+                <i class="bi bi-x-lg text-xl"></i>
+            </button>
+            <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="bi bi-person-dash text-white text-3xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Remove Sub-Admin?</h2>
+            <p class="text-red-200 text-sm mt-1">This action cannot be undone</p>
+        </div>
+
+        <div class="p-6">
+            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-5 mb-5">
+                <div class="flex items-center space-x-4">
+                    <div id="deleteAvatar"
+                         class="w-14 h-14 bg-red-200 rounded-full flex items-center justify-center text-red-700 font-bold text-xl flex-shrink-0">--</div>
+                    <div>
+                        <p id="deleteSubAdminName" class="font-bold text-gray-800 text-lg"></p>
+                        <p id="deleteSubAdminEmail" class="text-sm text-gray-600"></p>
+                        <p id="deleteSubAdminDept" class="text-sm text-gray-500 mt-1">
+                            <i class="bi bi-building mr-1"></i><span></span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-5">
+                <div class="flex items-start space-x-3">
+                    <i class="bi bi-exclamation-triangle-fill text-yellow-500 text-lg flex-shrink-0 mt-0.5"></i>
+                    <div>
+                        <p class="text-sm font-semibold text-yellow-800 mb-1">This will permanently:</p>
+                        <ul class="text-sm text-yellow-700 space-y-1">
+                            <li>• Delete their sub-admin account and login access</li>
+                            <li>• Free up their department for a new sub-admin</li>
+                            <li>• Remove them from the system entirely</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <form id="deleteForm" method="post" action="">
+                {% csrf_token %}
+                <div class="flex items-center space-x-4">
+                    <button type="button" onclick="closeAllModals()"
+                            class="flex-1 text-center px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-md font-medium">
+                        <i class="bi bi-trash"></i>
+                        <span>Yes, Remove</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    </div>
+</div>
+
+
+<script>
+    const MODAL_IDS = ['addModal', 'editModal', 'deleteModal'];
+
+    const EDIT_URL_TEMPLATE   = "{% url 'accounts:edit_subadmin' pk=0 %}";
+    const DELETE_URL_TEMPLATE = "{% url 'accounts:delete_subadmin' pk=0 %}";
+
+    function makeUrl(template, pk) {
+        return template.replace('/0/', '/' + pk + '/');
+    }
+
+    function openModal(modalId) {
+        document.getElementById('modalBackdrop').classList.remove('hidden');
+        MODAL_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (id === modalId) {
+                el.classList.remove('hidden');
+                const card = document.getElementById(id + 'Content');
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    card.classList.remove('scale-95', 'opacity-0');
+                    card.classList.add('scale-100', 'opacity-100');
+                }));
+            } else {
+                el.classList.add('hidden');
+            }
+        });
+    }
+
+    function closeAllModals() {
+        MODAL_IDS.forEach(id => {
+            const card = document.getElementById(id + 'Content');
+            card.classList.remove('scale-100', 'opacity-100');
+            card.classList.add('scale-95', 'opacity-0');
+        });
+        setTimeout(() => {
+            MODAL_IDS.forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.getElementById('modalBackdrop').classList.add('hidden');
+        }, 200);
+    }
+
+    function openAddModal() { openModal('addModal'); }
+
+    function openEditModal(pk, firstName, lastName, email, deptPk, deptName, isActive) {
+        document.getElementById('edit_first_name').value  = firstName;
+        document.getElementById('edit_last_name').value   = lastName;
+        document.getElementById('edit_email').value       = email;
+        document.getElementById('edit_is_active').checked = isActive;
+
+        const deptSelect = document.getElementById('edit_department');
+        for (let opt of deptSelect.options) {
+            opt.selected = (opt.value == deptPk);
+        }
+
+        const initials = (firstName[0] || '').toUpperCase() + (lastName[0] || '').toUpperCase();
+        document.getElementById('editAvatar').textContent       = initials;
+        document.getElementById('editSubAdminName').textContent = firstName + ' ' + lastName;
+        document.getElementById('editSubAdminDept').textContent = deptName || 'Unassigned';
+        document.getElementById('editForm').action              = makeUrl(EDIT_URL_TEMPLATE, pk);
+
+        openModal('editModal');
+    }
+
+    function openDeleteModal(pk, fullName, email, deptName) {
+        const parts   = fullName.trim().split(' ');
+        const initials = ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase();
+
+        document.getElementById('deleteAvatar').textContent = initials;
+        document.getElementById('deleteSubAdminName').textContent  = fullName;
+        document.getElementById('deleteSubAdminEmail').textContent = email;
+        document.getElementById('deleteSubAdminDept').querySelector('span').textContent = deptName || 'Unassigned';
+        document.getElementById('deleteForm').action = makeUrl(DELETE_URL_TEMPLATE, pk);
+
+        openModal('deleteModal');
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
+
+    {% if form and form.errors %}
+    window.addEventListener('DOMContentLoaded', () => openAddModal());
+    {% endif %}
+</script>
+
 {% endblock %}

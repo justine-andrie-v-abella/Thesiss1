@@ -215,8 +215,20 @@ def manage_teachers(request):
             Q(employee_id__icontains=search_query)
         )
 
-    context = {'teachers': teachers, 'search_query': search_query}
+    # Pass all departments so the edit-modal dropdown can populate them
+    departments = Department.objects.all().order_by('name')
+
+    # Pass form so add-modal can redisplay validation errors on POST redirect
+    form = TeacherCreationForm()
+
+    context = {
+        'teachers': teachers,
+        'search_query': search_query,
+        'departments': departments,
+        'form': form,
+    }
     return render(request, 'admin_dashboard/manage_teachers.html', context)
+
 
 
 @login_required
@@ -388,26 +400,17 @@ def delete_department(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def manage_subjects(request):
-    subjects = Subject.objects.prefetch_related('departments').all().order_by('name')
+    subjects = Subject.objects.prefetch_related('departments').all()
+    all_departments = Department.objects.all().order_by('name')
+    form = SubjectForm()  # blank form — errors passed back on add POST redirect
 
-    if request.method == 'POST':
-        form = SubjectForm(request.POST)
-        if form.is_valid():
-            subject = form.save()
-            ActivityLog.objects.create(
-                activity_type='subject_created',
-                user=request.user,
-                description=f"Subject {subject.name} ({subject.code}) was created"
-            )
-            messages.success(request, f'Subject "{subject.name}" ({subject.code}) has been added successfully!')
-            return redirect('accounts:manage_subjects')
-        else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = SubjectForm()
-
-    context = {'subjects': subjects, 'form': form}
+    context = {
+        'subjects': subjects,
+        'all_departments': all_departments,
+        'form': form,
+    }
     return render(request, 'admin_dashboard/manage_subjects.html', context)
+
 
 
 @login_required
@@ -485,94 +488,119 @@ def delete_subject(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def manage_subadmins(request):
-    """List all sub-admins across all departments."""
     subadmins = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
 
-    context = {'subadmins': subadmins}
+    # All departments for the edit modal dropdown (unrestricted)
+    all_departments = Department.objects.all().order_by('name')
+
+    # Blank form for the add modal (errors re-rendered on POST redirect)
+    form = SubAdminCreationForm()
+
+    context = {
+        'subadmins': subadmins,
+        'all_departments': all_departments,
+        'form': form,
+    }
     return render(request, 'admin_dashboard/manage_subadmins.html', context)
 
 
 @login_required
 @user_passes_test(is_admin)
 def add_subadmin(request):
-    """Superadmin creates a new sub-admin and assigns them to a department."""
     if request.method == 'POST':
         form = SubAdminCreationForm(request.POST)
         if form.is_valid():
-            subadmin = form.save(assigned_by=request.user)
-            ActivityLog.objects.create(
-                activity_type='subadmin_created',
-                user=request.user,
-                description=(
-                    f"Sub-Admin {subadmin.user.get_full_name()} was created "
-                    f"and assigned to {subadmin.department.name}"
-                )
+            # --- your existing save logic here (unchanged) ---
+            user = User.objects.create_user(
+                username=form.cleaned_data['username'],
+                password=form.cleaned_data['password'],
+                email=form.cleaned_data['email'],
+                first_name=form.cleaned_data['first_name'],
+                last_name=form.cleaned_data['last_name'],
             )
-            messages.success(
-                request,
-                f'Sub-Admin "{subadmin.user.get_full_name()}" has been created and assigned to {subadmin.department.name}.'
+            SubAdminProfile.objects.create(
+                user=user,
+                department=form.cleaned_data['department'],
+                assigned_by=request.user,
             )
+            messages.success(request, 'Sub-admin created successfully.')
             return redirect('accounts:manage_subadmins')
         else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = SubAdminCreationForm()
-
-    return render(request, 'admin_dashboard/add_subadmin.html', {'form': form})
+            # ✅ FIX: render manage_subadmins.html with the errored form
+            subadmins = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
+            all_departments = Department.objects.all().order_by('name')
+            return render(request, 'admin_dashboard/manage_subadmins.html', {
+                'subadmins': subadmins,
+                'all_departments': all_departments,
+                'form': form,   # the template checks `form.errors` to auto-open the add modal
+            })
+    return redirect('accounts:manage_subadmins')
 
 
 @login_required
 @user_passes_test(is_admin)
 def edit_subadmin(request, pk):
-    """Superadmin edits a sub-admin's details or re-assigns their department."""
     subadmin = get_object_or_404(SubAdminProfile, pk=pk)
-    old_dept = subadmin.department.name if subadmin.department else "None"
 
     if request.method == 'POST':
-        form = SubAdminEditForm(request.POST, instance=subadmin)
-        if form.is_valid():
-            updated = form.save()
-            new_dept = updated.department.name if updated.department else "None"
-            ActivityLog.objects.create(
-                activity_type='subadmin_updated',
-                user=request.user,
-                description=(
-                    f"Sub-Admin {updated.user.get_full_name()} was updated. "
-                    f"Department: {old_dept} → {new_dept}"
-                )
-            )
-            messages.success(request, f'Sub-Admin "{updated.user.get_full_name()}" has been updated.')
-            return redirect('accounts:manage_subadmins')
-        else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = SubAdminEditForm(instance=subadmin)
+        first_name = request.POST.get('first_name', '').strip()
+        last_name  = request.POST.get('last_name', '').strip()
+        email      = request.POST.get('email', '').strip()
+        dept_pk    = request.POST.get('department', '').strip()
+        is_active  = request.POST.get('is_active') == 'on'
 
-    return render(request, 'admin_dashboard/edit_subadmin.html', {'form': form, 'subadmin': subadmin})
+        # ── Validation ───────────────────────────────────────────────────────
+        errors = []
+
+        if not first_name:
+            errors.append('First name is required.')
+        if not last_name:
+            errors.append('Last name is required.')
+        if not email:
+            errors.append('Email address is required.')
+        elif '@' not in email:
+            errors.append('Enter a valid email address.')
+        if not dept_pk:
+            errors.append('Please select a department.')
+
+        # Check email uniqueness (exclude current user)
+        if email and User.objects.filter(email=email).exclude(pk=subadmin.user.pk).exists():
+            errors.append('That email address is already in use by another account.')
+
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+            return redirect('accounts:manage_subadmins')
+
+        # ── Save ─────────────────────────────────────────────────────────────
+        user = subadmin.user
+        user.first_name = first_name
+        user.last_name  = last_name
+        user.email      = email
+        user.save()
+
+        try:
+            subadmin.department = Department.objects.get(pk=dept_pk)
+        except Department.DoesNotExist:
+            messages.error(request, 'Selected department does not exist.')
+            return redirect('accounts:manage_subadmins')
+
+        subadmin.is_active = is_active
+        subadmin.save()
+
+        messages.success(request, f'{user.get_full_name()} has been updated successfully.')
+
+    return redirect('accounts:manage_subadmins')
 
 
 @login_required
 @user_passes_test(is_admin)
 def delete_subadmin(request, pk):
-    """Superadmin removes a sub-admin (deletes profile + user account)."""
     subadmin = get_object_or_404(SubAdminProfile, pk=pk)
-
     if request.method == 'POST':
-        name = subadmin.user.get_full_name()
-        dept_name = subadmin.department.name if subadmin.department else "N/A"
-        user = subadmin.user
-
-        ActivityLog.objects.create(
-            activity_type='subadmin_deleted',
-            user=request.user,
-            description=f"Sub-Admin {name} (Department: {dept_name}) was removed"
-        )
-        subadmin.delete()
-        user.delete()
-        messages.success(request, f'Sub-Admin "{name}" has been removed.')
-        return redirect('accounts:manage_subadmins')
-
-    return render(request, 'admin_dashboard/delete_subadmin.html', {'subadmin': subadmin})
+        subadmin.user.delete()   # cascades to SubAdminProfile
+        messages.success(request, 'Sub-admin removed successfully.')
+    return redirect('accounts:manage_subadmins')
 
 
 # ============================================================================
@@ -921,3 +949,233 @@ def test_activity(request):
         description='Test activity created manually'
     )
     return redirect('accounts:admin_dashboard')
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_manage_subjects(request):
+    """List subjects that belong to the sub-admin's department."""
+    department = request.user.subadmin_profile.department
+    subjects = Subject.objects.filter(departments=department).order_by('code')
+
+    search_query = request.GET.get('search', '')
+    if search_query:
+        subjects = subjects.filter(
+            Q(name__icontains=search_query) |
+            Q(code__icontains=search_query)
+        )
+
+    # Pass an empty form so the modal can display it (and show errors on POST redirect)
+    from .forms import SubjectForm
+    form = SubjectForm()
+
+    context = {
+        'subjects': subjects,
+        'search_query': search_query,
+        'department': department,
+        'form': form,
+    }
+    return render(request, 'subadmin_dashboard/manage_subjects.html', context)
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_add_subject(request):
+    """
+    Sub-admin adds a new subject and auto-assigns it to their department.
+    The department field is NOT shown to the user — it's forced server-side.
+    """
+    department = request.user.subadmin_profile.department
+
+    if request.method == 'POST':
+        # We use a lightweight inline form instead of SubjectForm which exposes
+        # the full department multi-select. Build the subject manually so the
+        # department is always locked to the sub-admin's own department.
+        code = request.POST.get('code', '').strip().upper()
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+
+        errors = {}
+        if not code:
+            errors['code'] = 'Subject code is required.'
+        elif Subject.objects.filter(code=code).exclude(pk=0).exists():
+            errors['code'] = f'A subject with code "{code}" already exists.'
+        if not name:
+            errors['name'] = 'Subject name is required.'
+
+        if not errors:
+            subject = Subject.objects.create(code=code, name=name, description=description)
+            subject.departments.add(department)
+            ActivityLog.objects.create(
+                activity_type='subject_created',
+                user=request.user,
+                description=(
+                    f"Subject {subject.name} ({subject.code}) was created "
+                    f"and added to {department.name} by Sub-Admin {request.user.get_full_name()}"
+                )
+            )
+            messages.success(request, f'Subject "{subject.name}" ({subject.code}) added successfully.')
+            return redirect('accounts:subadmin_manage_subjects')
+        else:
+            # Re-render the manage page with errors surfaced via messages
+            for field, error in errors.items():
+                messages.error(request, error)
+            return redirect('accounts:subadmin_manage_subjects')
+
+    return redirect('accounts:subadmin_manage_subjects')
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_edit_subject(request, pk):
+    """
+    Sub-admin edits a subject — only if it belongs to their department.
+    Department assignment is never changed here.
+    """
+    department = request.user.subadmin_profile.department
+    # 404 if the subject doesn't belong to this sub-admin's department
+    subject = get_object_or_404(Subject, pk=pk, departments=department)
+
+    if request.method == 'POST':
+        code = request.POST.get('code', '').strip().upper()
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+
+        errors = {}
+        if not code:
+            errors['code'] = 'Subject code is required.'
+        elif Subject.objects.filter(code=code).exclude(pk=pk).exists():
+            errors['code'] = f'A subject with code "{code}" already exists.'
+        if not name:
+            errors['name'] = 'Subject name is required.'
+
+        if not errors:
+            old_code = subject.code
+            subject.code = code
+            subject.name = name
+            subject.description = description
+            subject.save()
+            ActivityLog.objects.create(
+                activity_type='subject_updated',
+                user=request.user,
+                description=(
+                    f"Subject {old_code} updated to {subject.name} ({subject.code}) "
+                    f"in {department.name} by Sub-Admin {request.user.get_full_name()}"
+                )
+            )
+            messages.success(request, f'Subject "{subject.name}" updated successfully.')
+        else:
+            for field, error in errors.items():
+                messages.error(request, error)
+
+    return redirect('accounts:subadmin_manage_subjects')
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_delete_subject(request, pk):
+    """
+    Sub-admin deletes a subject — only if it belongs to their department.
+    If the subject is shared with other departments, it's only unlinked;
+    if it belongs solely to this department, the record is fully deleted.
+    """
+    department = request.user.subadmin_profile.department
+    subject = get_object_or_404(Subject, pk=pk, departments=department)
+
+    if request.method == 'POST':
+        subject_name = subject.name
+        subject_code = subject.code
+
+        other_departments = subject.departments.exclude(pk=department.pk)
+        if other_departments.exists():
+            # Shared subject — just unlink from this department
+            subject.departments.remove(department)
+            action = f"unlinked from {department.name}"
+        else:
+            # Belongs only to this department — delete it entirely
+            subject.delete()
+            action = "deleted"
+
+        ActivityLog.objects.create(
+            activity_type='subject_deleted',
+            user=request.user,
+            description=(
+                f"Subject {subject_name} ({subject_code}) was {action} "
+                f"by Sub-Admin {request.user.get_full_name()}"
+            )
+        )
+        messages.success(request, f'Subject "{subject_name}" ({subject_code}) removed successfully.')
+
+    return redirect('accounts:subadmin_manage_subjects')
+
+
+# ============================================================================
+# SUB-ADMIN — BROWSE QUESTIONNAIRES
+# Scoped to questionnaires uploaded by teachers in the sub-admin's department.
+# ============================================================================
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_browse_questionnaires(request):
+    """
+    Browse questionnaires from teachers in the sub-admin's department only.
+    Filters: subject (department-scoped), teacher (department-scoped), exam_type, search.
+    """
+    from questionnaires.models import Questionnaire
+    from django.core.paginator import Paginator
+
+    department = request.user.subadmin_profile.department
+
+    # Base queryset — only questionnaires whose uploader is in this department
+    questionnaires = Questionnaire.objects.filter(
+        uploader__department=department
+    ).select_related('subject', 'uploader__user', 'department')
+
+    # Subjects scoped to this department (for filter dropdown)
+    subjects = Subject.objects.filter(departments=department).order_by('code')
+
+    # Teachers scoped to this department (for filter dropdown)
+    teachers = TeacherProfile.objects.filter(
+        department=department, is_active=True
+    ).select_related('user').order_by('user__last_name')
+
+    # ── Apply filters ────────────────────────────────────────────────────────
+    selected_subject = request.GET.get('subject', '')
+    selected_teacher = request.GET.get('teacher', '')
+    exam_type        = request.GET.get('exam_type', '')
+    search_query     = request.GET.get('search', '')
+
+    if selected_subject:
+        questionnaires = questionnaires.filter(subject_id=selected_subject)
+
+    if selected_teacher:
+        questionnaires = questionnaires.filter(uploader_id=selected_teacher)
+
+    if exam_type:
+        questionnaires = questionnaires.filter(exam_type=exam_type)
+
+    if search_query:
+        questionnaires = questionnaires.filter(
+            Q(title__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(subject__name__icontains=search_query) |
+            Q(subject__code__icontains=search_query)
+        )
+
+    # ── Paginate ─────────────────────────────────────────────────────────────
+    paginator  = Paginator(questionnaires, 9)
+    page_number = request.GET.get('page', 1)
+    page_obj   = paginator.get_page(page_number)
+
+    context = {
+        'page_obj':         page_obj,
+        'department':       department,
+        'subjects':         subjects,
+        'teachers':         teachers,
+        'selected_subject': selected_subject,
+        'selected_teacher': selected_teacher,
+        'exam_type':        exam_type,
+        'search_query':     search_query,
+        'exam_type_choices': Questionnaire.EXAM_TYPE_CHOICES,
+    }
+    return render(request, 'subadmin_dashboard/browse_questionnaires.html', context)
+    

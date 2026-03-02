@@ -94,12 +94,16 @@
                     <i class="bi bi-people text-xl"></i>
                     <span class="font-medium">Manage Teachers</span>
                 </a>
-                <a href="{% url 'accounts:subadmin_add_teacher' %}"
-                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'subadmin/teachers/add' in request.path %}bg-blue-700 shadow-lg{% endif %}">
-                    <i class="bi bi-person-plus text-xl"></i>
-                    <span class="font-medium">Add Teacher</span>
+                <a href="{% url 'accounts:subadmin_manage_subjects' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'subadmin/subjects' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                    <i class="bi bi-book text-xl"></i>
+                    <span class="font-medium">Manage Subjects</span>
                 </a>
-
+                <a href="{% url 'accounts:subadmin_browse_questionnaires' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'subadmin/questionnaires' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                    <i class="bi bi-file-earmark-text text-xl"></i>
+                    <span class="font-medium">Browse Questionnaires</span>
+                </a>
                 {% if subadmin_department %}
                 <!-- Department badge -->
                 <div class="mx-3 mt-4 p-3 bg-blue-700 rounded-lg">
