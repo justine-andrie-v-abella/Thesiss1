@@ -9,28 +9,38 @@ app_name = 'questionnaires'
 
 urlpatterns = [
     # Upload and management
-    path('upload/', views.upload_questionnaire, name='upload_questionnaire'),
-    path('generate/', views.generate_questionnaire, name='generate_questionnaire'),
-    path('my-uploads/', views.my_uploads, name='my_uploads'),
-    path('browse/', views.browse_questionnaires, name='browse_questionnaires'),
-    path('all/', views.all_questionnaires, name='all_questionnaires'),
-    path('edit/<int:pk>/', views.edit_questionnaire, name='edit_questionnaire'),
+    path('upload/',    views.upload_questionnaire,   name='upload_questionnaire'),
+    path('generate/',  views.generate_questionnaire, name='generate_questionnaire'),
+    path('my-uploads/', views.my_uploads,            name='my_uploads'),
+    path('browse/',    views.browse_questionnaires,  name='browse_questionnaires'),
+    path('all/',       views.all_questionnaires,     name='all_questionnaires'),
+    path('edit/<int:pk>/',   views.edit_questionnaire,   name='edit_questionnaire'),
     path('delete/<int:pk>/', views.delete_questionnaire, name='delete_questionnaire'),
     path('download/<int:pk>/', views.download_questionnaire, name='download_questionnaire'),
 
-    # AI Extraction
-    path('review-extracted/<int:pk>/', views.review_extracted_questions, name='review_extracted'),
+    # ── Session-based review (upload + generate flow) ────────────────────────
+    # No <pk> — questions live in the session until the teacher clicks Save.
+    path('review/',         views.review_extracted_questions, name='review_extracted'),
+    path('review/cancel/',  views.cancel_pending,             name='cancel_pending'),
+
+    # ── DB-backed review (retry extraction only) ─────────────────────────────
+    path('review/<int:pk>/', views.review_extracted_questions_pk, name='review_extracted_pk'),
+
+    # Retry extraction
     path('retry-extraction/<int:pk>/', views.retry_extraction, name='retry_extraction'),
 
     # AJAX
-    path('get-subjects/', views.get_subjects_ajax, name='get_subjects'),
+    path('get-subjects/',        views.get_subjects_ajax,  name='get_subjects'),
     path('get-questions/<int:pk>/', views.get_questions_json, name='get_questions_json'),
-    
-    # ── workspace page + download ────────────────────────────────────────────
-    path('workspace/',                 views.workspace,                  name='workspace'),
-    path('workspace/download/',        views.download_workspace,         name='download_workspace'),
 
-    # ── workspace API (called by fetch() in the template JS) ─────────────────
+    # ── Workspace page + download ─────────────────────────────────────────────
+    path('workspace/',          views.workspace,          name='workspace'),
+    path('workspace/download/', views.download_workspace, name='download_workspace'),
+
+    # ── Workspace API ─────────────────────────────────────────────────────────
+    path('workspace/folders/list/',
+         views.workspace_list_folders,     name='workspace_list_folders'),
+
     path('workspace/folders/create/',
          views.workspace_create_folder,    name='workspace_create_folder'),
 
@@ -45,5 +55,4 @@ urlpatterns = [
 
     path('workspace/folders/<int:folder_id>/remove-question/<int:question_id>/',
          views.workspace_remove_question,  name='workspace_remove_question'),
-    path('workspace/folders/list/', views.workspace_list_folders, name='workspace_list_folders'),
 ]

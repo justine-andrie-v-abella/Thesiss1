@@ -127,7 +127,7 @@
             <!-- Action Buttons -->
             <div class="flex items-center space-x-2">
                 {% if quest.is_extracted %}
-                <a href="{% url 'questionnaires:review_extracted' quest.pk %}"
+                <a href="{% url 'questionnaires:review_extracted_pk' quest.pk %}"
                     class="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
                     <i class="bi bi-list-check mr-1"></i> Review
                 </a>

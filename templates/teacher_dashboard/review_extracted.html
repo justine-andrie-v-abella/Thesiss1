@@ -564,9 +564,9 @@
                     <i class="bi bi-check-circle mr-2" id="saveBtnIcon"></i>
                     <span id="saveBtnText">Save Questions</span>
                 </button>
-                <a href="{% url 'questionnaires:my_uploads' %}"
+                <a href="{% url 'questionnaires:cancel_pending' %}"
                     class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center flex items-center justify-center">
-                    <i class="bi bi-arrow-left mr-2"></i> Back
+                    <i class="bi bi-x-circle mr-2"></i> Cancel &amp; Discard
                 </a>
             </div>
         </div>
@@ -800,23 +800,48 @@
             if (!confirm('Remove this question?')) return;
             var questionId = btn.getAttribute('data-question-id');
             var card       = btn.closest('.question-card');
-
+ 
+            // Manual questions only exist in the DOM — just remove them
             if (!questionId || btn.getAttribute('data-manual') === 'true') {
                 fadeRemove(card);
                 return;
             }
-
+ 
             var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
             var fd   = new FormData();
             fd.append('csrfmiddlewaretoken', csrf);
             fd.append('action', 'delete_question');
-            fd.append('question_id', questionId);
-
+            fd.append('question_id', questionId);  // this is now the session list index
+ 
             fetch(window.location.href, { method: 'POST', body: fd })
-                .then(function (r) {
-                    if (r.ok) fadeRemove(card);
-                    else alert('Failed to delete question.');
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.ok) {
+                        fadeRemove(card);
+                        // Re-index remaining AI question cards so their
+                        // data-question-id stays in sync with the session list
+                        reindexQuestionCards();
+                    } else {
+                        alert(data.error || 'Failed to remove question.');
+                    }
+                })
+                .catch(function () {
+                    alert('Something went wrong. Please refresh and try again.');
                 });
+        });
+    }
+ 
+    // After a session-list deletion the remaining items shift down by one.
+    // Re-number every non-manual card's data-question-id to match.
+    function reindexQuestionCards() {
+        var idx = 0;
+        document.querySelectorAll('.question-card').forEach(function (card) {
+            if (card.dataset.manual === 'true') return;  // skip manual cards
+            var cb  = card.querySelector('.question-checkbox');
+            var btn = card.querySelector('.delete-btn');
+            if (cb)  cb.setAttribute('value', idx);
+            if (btn) btn.setAttribute('data-question-id', idx);
+            idx++;
         });
     }
 
