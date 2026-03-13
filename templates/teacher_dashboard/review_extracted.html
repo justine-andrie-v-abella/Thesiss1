@@ -10,24 +10,41 @@
         <div>
             <div class="flex items-center gap-2 text-sm text-gray-500 mb-1">
                 <span class="w-6 h-6 rounded-full bg-green-500 text-white font-bold flex items-center justify-center text-xs">✓</span>
-                <span class="text-green-600 font-medium">Upload Complete</span>
+                <span class="text-green-600 font-medium">
+                    {% if source == 'generate' %}Generation Complete{% else %}Upload Complete{% endif %}
+                </span>
                 <span class="text-gray-400">→</span>
                 <span class="w-6 h-6 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs">2</span>
                 <span class="text-blue-600 font-bold">Review & Select</span>
                 <span class="text-gray-400">→</span>
                 <span class="w-6 h-6 rounded-full bg-gray-300 text-white font-bold flex items-center justify-center text-xs">3</span>
-                <span class="text-gray-400">Save & Download</span>
+                <span class="text-gray-400">
+                    {% if source == 'generate' %}Save to Workspace{% else %}Save & Download{% endif %}
+                </span>
             </div>
-            <h1 class="text-3xl font-bold text-gray-800">Review Extracted Questions</h1>
+            <h1 class="text-3xl font-bold text-gray-800">Review
+                {% if source == 'generate' %}Generated{% else %}Extracted{% endif %}
+                Questions
+            </h1>
             <p class="text-gray-600 mt-1">{{ questionnaire.title }}</p>
         </div>
+
+        {% if source == 'generate' %}
+        <!-- Generate-mode badge -->
+        <div class="flex items-center gap-2 px-4 py-2 bg-purple-100 border border-purple-300 rounded-xl">
+            <i class="bi bi-stars text-purple-600"></i>
+            <span class="text-purple-700 font-semibold text-sm">AI Generated Mode</span>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
             <div class="text-3xl font-bold" id="totalCount">{{ questions.count }}</div>
-            <div class="text-sm opacity-90">Total Extracted</div>
+            <div class="text-sm opacity-90">Total
+                {% if source == 'generate' %}Generated{% else %}Extracted{% endif %}
+            </div>
         </div>
         <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
             <div class="text-3xl font-bold" id="selectedCount">0</div>
@@ -85,6 +102,7 @@
     <form method="post" id="questionsForm">
         {% csrf_token %}
         <input type="hidden" name="action" value="save_selected">
+        <input type="hidden" name="source" value="{{ source }}">
 
         <div class="space-y-4" id="questionsList">
             {% for question in questions %}
@@ -162,7 +180,10 @@
             {% empty %}
             <div class="bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded-lg flex items-center">
                 <i class="bi bi-exclamation-triangle text-yellow-600 text-2xl mr-3"></i>
-                <span class="text-yellow-800 font-semibold">No questions were extracted. Try uploading a different file.</span>
+                <span class="text-yellow-800 font-semibold">No questions were
+                    {% if source == 'generate' %}generated{% else %}extracted{% endif %}.
+                    Try uploading a different file.
+                </span>
             </div>
             {% endfor %}
         </div>
@@ -350,7 +371,116 @@
         </div>
         <!-- /MANUAL ADD QUESTION PANEL -->
 
-        <!-- Save & Download Section -->
+
+        <!-- ============================================================ -->
+        <!-- SAVE SECTION — switches based on source                      -->
+        <!-- ============================================================ -->
+
+        {% if source == 'generate' %}
+        <!-- ══ GENERATE MODE: Save to Workspace ══ -->
+        <div class="mt-8 bg-white rounded-xl shadow-lg overflow-hidden border-t-4 border-purple-500">
+            <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 flex items-center gap-3">
+                <span class="w-8 h-8 rounded-full bg-white/20 text-white font-bold flex items-center justify-center text-sm">3</span>
+                <div>
+                    <h3 class="text-xl font-bold text-white">Save to Workspace</h3>
+                    <p class="text-white/70 text-xs mt-0.5">Choose a folder — selected questions will be added directly to your workspace</p>
+                </div>
+            </div>
+
+            <div class="p-6 space-y-5">
+
+                <!-- Selection summary -->
+                <div class="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                    <h4 class="text-sm font-bold text-purple-800 mb-2">Selection Summary</h4>
+                    <div class="flex flex-wrap gap-4 text-sm text-purple-700">
+                        <span><i class="bi bi-check-circle mr-1"></i> <strong id="summarySelected">0</strong> questions selected</span>
+                        <span><i class="bi bi-star mr-1"></i> <strong id="summaryPoints">0</strong> total points</span>
+                        <span id="summaryTypes" class="text-indigo-600 font-medium"></span>
+                    </div>
+                </div>
+
+                <!-- Final title -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-pencil text-purple-500 mr-1"></i> Final Title
+                    </label>
+                    <input type="text" name="final_title" value="{{ questionnaire.title }}"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500">
+                </div>
+
+                <!-- Workspace folder picker -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-folder2-open text-purple-500 mr-1"></i>
+                        Save into Workspace Folder <span class="text-red-500">*</span>
+                    </label>
+
+                    <!-- Loading state -->
+                    <div id="folderLoadingState" class="flex items-center gap-2 text-sm text-gray-400 py-3">
+                        <div class="w-4 h-4 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin"></div>
+                        Loading your folders…
+                    </div>
+
+                    <!-- Folder list (populated by JS) -->
+                    <div id="folderPickerGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+
+                    <!-- No folders state -->
+                    <div id="noFoldersState" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+                        <i class="bi bi-exclamation-triangle text-amber-500 text-lg flex-shrink-0 mt-0.5"></i>
+                        <div>
+                            <p class="text-amber-800 font-semibold text-sm">No workspace folders yet</p>
+                            <p class="text-amber-700 text-xs mt-1">Create a folder in your workspace first, then come back here.</p>
+                            <a href="{% url 'questionnaires:workspace' %}" target="_blank"
+                                class="inline-flex items-center gap-1 mt-2 text-xs font-bold text-purple-600 hover:text-purple-800 underline">
+                                <i class="bi bi-folder-plus"></i> Open Workspace to create a folder
+                            </a>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="workspace_folder_id" id="selectedFolderId" value="">
+                    <p class="text-xs text-gray-400 mt-2" id="folderPickerHint">
+                        <i class="bi bi-info-circle mr-1"></i>
+                        Questions will also be saved to My Uploads so you can access them later.
+                    </p>
+                </div>
+
+                <!-- OR create a new folder inline -->
+                <div class="border-t border-gray-100 pt-4">
+                    <button type="button" id="inlineNewFolderToggle"
+                        class="flex items-center gap-2 text-sm font-semibold text-purple-600 hover:text-purple-800 transition-colors">
+                        <i class="bi bi-folder-plus"></i> Or create a new folder right here
+                        <i class="bi bi-chevron-down text-xs" id="inlineFolderChevron"></i>
+                    </button>
+
+                    <div id="inlineNewFolderForm" class="hidden mt-3 flex gap-2">
+                        <input type="text" id="newFolderName" maxlength="80"
+                            placeholder="New folder name (e.g. Midterm Exam)…"
+                            class="flex-1 px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 text-sm">
+                        <button type="button" id="createFolderInlineBtn"
+                            class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-sm transition-colors flex items-center gap-1.5 flex-shrink-0">
+                            <i class="bi bi-check-lg"></i> Create
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="flex gap-4 pt-2">
+                    <button type="submit" id="saveToWorkspaceBtn"
+                        class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
+                        disabled>
+                        <i class="bi bi-folder-check text-lg"></i>
+                        <span id="saveToWorkspaceBtnText">Select a folder first</span>
+                    </button>
+                    <a href="{% url 'questionnaires:workspace' %}"
+                        class="flex items-center gap-2 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition-colors text-sm flex-shrink-0">
+                        <i class="bi bi-arrow-left"></i> Workspace
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- ══ EXTRACT MODE: original Save & Download section ══ -->
         <div class="mt-8 bg-white rounded-xl shadow-lg p-6 border-t-4 border-blue-500">
             <div class="flex items-center mb-5">
                 <span class="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm mr-3">3</span>
@@ -367,7 +497,6 @@
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500">
                 </div>
 
-                <!-- Questionnaire Type — auto-detected, read only display -->
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         <i class="bi bi-tag text-blue-500 mr-1"></i> Questionnaire Type
@@ -384,7 +513,6 @@
                     </p>
                 </div>
 
-                <!-- Download Toggle -->
                 <div class="md:col-span-2">
                     <label class="block text-sm font-semibold text-gray-700 mb-3">
                         <i class="bi bi-file-earmark-arrow-down text-green-500 mr-1"></i> Save Options
@@ -442,6 +570,8 @@
                 </a>
             </div>
         </div>
+        {% endif %}
+
     </form>
 </div>
 
@@ -454,10 +584,16 @@
         <h3 class="text-2xl font-bold text-gray-800 mb-2">All Done!</h3>
         <p class="text-gray-600 mb-1" id="modalMessage">Your questions have been saved successfully.</p>
         <p class="text-sm text-gray-500 mb-6" id="modalSubMessage"></p>
-        <button type="button" id="modalOkBtn"
-            class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg">
-            <i class="bi bi-arrow-left mr-2"></i> OK — Go to My Uploads
-        </button>
+        <div class="flex gap-3">
+            <button type="button" id="modalGoWorkspace"
+                class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-all shadow text-sm">
+                <i class="bi bi-folder2-open mr-1"></i> Go to Workspace
+            </button>
+            <button type="button" id="modalGoUploads"
+                class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-all shadow text-sm">
+                <i class="bi bi-arrow-left mr-1"></i> My Uploads
+            </button>
+        </div>
     </div>
 </div>
 
@@ -479,39 +615,62 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 #spinner { animation: spin 1s linear infinite; }
 
-/* Manual panel slide-open animation */
-#manualAddBody {
-    transition: none;
-}
-#manualAddBody.open {
-    display: block;
-}
+#manualAddBody { transition: none; }
+#manualAddBody.open { display: block; }
 
-/* Pulse badge for newly added manual questions */
 @keyframes badgePop {
     0%   { transform: scale(0.8); opacity: 0; }
     70%  { transform: scale(1.1); }
     100% { transform: scale(1);   opacity: 1; }
 }
-.manual-badge {
-    animation: badgePop 0.35s ease-out;
-}
+.manual-badge { animation: badgePop 0.35s ease-out; }
 
-/* Slide-in for new question cards */
 @keyframes slideIn {
     from { opacity: 0; transform: translateY(-12px); }
     to   { opacity: 1; transform: translateY(0); }
 }
-.new-card-anim {
-    animation: slideIn 0.3s ease-out;
+.new-card-anim { animation: slideIn 0.3s ease-out; }
+
+/* Folder picker card */
+.folder-pick-card {
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex; align-items: center; gap: 10px;
+    background: #fff;
+    user-select: none;
 }
+.folder-pick-card:hover { border-color: #a78bfa; background: #faf5ff; }
+.folder-pick-card.selected {
+    border-color: #7c3aed;
+    background: #f5f3ff;
+    box-shadow: 0 0 0 3px #ede9fe;
+}
+.folder-pick-card .folder-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.folder-pick-card .folder-name { font-size: .875rem; font-weight: 600; color: #374151; }
+.folder-pick-card .folder-count { font-size: .75rem; color: #9ca3af; }
+.folder-pick-card .folder-check {
+    margin-left: auto; color: #7c3aed; font-size: 1.1rem;
+    opacity: 0; transition: opacity .15s;
+}
+.folder-pick-card.selected .folder-check { opacity: 1; }
 </style>
 
 <script>
 (function () {
+    // Detect generate vs extract mode from the hidden input
+    var sourceInput = document.querySelector('input[name="source"]');
+    var IS_GENERATE = sourceInput && sourceInput.value === 'generate';
 
     // ================================================================
-    // CORE: update stats + auto-detect questionnaire type
+    // CORE: update stats
     // ================================================================
     function updateStats() {
         var checked = document.querySelectorAll('.question-checkbox:checked');
@@ -527,38 +686,72 @@
         });
 
         var cnt = checked.length;
-        document.getElementById('selectedCount').textContent  = cnt;
-        document.getElementById('selectedPoints').textContent = pts;
-        document.getElementById('summarySelected').textContent = cnt;
-        document.getElementById('summaryPoints').textContent   = pts;
-        document.getElementById('typesCount').textContent      = types.size;
+        setText('selectedCount',  cnt);
+        setText('selectedPoints', pts);
+        setText('summarySelected', cnt);
+        setText('summaryPoints',   pts);
+        setText('typesCount',      types.size);
 
-        // ── Auto-detect questionnaire type ───────────────────────────
+        // Auto-detect type (extract mode only)
         var typeHidden  = document.getElementById('questionnaireType');
         var typeDisplay = document.getElementById('typeDisplay');
 
-        if (cnt === 0) {
-            typeHidden.value        = '';
-            typeDisplay.textContent = 'Select questions above to auto-detect type';
-            document.getElementById('summaryTypes').textContent = '';
-        } else if (types.size === 1) {
-            var singleType          = Array.from(types)[0];
-            typeHidden.value        = singleType;
-            typeDisplay.textContent = singleType.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); }) + ' Only';
-            document.getElementById('summaryTypes').textContent = 'Type: ' + typeDisplay.textContent;
+        if (typeHidden && typeDisplay) {
+            if (cnt === 0) {
+                typeHidden.value        = '';
+                typeDisplay.textContent = 'Select questions above to auto-detect type';
+                setText('summaryTypes', '');
+            } else if (types.size === 1) {
+                var st = Array.from(types)[0];
+                typeHidden.value        = st;
+                typeDisplay.textContent = st.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}) + ' Only';
+                setText('summaryTypes', 'Type: ' + typeDisplay.textContent);
+            } else {
+                typeHidden.value        = 'mixed';
+                typeDisplay.textContent = 'Mixed (' + Array.from(types).map(function(t){
+                    return t.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+                }).join(', ') + ')';
+                setText('summaryTypes', typeDisplay.textContent);
+            }
         } else {
-            typeHidden.value        = 'mixed';
-            typeDisplay.textContent = 'Mixed (' + Array.from(types).map(function(t){
-                return t.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
-            }).join(', ') + ')';
-            document.getElementById('summaryTypes').textContent = typeDisplay.textContent;
+            // Generate mode summary
+            var st = document.getElementById('summaryTypes');
+            if (st) {
+                if (types.size === 0) {
+                    st.textContent = '';
+                } else {
+                    st.textContent = Array.from(types).map(function(t){
+                        return t.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+                    }).join(', ');
+                }
+            }
         }
 
-        // Update total count badge
-        var totalEl = document.getElementById('totalCount');
-        if (totalEl) totalEl.textContent = document.querySelectorAll('.question-card').length;
+        setText('totalCount', document.querySelectorAll('.question-card').length);
 
-        updateSaveButtonText();
+        // Update workspace save button
+        if (IS_GENERATE) {
+            var folderId = document.getElementById('selectedFolderId') && document.getElementById('selectedFolderId').value;
+            var wsBtn    = document.getElementById('saveToWorkspaceBtn');
+            var wsBtnTxt = document.getElementById('saveToWorkspaceBtnText');
+            if (wsBtn) {
+                if (cnt > 0 && folderId) {
+                    wsBtn.disabled = false;
+                    wsBtn.classList.remove('opacity-50','cursor-not-allowed');
+                    wsBtnTxt.textContent = 'Save ' + cnt + ' Question(s) to Workspace';
+                } else if (cnt === 0) {
+                    wsBtn.disabled = true;
+                    wsBtn.classList.add('opacity-50','cursor-not-allowed');
+                    wsBtnTxt.textContent = 'Select questions first';
+                } else {
+                    wsBtn.disabled = true;
+                    wsBtn.classList.add('opacity-50','cursor-not-allowed');
+                    wsBtnTxt.textContent = 'Select a folder first';
+                }
+            }
+        }
+
+        if (!IS_GENERATE) updateSaveButtonText();
     }
 
     document.querySelectorAll('.question-checkbox').forEach(function (cb) {
@@ -571,16 +764,13 @@
     function applyFilters() {
         var type = document.getElementById('filterType').value;
         var diff = document.getElementById('filterDifficulty').value;
-
         document.querySelectorAll('.question-card').forEach(function (card) {
             var visible = (type === 'all' || card.dataset.type === type) &&
                           (diff === 'all' || card.dataset.difficulty === diff);
-
             card.style.display = visible ? 'block' : 'none';
             var cb = card.querySelector('.question-checkbox');
             if (cb) cb.checked = visible;
         });
-
         updateStats();
     }
 
@@ -592,17 +782,13 @@
     // ================================================================
     document.getElementById('selectAllBtn').addEventListener('click', function () {
         document.querySelectorAll('.question-card').forEach(function (card) {
-            if (card.style.display !== 'none') {
-                card.querySelector('.question-checkbox').checked = true;
-            }
+            if (card.style.display !== 'none') card.querySelector('.question-checkbox').checked = true;
         });
         updateStats();
     });
 
     document.getElementById('deselectAllBtn').addEventListener('click', function () {
-        document.querySelectorAll('.question-checkbox').forEach(function (cb) {
-            cb.checked = false;
-        });
+        document.querySelectorAll('.question-checkbox').forEach(function (cb) { cb.checked = false; });
         updateStats();
     });
 
@@ -612,16 +798,11 @@
     function bindDeleteBtn(btn) {
         btn.addEventListener('click', function () {
             if (!confirm('Remove this question?')) return;
-
             var questionId = btn.getAttribute('data-question-id');
             var card       = btn.closest('.question-card');
 
-            // Manual (client-only) question — just remove from DOM
             if (!questionId || btn.getAttribute('data-manual') === 'true') {
-                card.style.transition = 'opacity 0.3s, transform 0.3s';
-                card.style.opacity    = '0';
-                card.style.transform  = 'translateX(-10px)';
-                setTimeout(function () { card.remove(); updateStats(); }, 300);
+                fadeRemove(card);
                 return;
             }
 
@@ -633,16 +814,17 @@
 
             fetch(window.location.href, { method: 'POST', body: fd })
                 .then(function (r) {
-                    if (r.ok) {
-                        card.style.transition = 'opacity 0.3s, transform 0.3s';
-                        card.style.opacity    = '0';
-                        card.style.transform  = 'translateX(-10px)';
-                        setTimeout(function () { card.remove(); updateStats(); }, 300);
-                    } else {
-                        alert('Failed to delete question.');
-                    }
+                    if (r.ok) fadeRemove(card);
+                    else alert('Failed to delete question.');
                 });
         });
+    }
+
+    function fadeRemove(el) {
+        el.style.transition = 'opacity 0.3s, transform 0.3s';
+        el.style.opacity    = '0';
+        el.style.transform  = 'translateX(-10px)';
+        setTimeout(function () { el.remove(); updateStats(); }, 300);
     }
 
     document.querySelectorAll('.delete-btn').forEach(bindDeleteBtn);
@@ -666,7 +848,7 @@
     });
 
     // ================================================================
-    // MANUAL ADD — switch answer section by type
+    // MANUAL ADD — switch answer section
     // ================================================================
     var mcSection          = document.getElementById('mcSection');
     var tfSection          = document.getElementById('tfSection');
@@ -676,14 +858,9 @@
         mcSection.classList.add('hidden');
         tfSection.classList.add('hidden');
         shortAnswerSection.classList.add('hidden');
-
-        if (type === 'multiple_choice') {
-            mcSection.classList.remove('hidden');
-        } else if (type === 'true_false') {
-            tfSection.classList.remove('hidden');
-        } else {
-            shortAnswerSection.classList.remove('hidden');
-        }
+        if (type === 'multiple_choice') mcSection.classList.remove('hidden');
+        else if (type === 'true_false')  tfSection.classList.remove('hidden');
+        else shortAnswerSection.classList.remove('hidden');
     }
 
     document.getElementById('manualType').addEventListener('change', function () {
@@ -691,36 +868,28 @@
     });
 
     // ================================================================
-    // MANUAL ADD — add more MC options (up to Z)
+    // MANUAL ADD — MC option management
     // ================================================================
     var letters = ['A','B','C','D','E','F','G','H','I','J'];
 
     document.getElementById('addOptionBtn').addEventListener('click', function () {
-        var rows  = document.querySelectorAll('#mcOptions .mc-option-row');
-        var idx   = rows.length;
-        if (idx >= letters.length) {
-            alert('Maximum 10 options allowed.');
-            return;
-        }
+        var rows = document.querySelectorAll('#mcOptions .mc-option-row');
+        var idx  = rows.length;
+        if (idx >= letters.length) { alert('Maximum 10 options allowed.'); return; }
         var letter = letters[idx];
         var row    = document.createElement('div');
         row.className = 'flex items-center gap-2 mc-option-row';
         row.innerHTML =
             '<span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">' + letter + '</span>' +
             '<input type="text" placeholder="Option ' + letter + '" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">' +
-            '<label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">' +
-                '<input type="radio" name="manualCorrect" value="' + letter + '" class="w-4 h-4 text-indigo-600 cursor-pointer"> Correct' +
-            '</label>' +
-            '<button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 text-sm px-1" title="Remove option"><i class="bi bi-x-circle"></i></button>';
-
+            '<label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer"><input type="radio" name="manualCorrect" value="' + letter + '" class="w-4 h-4 text-indigo-600 cursor-pointer"> Correct</label>' +
+            '<button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 text-sm px-1"><i class="bi bi-x-circle"></i></button>';
         document.getElementById('mcOptions').appendChild(row);
         row.querySelector('.remove-mc-opt').addEventListener('click', function () {
-            row.remove();
-            relabelOptions();
+            row.remove(); relabelOptions();
         });
     });
 
-    // Show remove buttons on initial rows (only when >2 rows)
     function relabelOptions() {
         var rows = document.querySelectorAll('#mcOptions .mc-option-row');
         rows.forEach(function (r, i) {
@@ -729,10 +898,7 @@
             var rmv = r.querySelector('.remove-mc-opt');
             if (lbl) lbl.textContent = letters[i];
             if (inp) inp.value = letters[i];
-            if (rmv) {
-                if (rows.length > 2) rmv.classList.remove('hidden');
-                else rmv.classList.add('hidden');
-            }
+            if (rmv) { rows.length > 2 ? rmv.classList.remove('hidden') : rmv.classList.add('hidden'); }
         });
     }
 
@@ -756,15 +922,12 @@
         document.getElementById('manualExplanation').value  = '';
         document.getElementById('manualShortAnswer').value  = '';
 
-        // Reset MC options to A-D
         var mcOpts = document.getElementById('mcOptions');
         mcOpts.innerHTML = ['A','B','C','D'].map(function (l) {
             return '<div class="flex items-center gap-2 mc-option-row">' +
                 '<span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">' + l + '</span>' +
                 '<input type="text" placeholder="Option ' + l + '" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">' +
-                '<label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">' +
-                    '<input type="radio" name="manualCorrect" value="' + l + '" class="w-4 h-4 text-indigo-600 cursor-pointer"> Correct' +
-                '</label>' +
+                '<label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer"><input type="radio" name="manualCorrect" value="' + l + '" class="w-4 h-4 text-indigo-600 cursor-pointer"> Correct</label>' +
                 '<button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1"><i class="bi bi-x-circle"></i></button>' +
             '</div>';
         }).join('');
@@ -776,7 +939,7 @@
     document.getElementById('clearManualBtn').addEventListener('click', clearManualForm);
 
     // ================================================================
-    // MANUAL ADD — build and inject question card into the list
+    // MANUAL ADD — inject card into list
     // ================================================================
     var manualQuestionCounter = 0;
 
@@ -788,12 +951,7 @@
         var qExpl   = document.getElementById('manualExplanation').value.trim();
         var correct = '';
 
-        // ── Validate ─────────────────────────────────────────────────
-        if (!qText) {
-            alert('Please enter the question text.');
-            document.getElementById('manualQuestionText').focus();
-            return;
-        }
+        if (!qText) { alert('Please enter the question text.'); document.getElementById('manualQuestionText').focus(); return; }
 
         var optionsHTML = '';
 
@@ -801,69 +959,38 @@
             var rows    = document.querySelectorAll('#mcOptions .mc-option-row');
             var options = [];
             var correctRadio = document.querySelector('input[name="manualCorrect"]:checked');
-
             rows.forEach(function (row, i) {
-                var val = row.querySelector('.mc-option-input').value.trim();
-                options.push({ letter: letters[i], text: val });
+                options.push({ letter: letters[i], text: row.querySelector('.mc-option-input').value.trim() });
             });
-
-            if (options.some(function (o) { return !o.text; })) {
-                alert('Please fill in all answer choices, or remove empty ones.');
-                return;
-            }
-            if (!correctRadio) {
-                alert('Please mark one option as the correct answer.');
-                return;
-            }
-
+            if (options.some(function (o) { return !o.text; })) { alert('Please fill in all answer choices.'); return; }
+            if (!correctRadio) { alert('Please mark one option as the correct answer.'); return; }
             correct = correctRadio.value;
-
             optionsHTML = '<div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-2 mt-2">' +
                 options.map(function (o) {
-                    var isCorrect = o.letter === correct;
-                    return '<div class="flex items-center p-2 rounded text-sm ' +
-                        (isCorrect ? 'bg-green-50 border-2 border-green-400 font-semibold text-green-800' : 'bg-gray-50 text-gray-700') + '">' +
+                    var isC = o.letter === correct;
+                    return '<div class="flex items-center p-2 rounded text-sm ' + (isC ? 'bg-green-50 border-2 border-green-400 font-semibold text-green-800' : 'bg-gray-50 text-gray-700') + '">' +
                         '<span class="font-bold mr-2">' + o.letter + '.</span>' + escapeHtml(o.text) +
-                        (isCorrect ? '<i class="bi bi-check-circle-fill ml-auto text-green-600"></i>' : '') +
-                        '</div>';
-                }).join('') +
-            '</div>';
-
+                        (isC ? '<i class="bi bi-check-circle-fill ml-auto text-green-600"></i>' : '') + '</div>';
+                }).join('') + '</div>';
         } else if (qType === 'true_false') {
             var tfRadio = document.querySelector('input[name="tfAnswer"]:checked');
-            if (!tfRadio) {
-                alert('Please select True or False as the correct answer.');
-                return;
-            }
+            if (!tfRadio) { alert('Please select True or False.'); return; }
             correct = tfRadio.value;
-            optionsHTML = '<div class="bg-green-50 border-l-4 border-green-400 p-3 rounded text-sm mt-2">' +
-                '<span class="text-gray-500 font-medium">Answer: </span>' +
-                '<span class="text-green-800 font-semibold">' + correct + '</span></div>';
-
+            optionsHTML = '<div class="bg-green-50 border-l-4 border-green-400 p-3 rounded text-sm mt-2"><span class="text-gray-500 font-medium">Answer: </span><span class="text-green-800 font-semibold">' + correct + '</span></div>';
         } else {
             var shortAns = document.getElementById('manualShortAnswer').value.trim();
             correct = shortAns || '(open-ended)';
-            optionsHTML = '<div class="bg-green-50 border-l-4 border-green-400 p-3 rounded text-sm mt-2">' +
-                '<span class="text-gray-500 font-medium">Answer: </span>' +
-                '<span class="text-green-800 font-semibold">' + escapeHtml(correct) + '</span></div>';
+            optionsHTML = '<div class="bg-green-50 border-l-4 border-green-400 p-3 rounded text-sm mt-2"><span class="text-gray-500 font-medium">Answer: </span><span class="text-green-800 font-semibold">' + escapeHtml(correct) + '</span></div>';
         }
 
-        // ── Explanation ──────────────────────────────────────────────
-        var explHTML = qExpl
-            ? '<div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300">' +
-              '<i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>' + escapeHtml(qExpl) + '</div>'
-            : '';
-
-        // ── Difficulty border colour ─────────────────────────────────
+        var explHTML    = qExpl ? '<div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300"><i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>' + escapeHtml(qExpl) + '</div>' : '';
         var borderColor = qDiff === 'easy' ? 'border-green-500' : (qDiff === 'hard' ? 'border-red-500' : 'border-yellow-500');
         var diffBadge   = qDiff === 'easy' ? 'bg-green-100 text-green-800' : (qDiff === 'hard' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800');
-
-        var typeLabel   = qType.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+        var typeLabel   = qType.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
 
         manualQuestionCounter++;
         var uid = 'manual_' + manualQuestionCounter;
 
-        // ── Build card ───────────────────────────────────────────────
         var card = document.createElement('div');
         card.className = 'question-card bg-white rounded-lg shadow-md overflow-hidden border-l-4 ' + borderColor + ' new-card-anim transition-all';
         card.dataset.type       = qType;
@@ -873,106 +1000,204 @@
         card.dataset.uid        = uid;
 
         card.innerHTML =
-            '<div class="p-5">' +
-                '<div class="flex items-start gap-4">' +
-                    '<div class="flex-shrink-0 pt-1">' +
-                        '<input type="checkbox" name="manual_questions[]" value="' + uid + '" ' +
-                            'class="question-checkbox w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer" checked>' +
+            '<div class="p-5"><div class="flex items-start gap-4">' +
+                '<div class="flex-shrink-0 pt-1"><input type="checkbox" name="manual_questions[]" value="' + uid + '" class="question-checkbox w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer" checked></div>' +
+                '<div class="flex-1 min-w-0">' +
+                    '<div class="flex flex-wrap gap-2 mb-2">' +
+                        '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">' + typeLabel + '</span>' +
+                        '<span class="px-2 py-0.5 text-xs font-semibold rounded-full ' + diffBadge + '">' + capitalize(qDiff) + '</span>' +
+                        '<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">' + qPts + ' pt' + (qPts!==1?'s':'') + '</span>' +
+                        '<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full manual-badge"><i class="bi bi-pencil-fill mr-1"></i>Manual</span>' +
                     '</div>' +
-                    '<div class="flex-1 min-w-0">' +
-                        '<div class="flex flex-wrap gap-2 mb-2">' +
-                            '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">' + typeLabel + '</span>' +
-                            '<span class="px-2 py-0.5 text-xs font-semibold rounded-full ' + diffBadge + '">' + capitalize(qDiff) + '</span>' +
-                            '<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">' + qPts + ' pt' + (qPts !== 1 ? 's' : '') + '</span>' +
-                            '<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full manual-badge">' +
-                                '<i class="bi bi-pencil-fill mr-1"></i>Manual</span>' +
-                        '</div>' +
-                        '<p class="text-gray-800 font-medium mb-1">' + escapeHtml(qText) + '</p>' +
-                        optionsHTML +
-                        explHTML +
-
-                        // Hidden fields that will travel with form submission
-                        '<input type="hidden" name="manual_question_text[]"   value="' + escapeAttr(qText)    + '">' +
-                        '<input type="hidden" name="manual_question_type[]"   value="' + escapeAttr(qType)    + '">' +
-                        '<input type="hidden" name="manual_difficulty[]"      value="' + escapeAttr(qDiff)    + '">' +
-                        '<input type="hidden" name="manual_points[]"          value="' + qPts                 + '">' +
-                        '<input type="hidden" name="manual_correct_answer[]"  value="' + escapeAttr(correct)  + '">' +
-                        '<input type="hidden" name="manual_explanation[]"     value="' + escapeAttr(qExpl)    + '">' +
-                        (qType === 'multiple_choice' ? buildMcHiddenInputs(qType, uid) : '') +
-                    '</div>' +
-                    '<button type="button" class="delete-btn flex-shrink-0 bg-red-100 text-red-600 hover:bg-red-500 hover:text-white px-3 py-2 rounded transition-colors text-sm" data-manual="true" title="Remove Question">' +
-                        '<i class="bi bi-trash"></i>' +
-                    '</button>' +
+                    '<p class="text-gray-800 font-medium mb-1">' + escapeHtml(qText) + '</p>' +
+                    optionsHTML + explHTML +
+                    '<input type="hidden" name="manual_question_text[]"  value="' + escapeAttr(qText)   + '">' +
+                    '<input type="hidden" name="manual_question_type[]"  value="' + escapeAttr(qType)   + '">' +
+                    '<input type="hidden" name="manual_difficulty[]"     value="' + escapeAttr(qDiff)   + '">' +
+                    '<input type="hidden" name="manual_points[]"         value="' + qPts                + '">' +
+                    '<input type="hidden" name="manual_correct_answer[]" value="' + escapeAttr(correct) + '">' +
+                    '<input type="hidden" name="manual_explanation[]"    value="' + escapeAttr(qExpl)   + '">' +
+                    (qType === 'multiple_choice' ? buildMcHiddenInputs() : '') +
                 '</div>' +
-            '</div>';
+                '<button type="button" class="delete-btn flex-shrink-0 bg-red-100 text-red-600 hover:bg-red-500 hover:text-white px-3 py-2 rounded transition-colors text-sm" data-manual="true" title="Remove Question"><i class="bi bi-trash"></i></button>' +
+            '</div></div>';
 
         document.getElementById('questionsList').prepend(card);
-
-        // Bind events
         card.querySelector('.question-checkbox').addEventListener('change', updateStats);
         bindDeleteBtn(card.querySelector('.delete-btn'));
-
         updateStats();
         clearManualForm();
-
-        // Collapse panel after adding
         panelOpen = false;
         manualBodyEl.classList.add('hidden');
         manualChevronEl.style.transform = 'rotate(0deg)';
-
-        // Scroll to the new card
         card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
-    // Helper: build hidden option inputs for MC (used if backend needs individual options)
-    function buildMcHiddenInputs(type, uid) {
+    function buildMcHiddenInputs() {
         var rows   = document.querySelectorAll('#mcOptions .mc-option-row');
         var fields = '';
         rows.forEach(function (row, i) {
-            var val = row.querySelector('.mc-option-input').value.trim();
-            fields += '<input type="hidden" name="manual_option_' + letters[i] + '[]" value="' + escapeAttr(val) + '">';
+            fields += '<input type="hidden" name="manual_option_' + letters[i] + '[]" value="' + escapeAttr(row.querySelector('.mc-option-input').value.trim()) + '">';
         });
         return fields;
     }
 
     // ================================================================
-    // DOWNLOAD TOGGLE
+    // DOWNLOAD TOGGLE (extract mode only)
     // ================================================================
     var downloadEnabled = false;
 
-    document.getElementById('downloadToggle').addEventListener('click', function () {
-        downloadEnabled = !downloadEnabled;
-        var toggle     = document.getElementById('downloadToggle');
-        var knob       = document.getElementById('toggleKnob');
-        var fmtOptions = document.getElementById('formatOptions');
-
-        if (downloadEnabled) {
-            toggle.classList.replace('bg-gray-300', 'bg-green-500');
-            knob.style.transform = 'translateX(28px)';
-            toggle.setAttribute('aria-checked', 'true');
-            fmtOptions.classList.remove('hidden');
-            fmtOptions.classList.add('flex');
-        } else {
-            toggle.classList.replace('bg-green-500', 'bg-gray-300');
-            knob.style.transform = 'translateX(0)';
-            toggle.setAttribute('aria-checked', 'false');
-            fmtOptions.classList.add('hidden');
-            fmtOptions.classList.remove('flex');
-        }
-
-        updateSaveButtonText();
-    });
+    var dlToggle = document.getElementById('downloadToggle');
+    if (dlToggle) {
+        dlToggle.addEventListener('click', function () {
+            downloadEnabled = !downloadEnabled;
+            var knob       = document.getElementById('toggleKnob');
+            var fmtOptions = document.getElementById('formatOptions');
+            if (downloadEnabled) {
+                dlToggle.classList.replace('bg-gray-300','bg-green-500');
+                knob.style.transform = 'translateX(28px)';
+                dlToggle.setAttribute('aria-checked','true');
+                fmtOptions.classList.remove('hidden'); fmtOptions.classList.add('flex');
+            } else {
+                dlToggle.classList.replace('bg-green-500','bg-gray-300');
+                knob.style.transform = 'translateX(0)';
+                dlToggle.setAttribute('aria-checked','false');
+                fmtOptions.classList.add('hidden'); fmtOptions.classList.remove('flex');
+            }
+            updateSaveButtonText();
+        });
+    }
 
     function updateSaveButtonText() {
         var btnText = document.getElementById('saveBtnText');
         var btnIcon = document.getElementById('saveBtnIcon');
-        if (downloadEnabled) {
-            btnText.textContent = 'Save & Download';
-            btnIcon.className   = 'bi bi-download mr-2';
-        } else {
-            btnText.textContent = 'Save Questions';
-            btnIcon.className   = 'bi bi-check-circle mr-2';
-        }
+        if (!btnText) return;
+        if (downloadEnabled) { btnText.textContent='Save & Download'; btnIcon.className='bi bi-download mr-2'; }
+        else                 { btnText.textContent='Save Questions';  btnIcon.className='bi bi-check-circle mr-2'; }
+    }
+
+    // ================================================================
+    // WORKSPACE FOLDER PICKER (generate mode only)
+    // ================================================================
+    if (IS_GENERATE) {
+        var selectedFolderIdEl = document.getElementById('selectedFolderId');
+        var folderGrid         = document.getElementById('folderPickerGrid');
+        var folderLoading      = document.getElementById('folderLoadingState');
+        var noFoldersEl        = document.getElementById('noFoldersState');
+
+        // Load folders from workspace API
+        fetch('/questionnaires/workspace/folders/list/')
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                folderLoading.classList.add('hidden');
+
+                var folders = data.folders || [];
+                if (folders.length === 0) {
+                    noFoldersEl.classList.remove('hidden');
+                    return;
+                }
+
+                folderGrid.classList.remove('hidden');
+                folders.forEach(function(folder){
+                    var card = document.createElement('div');
+                    card.className = 'folder-pick-card';
+                    card.dataset.folderId = folder.id;
+                    card.innerHTML =
+                        '<div class="folder-icon"><i class="bi bi-folder2-open text-white text-base"></i></div>' +
+                        '<div class="flex-1 min-w-0">' +
+                            '<div class="folder-name truncate">' + escapeHtml(folder.name) + '</div>' +
+                            '<div class="folder-count">' + folder.question_count + ' question(s)</div>' +
+                        '</div>' +
+                        '<i class="bi bi-check-circle-fill folder-check"></i>';
+
+                    card.addEventListener('click', function(){
+                        // Deselect all
+                        document.querySelectorAll('.folder-pick-card').forEach(function(c){
+                            c.classList.remove('selected');
+                        });
+                        card.classList.add('selected');
+                        selectedFolderIdEl.value = folder.id;
+                        updateStats(); // refreshes save button
+                    });
+
+                    folderGrid.appendChild(card);
+                });
+            })
+            .catch(function(){
+                folderLoading.innerHTML = '<span class="text-red-500 text-sm">Failed to load folders. Please refresh.</span>';
+            });
+
+        // Inline create folder toggle
+        var inlineToggle  = document.getElementById('inlineNewFolderToggle');
+        var inlineForm    = document.getElementById('inlineNewFolderForm');
+        var inlineChevron = document.getElementById('inlineFolderChevron');
+        var inlineOpen    = false;
+
+        inlineToggle && inlineToggle.addEventListener('click', function(){
+            inlineOpen = !inlineOpen;
+            if (inlineOpen) {
+                inlineForm.classList.remove('hidden');
+                inlineChevron.className = 'bi bi-chevron-up text-xs';
+            } else {
+                inlineForm.classList.add('hidden');
+                inlineChevron.className = 'bi bi-chevron-down text-xs';
+            }
+        });
+
+        // Inline create folder submit
+        document.getElementById('createFolderInlineBtn').addEventListener('click', function(){
+            var name = document.getElementById('newFolderName').value.trim();
+            if (!name) { alert('Please enter a folder name.'); return; }
+
+            var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            fetch('/questionnaires/workspace/folders/create/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                body: JSON.stringify({ name: name })
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                if (data.error) { alert(data.error); return; }
+
+                // Add new card to folder grid
+                folderGrid.classList.remove('hidden');
+                noFoldersEl.classList.add('hidden');
+
+                var card = document.createElement('div');
+                card.className = 'folder-pick-card';
+                card.dataset.folderId = data.id;
+                card.innerHTML =
+                    '<div class="folder-icon"><i class="bi bi-folder2-open text-white text-base"></i></div>' +
+                    '<div class="flex-1 min-w-0">' +
+                        '<div class="folder-name truncate">' + escapeHtml(data.name) + '</div>' +
+                        '<div class="folder-count">0 question(s)</div>' +
+                    '</div>' +
+                    '<i class="bi bi-check-circle-fill folder-check"></i>';
+
+                card.addEventListener('click', function(){
+                    document.querySelectorAll('.folder-pick-card').forEach(function(c){ c.classList.remove('selected'); });
+                    card.classList.add('selected');
+                    selectedFolderIdEl.value = data.id;
+                    updateStats();
+                });
+
+                folderGrid.prepend(card);
+
+                // Auto-select the new folder
+                document.querySelectorAll('.folder-pick-card').forEach(function(c){ c.classList.remove('selected'); });
+                card.classList.add('selected');
+                selectedFolderIdEl.value = data.id;
+
+                // Reset inline form
+                document.getElementById('newFolderName').value = '';
+                inlineForm.classList.add('hidden');
+                inlineChevron.className = 'bi bi-chevron-down text-xs';
+                inlineOpen = false;
+
+                updateStats();
+            })
+            .catch(function(){ alert('Failed to create folder. Please try again.'); });
+        });
     }
 
     // ================================================================
@@ -981,44 +1206,57 @@
     document.getElementById('questionsForm').addEventListener('submit', function (e) {
         e.preventDefault();
 
-        // Count ALL checked checkboxes — both AI-extracted and manual cards
         var checkedBoxes = document.querySelectorAll('.question-checkbox:checked');
-
-        // Also count checked manual cards separately for clarity
-        var checkedManualCards = Array.from(
-            document.querySelectorAll('.question-card[data-manual="true"]')
-        ).filter(function (card) {
-            var cb = card.querySelector('.question-checkbox');
-            return cb && cb.checked;
-        });
-
-        var totalSelected = checkedBoxes.length; // includes both AI + manual
+        var totalSelected = checkedBoxes.length;
 
         if (totalSelected === 0) {
             alert('Please select at least one question to save.');
             return;
         }
 
-        var typeVal = document.getElementById('questionnaireType').value;
-        if (!typeVal) {
-            alert('Could not detect questionnaire type. Please select at least one question.');
-            return;
+        // Generate mode validation: must have a folder selected
+        if (IS_GENERATE) {
+            var folderId = document.getElementById('selectedFolderId').value;
+            if (!folderId) {
+                alert('Please select a workspace folder to save questions into.');
+                return;
+            }
+        } else {
+            // Extract mode: need type detection
+            var typeVal = document.getElementById('questionnaireType') && document.getElementById('questionnaireType').value;
+            if (!typeVal) {
+                alert('Could not detect questionnaire type. Please select at least one question.');
+                return;
+            }
         }
 
         var format = 'none';
-        if (downloadEnabled) {
+        if (!IS_GENERATE && downloadEnabled) {
             var checkedRadio = document.querySelector('input[name="download_format"]:checked');
             if (checkedRadio) format = checkedRadio.value;
         }
 
+        var loadingModal = document.getElementById('loadingModal');
+        document.getElementById('loadingMessage').textContent = IS_GENERATE
+            ? 'Saving ' + totalSelected + ' question(s) to workspace…'
+            : (downloadEnabled ? 'Saving and generating file…' : 'Saving ' + totalSelected + ' question(s)…');
+        loadingModal.classList.remove('hidden');
+        loadingModal.classList.add('flex');
+
         var formData = new FormData();
         formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
         formData.append('action', 'save_selected');
+        formData.append('source', IS_GENERATE ? 'generate' : 'extract');
         formData.append('final_title', document.querySelector('[name=final_title]').value);
-        formData.append('questionnaire_type', typeVal);
         formData.append('download_format', format);
 
-        // Append selected AI-extracted question IDs (skip manual cards)
+        if (IS_GENERATE) {
+            formData.append('workspace_folder_id', document.getElementById('selectedFolderId').value);
+        } else {
+            formData.append('questionnaire_type', document.getElementById('questionnaireType').value);
+        }
+
+        // AI-extracted questions
         document.querySelectorAll('.question-checkbox:checked').forEach(function (cb) {
             var card = cb.closest('.question-card');
             if (card && card.dataset.manual !== 'true') {
@@ -1026,67 +1264,63 @@
             }
         });
 
-        // Append manual question data from every checked manual card
-        checkedManualCards.forEach(function (card) {
-            formData.append('manual_selected_uid[]', card.dataset.uid);
-            card.querySelectorAll('input[type="hidden"]').forEach(function (inp) {
-                formData.append(inp.name, inp.value);
+        // Manual questions
+        Array.from(document.querySelectorAll('.question-card[data-manual="true"]'))
+            .filter(function(c){ return c.querySelector('.question-checkbox').checked; })
+            .forEach(function(card){
+                formData.append('manual_selected_uid[]', card.dataset.uid);
+                card.querySelectorAll('input[type="hidden"]').forEach(function(inp){
+                    formData.append(inp.name, inp.value);
+                });
             });
-        });
 
-        // Loading modal
-        var loadingModal = document.getElementById('loadingModal');
-        document.getElementById('loadingMessage').textContent = downloadEnabled
-            ? 'Saving ' + totalSelected + ' question(s) and generating file...'
-            : 'Saving ' + totalSelected + ' question(s)...';
-        loadingModal.classList.remove('hidden');
-        loadingModal.classList.add('flex');
-
-        // Save only — POST via real form
-        if (!downloadEnabled) {
+        // For extract mode without download — submit normally
+        if (!IS_GENERATE && !downloadEnabled) {
             var tmpForm = document.createElement('form');
             tmpForm.method = 'POST';
             tmpForm.action = window.location.href;
             document.body.appendChild(tmpForm);
-
             formData.forEach(function (value, key) {
-                var input   = document.createElement('input');
-                input.type  = 'hidden';
-                input.name  = key;
-                input.value = value;
+                var input = document.createElement('input');
+                input.type = 'hidden'; input.name = key; input.value = value;
                 tmpForm.appendChild(input);
             });
-
             tmpForm.submit();
             return;
         }
 
-        // Save + Download — fetch blob
+        // All other cases — fetch
         fetch(window.location.href, { method: 'POST', body: formData })
             .then(function (response) {
                 var ct = response.headers.get('content-type') || '';
 
-                if (ct.includes('application/') || ct.includes('text/plain')) {
+                // File download response (extract + download mode)
+                if (!IS_GENERATE && (ct.includes('application/') || ct.includes('text/plain'))) {
                     return response.blob().then(function (blob) {
                         var disposition = response.headers.get('content-disposition') || '';
                         var filename    = 'questionnaire.' + format;
                         var match       = disposition.match(/filename="?([^"]+)"?/);
                         if (match) filename = match[1];
-
                         var url = URL.createObjectURL(blob);
                         var a   = document.createElement('a');
-                        a.href     = url;
-                        a.download = filename;
-                        document.body.appendChild(a);
-                        a.click();
-                        a.remove();
+                        a.href = url; a.download = filename;
+                        document.body.appendChild(a); a.click(); a.remove();
                         URL.revokeObjectURL(url);
-
                         showSuccess(totalSelected, format);
                     });
-                } else {
-                    showSuccess(totalSelected, 'none');
                 }
+
+                // JSON response (generate mode workspace save)
+                return response.json().then(function(data){
+                    loadingModal.classList.add('hidden');
+                    loadingModal.classList.remove('flex');
+
+                    if (data.success) {
+                        showSuccess(totalSelected, 'workspace', data.folder_name || '');
+                    } else {
+                        alert(data.error || 'Failed to save questions. Please try again.');
+                    }
+                });
             })
             .catch(function () {
                 loadingModal.classList.add('hidden');
@@ -1098,44 +1332,44 @@
     // ================================================================
     // SUCCESS MODAL
     // ================================================================
-    function showSuccess(count, format) {
+    function showSuccess(count, format, folderName) {
         document.getElementById('loadingModal').classList.add('hidden');
         document.getElementById('loadingModal').classList.remove('flex');
 
-        document.getElementById('modalMessage').textContent = count + ' question(s) saved successfully!';
-        document.getElementById('modalSubMessage').textContent = format !== 'none'
-            ? 'Your ' + format.toUpperCase() + ' file has been downloaded.'
-            : 'Your questions are saved. You can download anytime from My Uploads.';
+        if (IS_GENERATE) {
+            document.getElementById('modalMessage').textContent    = count + ' question(s) saved to your workspace!';
+            document.getElementById('modalSubMessage').textContent = folderName ? 'Folder: "' + folderName + '"' : 'Questions are also saved in My Uploads.';
+        } else {
+            document.getElementById('modalMessage').textContent    = count + ' question(s) saved successfully!';
+            document.getElementById('modalSubMessage').textContent = format !== 'none'
+                ? 'Your ' + format.toUpperCase() + ' file has been downloaded.'
+                : 'Your questions are saved. You can download anytime from My Uploads.';
+        }
 
         var sm = document.getElementById('successModal');
         sm.classList.remove('hidden');
         sm.classList.add('flex');
     }
 
-    document.getElementById('modalOkBtn').addEventListener('click', function () {
+    document.getElementById('modalGoWorkspace').addEventListener('click', function () {
+        window.location.href = "{% url 'questionnaires:workspace' %}";
+    });
+    document.getElementById('modalGoUploads').addEventListener('click', function () {
         window.location.href = "{% url 'questionnaires:my_uploads' %}";
     });
 
     // ================================================================
     // UTILS
     // ================================================================
+    function setText(id, val) { var el=document.getElementById(id); if(el) el.textContent=val; }
     function escapeHtml(str) {
-        return String(str)
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-            .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
-    function escapeAttr(str) {
-        return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-    function capitalize(str) {
-        return str.charAt(0).toUpperCase() + str.slice(1);
-    }
+    function escapeAttr(str) { return String(str).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function capitalize(str) { return str.charAt(0).toUpperCase() + str.slice(1); }
 
-    // ================================================================
-    // INIT
-    // ================================================================
+    // Init
     updateStats();
-
 })();
 </script>
 

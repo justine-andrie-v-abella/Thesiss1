@@ -152,8 +152,19 @@ def upload_questionnaire(request):
 
 @login_required
 def generate_questionnaire(request):
+    """
+    Teacher uploads a MODULE (lecture notes, textbook chapter, etc.).
+    AI *generates* brand-new questions from the content — it does NOT copy
+    existing questions from the file.
+
+    Flow:
+        POST  → validate form → save Questionnaire → call Gemini with
+                mode='generate' + num_questions → redirect to review_extracted
+        review_extracted → teacher approves questions → saved to my_uploads
+                           (teacher can then add them to workspace from browse page)
+    """
     if request.user.is_staff:
-        messages.error(request, 'Admins cannot generate questionnaires')
+        messages.error(request, 'Admins cannot generate questionnaires.')
         return redirect('accounts:admin_dashboard')
 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
@@ -162,64 +173,132 @@ def generate_questionnaire(request):
         form = QuestionnaireUploadForm(request.POST, request.FILES, user=request.user)
 
         if form.is_valid():
-            questionnaire = form.save(commit=False)
-            questionnaire.uploader = teacher
+            # ── 1. Save the Questionnaire record ──────────────────────────────
+            questionnaire                    = form.save(commit=False)
+            questionnaire.uploader          = teacher
+            questionnaire.department        = teacher.department
+            questionnaire.exam_type         = form.cleaned_data['exam_type']
+            questionnaire.extraction_status = 'processing'
             questionnaire.save()
 
             ActivityLog.objects.create(
                 activity_type='questionnaire_uploaded',
                 user=request.user,
-                description=f'You uploaded "{questionnaire.title}" for AI extraction'
+                description=(
+                    f'You uploaded "{questionnaire.title}" '
+                    f'(module) for AI question generation'
+                ),
             )
 
             try:
-                questionnaire.extraction_status = 'processing'
-                questionnaire.save()
-
-                question_types = form.cleaned_data.get('question_types')
-                if question_types:
-                    type_names = [qt.name for qt in question_types]
+                from django.urls import reverse
+                # ── 2. Determine which question types the teacher wants ────────
+                question_types_qs = form.cleaned_data.get('question_types')
+                if question_types_qs:
+                    type_names = [qt.name for qt in question_types_qs]
                 else:
                     type_names = list(
-                        QuestionType.objects.filter(is_active=True).values_list('name', flat=True)
+                        QuestionType.objects.filter(is_active=True)
+                                            .values_list('name', flat=True)
                     )
 
-                extractor = get_extractor()
-                created_questions = extractor.process_questionnaire(questionnaire, type_names)
+                # ── 3. How many questions per type? ───────────────────────────
+                try:
+                    num_questions = int(request.POST.get('num_questions', 10))
+                    num_questions = max(1, min(num_questions, 30))   # clamp 1–30
+                except (ValueError, TypeError):
+                    num_questions = 10
+
+                # ── 4. Call the AI extractor in GENERATE mode ─────────────────
+                extractor       = get_extractor()
+                created_questions = extractor.process_questionnaire(
+                    questionnaire,
+                    type_names,
+                    mode='generate',
+                    num_questions=num_questions,   # ← new param (see service update)
+                )
+
+                if not created_questions:
+                    # Clean up — don't leave an empty questionnaire behind
+                    questionnaire.file.delete(save=False)
+                    questionnaire.delete()
+                    messages.error(
+                        request,
+                        'The AI could not generate any questions from this file. '
+                        'Please upload a more content-rich document and try again.',
+                    )
+                    return render(
+                        request,
+                        'teacher_dashboard/generate_questionnaire.html',
+                        {'form': form},
+                    )
 
                 questionnaire.extraction_status = 'completed'
-                questionnaire.is_extracted = True
+                questionnaire.is_extracted      = True
                 questionnaire.save()
+
+                # Delete the uploaded file — only needed for text extraction.
+                # The Questionnaire DB record is kept so ExtractedQuestion FKs stay valid,
+                # but the physical file is removed and the record is hidden from My Uploads.
+                try:
+                    questionnaire.file.delete(save=True)  # wipes disk + clears file field
+                except Exception:
+                    pass  # non-critical
 
                 ActivityLog.objects.create(
                     activity_type='questions_extracted',
                     user=request.user,
-                    description=f'Successfully extracted {len(created_questions)} questions from "{questionnaire.title}"'
+                    description=(
+                        f'AI generated {len(created_questions)} question(s) '
+                        f'from "{questionnaire.title}"'
+                    ),
                 )
 
-                messages.success(request, f'Successfully extracted {len(created_questions)} questions!')
-                return redirect('questionnaires:review_extracted', pk=questionnaire.pk)
+                messages.success(
+                    request,
+                    f'AI generated {len(created_questions)} question(s)! '
+                    f'Review and save the ones you want to your workspace.',
+                )
+                return redirect(
+                    f"{reverse('questionnaires:review_extracted', kwargs={'pk': questionnaire.pk})}?source=generate"
+                )
 
             except Exception as e:
-                questionnaire.extraction_status = 'failed'
-                questionnaire.extraction_error = str(e)
-                questionnaire.save()
+                # Clean up on failure so no orphan record is left
+                try:
+                    questionnaire.file.delete(save=False)
+                    questionnaire.delete()
+                except Exception:
+                    pass
 
                 ActivityLog.objects.create(
                     activity_type='extraction_failed',
                     user=request.user,
-                    description=f'Question extraction failed for "{questionnaire.title}"'
+                    description='AI question generation failed — file was not saved.',
                 )
 
-                messages.error(request, f'AI extraction failed: {str(e)}. Please try again.')
-                return render(request, 'teacher_dashboard/upload_questionnaire.html', {'form': form})
+                messages.error(
+                    request,
+                    f'AI generation failed: {str(e)}. '
+                    f'Your file was not saved. Please try again.',
+                )
+                return render(
+                    request,
+                    'teacher_dashboard/generate_questionnaire.html',
+                    {'form': form},
+                )
+
         else:
             messages.error(request, 'Please correct the errors below.')
+
     else:
         form = QuestionnaireUploadForm(user=request.user)
 
-    return render(request, 'teacher_dashboard/upload_questionnaire.html', {'form': form})
-
+    return render(
+        request,
+        'teacher_dashboard/generate_questionnaire.html',
+        {'form': form},
+    )
 
 @login_required
 def review_extracted_questions(request, pk):
@@ -238,12 +317,20 @@ def review_extracted_questions(request, pk):
 
     extracted_questions = questionnaire.extracted_questions.select_related('question_type').all()
 
+    # ── detect which flow we came from ────────────────────────────────────────
+    # The generate view passes ?source=generate in the redirect URL.
+    source = request.GET.get('source', request.POST.get('source', 'extract'))
+
     if request.method == 'POST':
         action = request.POST.get('action')
+        source = request.POST.get('source', 'extract')   # keep it across POST
 
         if action == 'save_selected':
+
+            # ── 1. Collect AI-extracted question IDs ──────────────────────────
             selected_ids = request.POST.getlist('selected_questions')
 
+            # ── 2. Build any manually-added questions ─────────────────────────
             manual_uids         = request.POST.getlist('manual_selected_uid[]')
             manual_texts        = request.POST.getlist('manual_question_text[]')
             manual_types        = request.POST.getlist('manual_question_type[]')
@@ -251,11 +338,10 @@ def review_extracted_questions(request, pk):
             manual_points_list  = request.POST.getlist('manual_points[]')
             manual_answers      = request.POST.getlist('manual_correct_answer[]')
             manual_explanations = request.POST.getlist('manual_explanation[]')
-
-            manual_opts_a = request.POST.getlist('manual_option_A[]')
-            manual_opts_b = request.POST.getlist('manual_option_B[]')
-            manual_opts_c = request.POST.getlist('manual_option_C[]')
-            manual_opts_d = request.POST.getlist('manual_option_D[]')
+            manual_opts_a       = request.POST.getlist('manual_option_A[]')
+            manual_opts_b       = request.POST.getlist('manual_option_B[]')
+            manual_opts_c       = request.POST.getlist('manual_option_C[]')
+            manual_opts_d       = request.POST.getlist('manual_option_D[]')
 
             type_name_map = {
                 'fill_in_the_blank': 'fill_blank',
@@ -294,11 +380,6 @@ def review_extracted_questions(request, pk):
                     if not question_type_obj:
                         continue
 
-                opt_a = manual_opts_a[i] if i < len(manual_opts_a) else None
-                opt_b = manual_opts_b[i] if i < len(manual_opts_b) else None
-                opt_c = manual_opts_c[i] if i < len(manual_opts_c) else None
-                opt_d = manual_opts_d[i] if i < len(manual_opts_d) else None
-
                 new_q = ExtractedQuestion.objects.create(
                     questionnaire  = questionnaire,
                     question_type  = question_type_obj,
@@ -308,28 +389,34 @@ def review_extracted_questions(request, pk):
                     points         = q_pts,
                     difficulty     = q_diff,
                     is_approved    = True,
-                    option_a       = opt_a or None,
-                    option_b       = opt_b or None,
-                    option_c       = opt_c or None,
-                    option_d       = opt_d or None,
+                    option_a       = manual_opts_a[i] if i < len(manual_opts_a) else None,
+                    option_b       = manual_opts_b[i] if i < len(manual_opts_b) else None,
+                    option_c       = manual_opts_c[i] if i < len(manual_opts_c) else None,
+                    option_d       = manual_opts_d[i] if i < len(manual_opts_d) else None,
                 )
                 newly_created_ids.append(new_q.id)
 
             all_approved_ids = list(selected_ids) + [str(i) for i in newly_created_ids]
 
             if not all_approved_ids:
+                if source == 'generate':
+                    from django.http import JsonResponse as _JsonResponse
+                    return _JsonResponse({'success': False, 'error': 'Please select at least one question.'})
                 messages.error(request, 'Please select at least one question.')
                 return redirect('questionnaires:review_extracted', pk=pk)
 
+            # Mark approved / unapproved
             extracted_questions.filter(id__in=selected_ids).update(is_approved=True)
             extracted_questions.exclude(id__in=all_approved_ids).update(is_approved=False)
 
+            # Update title
             final_title = request.POST.get('final_title', '').strip()
             if final_title:
                 questionnaire.title = final_title
                 questionnaire.save()
 
             total_saved = len(all_approved_ids)
+
             ActivityLog.objects.create(
                 activity_type='questions_approved',
                 user=request.user,
@@ -339,6 +426,55 @@ def review_extracted_questions(request, pk):
                 )
             )
 
+            # ── GENERATE MODE: also save into workspace folder ─────────────────
+            if source == 'generate':
+                folder_id = request.POST.get('workspace_folder_id', '').strip()
+
+                if not folder_id:
+                    return JsonResponse({'success': False, 'error': 'No workspace folder selected.'})
+
+                teacher = get_object_or_404(TeacherProfile, user=request.user)
+
+                try:
+                    folder = WorkspaceFolder.objects.get(pk=folder_id, teacher=teacher)
+                except WorkspaceFolder.DoesNotExist:
+                    return JsonResponse({'success': False, 'error': 'Workspace folder not found.'})
+
+                # Add all approved questions to the folder
+                approved_questions = ExtractedQuestion.objects.filter(
+                    id__in=all_approved_ids,
+                    questionnaire=questionnaire,
+                )
+
+                added   = 0
+                already = 0
+                for q in approved_questions:
+                    _, created = WorkspaceFolderQuestion.objects.get_or_create(
+                        folder=folder, question=q
+                    )
+                    if created:
+                        added += 1
+                    else:
+                        already += 1
+
+                ActivityLog.objects.create(
+                    activity_type='questions_approved',
+                    user=request.user,
+                    description=(
+                        f'Saved {added} generated question(s) to workspace folder '
+                        f'"{folder.name}" from "{questionnaire.title}"'
+                    )
+                )
+
+                return JsonResponse({
+                    'success':     True,
+                    'added':       added,
+                    'already':     already,
+                    'folder_name': folder.name,
+                    'total_saved': total_saved,
+                })
+
+            # ── EXTRACT MODE: original download / redirect flow ────────────────
             download_format = request.POST.get('download_format', 'none')
             if download_format != 'none':
                 from django.urls import reverse
@@ -376,9 +512,11 @@ def review_extracted_questions(request, pk):
         'questions':      extracted_questions,
         'question_types': question_types,
         'total_points':   sum(q.points for q in extracted_questions),
+        'source':         source,   # ← 'generate' or 'extract'
     }
 
     return render(request, 'teacher_dashboard/review_extracted.html', context)
+
 
 
 @login_required
@@ -450,7 +588,15 @@ def my_uploads(request):
         return redirect('accounts:admin_dashboard')
 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
-    questionnaires = Questionnaire.objects.filter(uploader=teacher).select_related('department', 'subject')
+
+    # Exclude generated questionnaires — their file field is cleared after
+    # AI generation so the physical file is not stored on disk.
+    questionnaires = (
+        Questionnaire.objects
+        .filter(uploader=teacher)
+        .exclude(file='')          # ← hides generate_questionnaire records
+        .select_related('department', 'subject')
+    )
 
     search_query = request.GET.get('search', '')
     if search_query:
@@ -460,12 +606,12 @@ def my_uploads(request):
             Q(subject__name__icontains=search_query)
         )
 
-    paginator = Paginator(questionnaires, 10)
+    paginator   = Paginator(questionnaires, 10)
     page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj    = paginator.get_page(page_number)
 
     context = {
-        'page_obj': page_obj,
+        'page_obj':     page_obj,
         'search_query': search_query,
     }
     return render(request, 'teacher_dashboard/my_uploads.html', context)
@@ -555,17 +701,19 @@ def browse_questionnaires(request):
 
     questionnaires = Questionnaire.objects.select_related(
         'department', 'subject', 'uploader__user'
-    ).filter(subject__departments=teacher.department)
+    ).filter(
+        subject__departments=teacher.department
+    ).exclude(file='')          # ← hides generate_questionnaire records
 
     # ── filters ──────────────────────────────────────────────────────────────
     subject_id   = request.GET.get('subject', '')
-    exam_type    = request.GET.get('exam_type', '')          # ← new
+    exam_type    = request.GET.get('exam_type', '')
     search_query = request.GET.get('search', '')
 
     if subject_id:
         questionnaires = questionnaires.filter(subject_id=subject_id)
 
-    if exam_type:                                             # ← new
+    if exam_type:
         questionnaires = questionnaires.filter(exam_type=exam_type)
 
     if search_query:
@@ -583,14 +731,15 @@ def browse_questionnaires(request):
     page_obj    = paginator.get_page(page_number)
 
     context = {
-        'page_obj':         page_obj,
-        'subjects':         subjects,
-        'selected_subject': subject_id,
-        'search_query':     search_query,
-        'exam_type':        exam_type,                        # ← new
-        'exam_type_choices': Questionnaire.EXAM_TYPE_CHOICES, # ← new
+        'page_obj':          page_obj,
+        'subjects':          subjects,
+        'selected_subject':  subject_id,
+        'search_query':      search_query,
+        'exam_type':         exam_type,
+        'exam_type_choices': Questionnaire.EXAM_TYPE_CHOICES,
     }
     return render(request, 'teacher_dashboard/browse_questionnaires.html', context)
+
 
 
 
@@ -608,12 +757,12 @@ def all_questionnaires(request):
 
     questionnaires = Questionnaire.objects.select_related(
         'department', 'subject', 'uploader__user'
-    ).all()
+    ).exclude(file='')          # ← hides generate_questionnaire records
 
     # ── filters ──────────────────────────────────────────────────────────────
     selected_department = request.GET.get('department', '')
     selected_subject    = request.GET.get('subject', '')
-    exam_type           = request.GET.get('exam_type', '')   # ← new
+    exam_type           = request.GET.get('exam_type', '')
     search_query        = request.GET.get('search', '')
 
     if selected_department:
@@ -622,7 +771,7 @@ def all_questionnaires(request):
     if selected_subject:
         questionnaires = questionnaires.filter(subject_id=selected_subject)
 
-    if exam_type:                                            # ← new
+    if exam_type:
         questionnaires = questionnaires.filter(exam_type=exam_type)
 
     if search_query:
@@ -647,8 +796,8 @@ def all_questionnaires(request):
         'selected_department': selected_department,
         'selected_subject':    selected_subject,
         'search_query':        search_query,
-        'exam_type':           exam_type,                    # ← new
-        'exam_type_choices':   Questionnaire.EXAM_TYPE_CHOICES,  # ← new
+        'exam_type':           exam_type,
+        'exam_type_choices':   Questionnaire.EXAM_TYPE_CHOICES,
     }
     return render(request, 'admin_dashboard/all_questionnaires.html', context)
 

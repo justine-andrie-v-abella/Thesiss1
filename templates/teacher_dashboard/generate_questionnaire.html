@@ -1,367 +1,638 @@
 {% extends 'base.html' %}
 
-{% block title %}Generate Questionnaire - Teacher{% endblock %}
+{% block title %}Generate Questions from Module{% endblock %}
 
-{% block header_title %}Generate Questionnaire with AI{% endblock %}
-{% block header_subtitle %}Upload content and automatically extract questions using AI{% endblock %}
+{% block header_title %}AI Question Generator{% endblock %}
+{% block header_subtitle %}Upload a module or lecture notes — AI will generate exam questions for your workspace{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto">
-    <!-- Generate Form -->
-    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4 flex items-center justify-between">
-            <h2 class="text-xl font-bold text-white flex items-center">
-                <i class="bi bi-robot text-2xl mr-3"></i>
-                AI Question Generator
-            </h2>
-            <button 
-                type="button"
-                id="guidelinesBtn"
-                class="bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 transition-all transform hover:scale-110"
-                title="View AI Generation Guidelines"
-            >
-                <i class="bi bi-exclamation-circle text-2xl"></i>
-            </button>
-        </div>
-        <div class="p-8">
-            <form method="post" enctype="multipart/form-data" class="space-y-6">
-                {% csrf_token %}
-                
-                <!-- Title -->
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="bi bi-card-heading text-purple-500 mr-1"></i>
-                        Questionnaire Title *
-                    </label>
-                    <input 
-                        type="text" 
-                        name="title" 
-                        value="{{ form.title.value|default:'' }}"
-                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
-                        placeholder="e.g., Final Exam - Introduction to Programming"
-                        required
-                    >
-                    {% if form.title.errors %}
-                        <p class="text-red-500 text-sm mt-1 flex items-center">
-                            <i class="bi bi-exclamation-circle mr-1"></i>
-                            {{ form.title.errors.0 }}
-                        </p>
-                    {% endif %}
-                </div>
+<style>
+  /* ── Core Variables ── */
+  :root {
+    --gen-primary: #6d28d9;
+    --gen-primary-light: #7c3aed;
+    --gen-accent: #f59e0b;
+    --gen-surface: #faf9ff;
+    --gen-border: #e5e0f8;
+    --gen-text: #1e1b2e;
+    --gen-muted: #6b7280;
+    --gen-success: #059669;
+    --gen-radius: 14px;
+    --gen-shadow: 0 4px 24px rgba(109,40,217,.10);
+    --gen-shadow-lg: 0 12px 48px rgba(109,40,217,.18);
+  }
 
-                <!-- Description -->
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="bi bi-card-text text-purple-500 mr-1"></i>
-                        Description
-                    </label>
-                    <textarea 
-                        name="description" 
-                        rows="4"
-                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors resize-none"
-                        placeholder="Provide a brief description of the questionnaire..."
-                    >{{ form.description.value|default:'' }}</textarea>
-                    {% if form.description.errors %}
-                        <p class="text-red-500 text-sm mt-1 flex items-center">
-                            <i class="bi bi-exclamation-circle mr-1"></i>
-                            {{ form.description.errors.0 }}
-                        </p>
-                    {% endif %}
-                </div>
+  /* ── Step Indicator ── */
+  .step-bar { display:flex; align-items:center; gap:0; margin-bottom:2.5rem; }
+  .step-item { display:flex; align-items:center; gap:.5rem; font-size:.8rem; font-weight:600; color:#9ca3af; }
+  .step-item.active { color:var(--gen-primary); }
+  .step-item.done   { color:var(--gen-success); }
+  .step-dot {
+    width:28px; height:28px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:.75rem; font-weight:700;
+    background:#e5e7eb; color:#9ca3af; transition:all .3s;
+    flex-shrink:0;
+  }
+  .step-item.active .step-dot { background:var(--gen-primary); color:#fff; box-shadow:0 0 0 4px #ede9fe; }
+  .step-item.done   .step-dot { background:var(--gen-success); color:#fff; }
+  .step-line { flex:1; height:2px; background:#e5e7eb; min-width:20px; }
 
-                <!-- Department and Subject -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="id_department" class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="bi bi-building text-purple-500 mr-1"></i>
-                            Department *
-                        </label>
-                        {{ form.department }}
-                        {% if form.department.errors %}
-                            <p class="text-red-500 text-sm mt-1 flex items-center">
-                                <i class="bi bi-exclamation-circle mr-1"></i>
-                                {{ form.department.errors.0 }}
-                            </p>
-                        {% endif %}
-                    </div>
+  /* ── Card ── */
+  .gen-card {
+    background:#fff;
+    border:1.5px solid var(--gen-border);
+    border-radius:var(--gen-radius);
+    box-shadow:var(--gen-shadow);
+    overflow:hidden;
+  }
+  .gen-card-header {
+    background:linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #5b21b6 100%);
+    padding:1.5rem 2rem;
+    display:flex; align-items:center; justify-content:space-between;
+  }
 
-                    <div>
-                        <label for="id_subject" class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="bi bi-book text-purple-500 mr-1"></i>
-                            Subject *
-                        </label>
-                        {{ form.subject }}
-                        {% if form.subject.errors %}
-                            <p class="text-red-500 text-sm mt-1 flex items-center">
-                                <i class="bi bi-exclamation-circle mr-1"></i>
-                                {{ form.subject.errors.0 }}
-                            </p>
-                        {% endif %}
-                        <p class="text-xs text-gray-500 mt-1">Subjects available for the selected department</p>
-                    </div>
-                </div>
+  /* ── Section Labels ── */
+  .section-label {
+    display:flex; align-items:center; gap:.5rem;
+    font-size:.8rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.07em; color:var(--gen-primary); margin-bottom:.6rem;
+  }
+  .section-label i { font-size:.9rem; }
 
-                <!-- File Upload -->
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="bi bi-file-earmark-arrow-up text-purple-500 mr-1"></i>
-                        Upload Source Material *
-                    </label>
-                    <div class="border-2 border-dashed border-purple-300 rounded-lg p-6 text-center hover:border-purple-500 transition-colors bg-purple-50/30">
-                        <i class="bi bi-file-earmark-text text-5xl text-purple-400 mb-3 block"></i>
-                        <input 
-                            type="file" 
-                            name="file" 
-                            id="id_file"
-                            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
-                            required
-                        >
-                    </div>
-                    {% if form.file.errors %}
-                        <p class="text-red-500 text-sm mt-1 flex items-center">
-                            <i class="bi bi-exclamation-circle mr-1"></i>
-                            {{ form.file.errors.0 }}
-                        </p>
-                    {% endif %}
-                    <p class="text-xs text-gray-500 mt-2">
-                        <i class="bi bi-info-circle mr-1"></i>
-                        Allowed formats: PDF, DOCX, XLSX, XLS, TXT (Max 10MB)
-                    </p>
-                </div>
+  /* ── Input Styles ── */
+  .gen-input {
+    width:100%; padding:.75rem 1rem;
+    border:2px solid #e5e7eb; border-radius:10px;
+    font-size:.925rem; color:var(--gen-text);
+    transition:border-color .2s, box-shadow .2s;
+    background:#fff; outline:none;
+  }
+  .gen-input:focus { border-color:var(--gen-primary); box-shadow:0 0 0 3px #ede9fe; }
 
-                <!-- AI Extraction Options -->
-                <div class="bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 rounded-lg p-6 border-2 border-purple-300 shadow-inner">
-                    <div class="flex items-center mb-4">
-                        <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center mr-3 shadow-lg">
-                            <i class="bi bi-stars text-white text-2xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-800">AI-Powered Question Extraction</h3>
-                            <p class="text-sm text-gray-600">Configure how AI should generate questions from your content</p>
-                        </div>
-                    </div>
+  /* ── Question Type Chips ── */
+  .qtype-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.6rem; }
+  .qtype-chip {
+    display:flex; align-items:center; gap:.6rem;
+    padding:.65rem .9rem; border-radius:10px;
+    border:2px solid #e5e7eb; background:#fff;
+    cursor:pointer; transition:all .2s; user-select:none;
+  }
+  .qtype-chip:hover { border-color:#c4b5fd; background:#faf5ff; }
+  .qtype-chip input[type=checkbox] { accent-color:var(--gen-primary); width:16px; height:16px; cursor:pointer; }
+  .qtype-chip input:checked ~ .chip-label { color:var(--gen-primary); font-weight:700; }
+  .qtype-chip:has(input:checked) { border-color:var(--gen-primary); background:#f5f3ff; }
+  .chip-label { font-size:.875rem; font-weight:500; color:#374151; }
+  .chip-icon { font-size:1rem; color:#a78bfa; flex-shrink:0; }
 
-                    <!-- Question Types Selection -->
-                    <div class="mb-5">
-                        <label class="block text-sm font-semibold text-gray-700 mb-3">
-                            <i class="bi bi-list-check text-purple-500 mr-1"></i>
-                            Select Question Types to Extract *
-                        </label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {% for question_type in form.question_types %}
-                                <label class="flex items-center p-3 bg-white rounded-lg border-2 border-gray-200 hover:border-purple-400 cursor-pointer transition-all hover:shadow-md">
-                                    {{ question_type.tag }}
-                                    <span class="ml-3 text-sm font-medium text-gray-700">{{ question_type.choice_label }}</span>
-                                </label>
-                            {% endfor %}
-                        </div>
-                        {% if form.question_types.errors %}
-                            <p class="text-red-500 text-sm mt-2 flex items-center">
-                                <i class="bi bi-exclamation-circle mr-1"></i>
-                                {{ form.question_types.errors.0 }}
-                            </p>
-                        {% endif %}
-                    </div>
+  /* ── Upload Zone ── */
+  .upload-zone {
+    border:2.5px dashed #c4b5fd; border-radius:var(--gen-radius);
+    padding:2.5rem 2rem; text-align:center;
+    background:linear-gradient(135deg, #faf5ff 0%, #f0fdf4 100%);
+    transition:all .25s; cursor:pointer; position:relative;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color:var(--gen-primary); background:#f5f3ff;
+    box-shadow:0 0 0 4px #ede9fe;
+  }
+  .upload-zone input[type=file] {
+    position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer;
+  }
+  .upload-icon { font-size:3rem; color:#c4b5fd; margin-bottom:.75rem; display:block; line-height:1; }
+  .upload-zone.has-file .upload-icon { color:var(--gen-success); }
+  .upload-zone.has-file { border-color:var(--gen-success); background:#f0fdf4; }
 
-                    <!-- Number of Questions (Optional) -->
-                    <div class="mb-5">
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="bi bi-hash text-purple-500 mr-1"></i>
-                            Number of Questions (per type)
-                        </label>
-                        <input 
-                            type="number" 
-                            name="num_questions" 
-                            value="{{ form.num_questions.value|default:'10' }}"
-                            min="1"
-                            max="50"
-                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
-                            placeholder="10"
-                        >
-                        <p class="text-xs text-gray-600 mt-2">
-                            <i class="bi bi-info-circle mr-1"></i>
-                            Specify how many questions to generate for each selected type (1-50)
-                        </p>
-                    </div>
+  /* ── Num Questions Range ── */
+  .range-wrap { display:flex; align-items:center; gap:1rem; }
+  .range-wrap input[type=range] {
+    flex:1; accent-color:var(--gen-primary); height:6px; cursor:pointer;
+  }
+  .range-val {
+    min-width:3rem; text-align:center; font-size:1.25rem; font-weight:800;
+    color:var(--gen-primary); background:#f5f3ff; border-radius:8px;
+    padding:.2rem .5rem;
+  }
 
-                    <!-- AI Tips -->
-                    <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 border-amber-400 p-4 rounded-lg">
-                        <div class="flex items-start">
-                            <i class="bi bi-lightbulb-fill text-amber-500 text-xl mr-3 flex-shrink-0 mt-0.5"></i>
-                            <div>
-                                <h4 class="text-sm font-bold text-gray-800 mb-1">AI Tips for Best Results</h4>
-                                <ul class="text-xs text-gray-700 space-y-1">
-                                    <li>• Upload content-rich materials with clear explanations</li>
-                                    <li>• Select multiple question types for variety</li>
-                                    <li>• Review and edit AI-generated questions before use</li>
-                                    <li>• Longer documents produce better quality questions</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+  /* ── Submit Button ── */
+  .btn-generate {
+    width:100%; padding:1rem 2rem;
+    background:linear-gradient(135deg, #6d28d9, #7c3aed);
+    color:#fff; font-size:1rem; font-weight:700; border:none;
+    border-radius:12px; cursor:pointer; display:flex;
+    align-items:center; justify-content:center; gap:.6rem;
+    transition:all .2s; box-shadow:0 4px 16px rgba(109,40,217,.35);
+    position:relative; overflow:hidden;
+  }
+  .btn-generate:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(109,40,217,.45); }
+  .btn-generate:active { transform:translateY(0); }
+  .btn-generate:disabled { opacity:.65; cursor:not-allowed; transform:none; }
 
-                <!-- Form-wide Errors -->
-                {% if form.non_field_errors %}
-                    <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
-                        {% for error in form.non_field_errors %}
-                            <p class="text-red-700 text-sm">{{ error }}</p>
-                        {% endfor %}
-                    </div>
-                {% endif %}
+  /* Loading shimmer on button */
+  .btn-generate .btn-shimmer {
+    position:absolute; inset:0;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.25), transparent);
+    transform:translateX(-100%);
+  }
+  .btn-generate.loading .btn-shimmer { animation:shimmer 1.4s infinite; }
+  @keyframes shimmer { to { transform:translateX(100%); } }
 
-                <!-- Buttons -->
-                <div class="flex space-x-3 pt-4">
-                    <button 
-                        type="submit" 
-                        class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg flex items-center justify-center"
-                    >
-                        <i class="bi bi-stars mr-2"></i> Generate Questions with AI
-                    </button>
-                    <a 
-                        href="{% url 'accounts:teacher_dashboard' %}" 
-                        class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center flex items-center justify-center"
-                    >
-                        <i class="bi bi-x-circle mr-2"></i> Cancel
-                    </a>
-                </div>
-            </form>
-        </div>
+  /* ── AI Tip Box ── */
+  .tip-box {
+    background:linear-gradient(135deg, #fffbeb, #fef3c7);
+    border-left:4px solid var(--gen-accent);
+    border-radius:0 10px 10px 0; padding:1rem 1.25rem;
+    display:flex; gap:.75rem; align-items:flex-start;
+  }
+  .tip-box i { color:var(--gen-accent); font-size:1.2rem; flex-shrink:0; margin-top:.1rem; }
+
+  /* ── Info Banner ── */
+  .info-banner {
+    background:linear-gradient(135deg, #ede9fe, #ddd6fe);
+    border:1.5px solid #c4b5fd; border-radius:12px;
+    padding:1rem 1.25rem; display:flex; gap:.75rem; align-items:flex-start;
+    margin-bottom:1.5rem;
+  }
+  .info-banner i { color:var(--gen-primary); font-size:1.25rem; flex-shrink:0; margin-top:.1rem; }
+
+  /* ── Error Messages ── */
+  .field-error {
+    font-size:.8rem; color:#dc2626;
+    display:flex; align-items:center; gap:.3rem; margin-top:.35rem;
+  }
+
+  /* ── Guidelines Modal ── */
+  .modal-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999;
+    display:none; align-items:center; justify-content:center; padding:1rem;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal-box {
+    background:#fff; border-radius:18px; box-shadow:var(--gen-shadow-lg);
+    max-width:420px; width:100%; animation:modalPop .25s ease;
+    overflow:hidden;
+  }
+  @keyframes modalPop { from{opacity:0;transform:scale(.93)} to{opacity:1;transform:scale(1)} }
+  .modal-header {
+    background:linear-gradient(135deg, #6d28d9, #7c3aed);
+    padding:1.25rem 1.5rem; display:flex; align-items:center; justify-content:space-between;
+  }
+  .modal-close {
+    background:rgba(255,255,255,.2); border:none; color:#fff; border-radius:8px;
+    width:32px; height:32px; cursor:pointer; display:flex; align-items:center;
+    justify-content:center; transition:background .2s;
+  }
+  .modal-close:hover { background:rgba(255,255,255,.35); }
+  .guideline-item { display:flex; gap:.75rem; align-items:flex-start; padding:.5rem 0; }
+  .guideline-item i { color:var(--gen-primary); font-size:1rem; flex-shrink:0; margin-top:.15rem; }
+  .guideline-item span { font-size:.875rem; color:#374151; line-height:1.5; }
+
+  /* ── Progress Overlay ── */
+  #progress-overlay {
+    position:fixed; inset:0; background:rgba(30,27,46,.75);
+    z-index:9998; display:none; align-items:center; justify-content:center;
+    backdrop-filter:blur(4px);
+  }
+  #progress-overlay.show { display:flex; }
+  .progress-card {
+    background:#fff; border-radius:20px; padding:2.5rem;
+    text-align:center; max-width:360px; width:90%;
+    box-shadow:0 24px 64px rgba(0,0,0,.3); animation:modalPop .3s ease;
+  }
+  .progress-ring { width:80px; height:80px; margin:0 auto 1.25rem; }
+  .progress-ring svg { animation:spin 1.4s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .progress-dots span {
+    display:inline-block; width:8px; height:8px; border-radius:50%;
+    background:#c4b5fd; margin:0 3px;
+    animation:dot-bounce .8s infinite;
+  }
+  .progress-dots span:nth-child(2) { animation-delay:.15s; }
+  .progress-dots span:nth-child(3) { animation-delay:.3s; }
+  @keyframes dot-bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-8px)} }
+
+  /* ── Responsive ── */
+  @media(max-width:640px) {
+    .gen-card-header { padding:1rem 1.25rem; }
+    .qtype-grid { grid-template-columns:1fr 1fr; }
+  }
+</style>
+
+<div class="max-w-3xl mx-auto">
+
+  <!-- Step Bar -->
+  <div class="step-bar">
+    <div class="step-item active">
+      <div class="step-dot">1</div>
+      <span>Configure</span>
     </div>
+    <div class="step-line"></div>
+    <div class="step-item">
+      <div class="step-dot">2</div>
+      <span>AI Generates</span>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item">
+      <div class="step-dot">3</div>
+      <span>Review &amp; Save</span>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item">
+      <div class="step-dot">4</div>
+      <span>Workspace</span>
+    </div>
+  </div>
+
+  <!-- Info Banner -->
+  <div class="info-banner">
+    <i class="bi bi-stars"></i>
+    <div>
+      <div class="font-bold text-purple-800 text-sm mb-0.5">How this works</div>
+      <div class="text-purple-700 text-sm">Upload your module, lecture notes, or any educational document. The AI will read the content and <strong>generate brand-new exam questions</strong> — not copy existing ones. You'll review them before saving to your workspace.</div>
+    </div>
+  </div>
+
+  <!-- Main Card -->
+  <div class="gen-card">
+    <!-- Header -->
+    <div class="gen-card-header">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+          <i class="bi bi-robot text-white text-2xl"></i>
+        </div>
+        <div>
+          <h2 class="text-xl font-bold text-white">Generate Questions from Module</h2>
+          <p class="text-white/70 text-sm">AI reads your content and creates new questions</p>
+        </div>
+      </div>
+      <button type="button" id="guidelinesBtn"
+        class="w-10 h-10 bg-white/20 hover:bg-white/35 rounded-xl flex items-center justify-center transition-colors"
+        title="View tips">
+        <i class="bi bi-question-circle text-white text-xl"></i>
+      </button>
+    </div>
+
+    <!-- Form Body -->
+    <div class="p-8 space-y-7">
+      <form method="post" enctype="multipart/form-data" id="gen-form">
+        {% csrf_token %}
+        <!-- hidden field so view knows it's generate mode -->
+        <input type="hidden" name="mode" value="generate">
+
+        <!-- ── Title ── -->
+        <div>
+          <div class="section-label"><i class="bi bi-card-heading"></i> Questionnaire Title <span class="text-red-500 ml-0.5">*</span></div>
+          <input type="text" name="title" id="id_title"
+            value="{{ form.title.value|default:'' }}"
+            class="gen-input" required
+            placeholder="e.g. Midterm Exam — Introduction to Programming">
+          {% if form.title.errors %}
+            <p class="field-error"><i class="bi bi-exclamation-circle"></i> {{ form.title.errors.0 }}</p>
+          {% endif %}
+        </div>
+
+        <!-- ── Description ── -->
+        <div>
+          <div class="section-label"><i class="bi bi-card-text"></i> Description <span class="text-gray-400 font-normal normal-case text-xs ml-1">(optional)</span></div>
+          <textarea name="description" rows="3" class="gen-input resize-none"
+            placeholder="Brief notes about this questionnaire...">{{ form.description.value|default:'' }}</textarea>
+        </div>
+
+        <!-- ── Department & Subject ── -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <div class="section-label"><i class="bi bi-building"></i> Department <span class="text-red-500 ml-0.5">*</span></div>
+            {{ form.department }}
+            {% if form.department.errors %}
+              <p class="field-error"><i class="bi bi-exclamation-circle"></i> {{ form.department.errors.0 }}</p>
+            {% endif %}
+          </div>
+          <div>
+            <div class="section-label"><i class="bi bi-book"></i> Subject <span class="text-red-500 ml-0.5">*</span></div>
+            {{ form.subject }}
+            {% if form.subject.errors %}
+              <p class="field-error"><i class="bi bi-exclamation-circle"></i> {{ form.subject.errors.0 }}</p>
+            {% endif %}
+            <p class="text-xs text-gray-400 mt-1">Filtered by your department</p>
+          </div>
+        </div>
+
+        <!-- ── Exam Type ── -->
+        <div>
+          <div class="section-label"><i class="bi bi-journal-bookmark"></i> Exam Type <span class="text-red-500 ml-0.5">*</span></div>
+          {{ form.exam_type }}
+          {% if form.exam_type.errors %}
+            <p class="field-error"><i class="bi bi-exclamation-circle"></i> {{ form.exam_type.errors.0 }}</p>
+          {% endif %}
+        </div>
+
+        <!-- ── File Upload ── -->
+        <div>
+          <div class="section-label"><i class="bi bi-file-earmark-arrow-up"></i> Upload Module / Source Material <span class="text-red-500 ml-0.5">*</span></div>
+          <div class="upload-zone" id="upload-zone">
+            <input type="file" name="file" id="id_file" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt" required>
+            <i class="bi bi-cloud-arrow-up upload-icon" id="upload-icon"></i>
+            <p class="font-semibold text-gray-700" id="upload-text">Drop your file here or click to browse</p>
+            <p class="text-sm text-gray-400 mt-1" id="upload-sub">PDF, DOCX, XLSX, TXT — up to 10 MB</p>
+          </div>
+          {% if form.file.errors %}
+            <p class="field-error"><i class="bi bi-exclamation-circle"></i> {{ form.file.errors.0 }}</p>
+          {% endif %}
+        </div>
+
+        <!-- ══ AI Config Box ══ -->
+        <div class="rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 p-6 space-y-6">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+              <i class="bi bi-stars text-white text-xl"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-gray-800">AI Generation Settings</h3>
+              <p class="text-sm text-gray-500">Control what the AI generates from your module</p>
+            </div>
+          </div>
+
+          <!-- Question Types -->
+          <div>
+            <div class="section-label"><i class="bi bi-list-check"></i> Question Types to Generate <span class="text-red-500 ml-0.5">*</span></div>
+            <div class="qtype-grid">
+              {% for question_type in form.question_types %}
+              <label class="qtype-chip">
+                {{ question_type.tag }}
+                <span class="chip-icon">
+                  {% if question_type.choice_label == "Multiple Choice" %}<i class="bi bi-ui-radios"></i>
+                  {% elif question_type.choice_label == "True/False" %}<i class="bi bi-toggle-on"></i>
+                  {% elif question_type.choice_label == "Identification" %}<i class="bi bi-pencil-square"></i>
+                  {% elif question_type.choice_label == "Essay" %}<i class="bi bi-textarea-t"></i>
+                  {% elif question_type.choice_label == "Fill in the Blanks" %}<i class="bi bi-input-cursor-text"></i>
+                  {% elif question_type.choice_label == "Matching Type" %}<i class="bi bi-arrows-expand"></i>
+                  {% else %}<i class="bi bi-question-circle"></i>{% endif %}
+                </span>
+                <span class="chip-label">{{ question_type.choice_label }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            {% if form.question_types.errors %}
+              <p class="field-error mt-2"><i class="bi bi-exclamation-circle"></i> {{ form.question_types.errors.0 }}</p>
+            {% endif %}
+          </div>
+
+          <!-- Number of Questions Slider -->
+          <div>
+            <div class="section-label"><i class="bi bi-hash"></i> Questions per Type</div>
+            <div class="range-wrap">
+              <input type="range" name="num_questions" id="num_questions_range"
+                min="1" max="30" value="{{ form.num_questions.value|default:'10' }}"
+                oninput="document.getElementById('num_questions_val').textContent=this.value;
+                         document.getElementById('num_questions_hidden').value=this.value;">
+              <div class="range-val" id="num_questions_val">{{ form.num_questions.value|default:'10' }}</div>
+            </div>
+            <input type="hidden" name="num_questions" id="num_questions_hidden" value="{{ form.num_questions.value|default:'10' }}">
+            <p class="text-xs text-gray-500 mt-2">
+              <i class="bi bi-info-circle mr-1"></i>
+              The AI will try to generate this many questions for each selected type (1–30)
+            </p>
+          </div>
+
+          <!-- Tip Box -->
+          <div class="tip-box">
+            <i class="bi bi-lightbulb-fill"></i>
+            <div>
+              <div class="font-bold text-sm text-gray-800 mb-1">Tips for best results</div>
+              <ul class="text-xs text-gray-600 space-y-1">
+                <li>• Upload content-rich materials: lecture notes, textbook chapters, readings</li>
+                <li>• Longer, well-structured documents produce higher-quality questions</li>
+                <li>• Select only the question types you actually need for your exam</li>
+                <li>• You can edit every generated question before saving to your workspace</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Non-field errors -->
+        {% if form.non_field_errors %}
+          <div class="bg-red-50 border-l-4 border-red-500 rounded p-4">
+            {% for error in form.non_field_errors %}
+              <p class="text-red-700 text-sm">{{ error }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <!-- Buttons -->
+        <div class="flex gap-3 pt-2">
+          <button type="submit" class="btn-generate flex-1" id="gen-btn">
+            <div class="btn-shimmer"></div>
+            <i class="bi bi-stars text-lg"></i>
+            <span id="gen-btn-label">Generate Questions with AI</span>
+          </button>
+          <a href="{% url 'accounts:teacher_dashboard' %}"
+            class="flex items-center gap-2 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors text-sm flex-shrink-0">
+            <i class="bi bi-x-circle"></i> Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- After generation note -->
+  <div class="mt-4 text-center text-sm text-gray-400">
+    <i class="bi bi-arrow-right-circle mr-1 text-purple-400"></i>
+    After generation you'll review all questions, then choose a workspace folder to save them into.
+  </div>
 </div>
 
-<!-- Guidelines Modal -->
-<div id="guidelinesModal" style="display: none;" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full transform transition-all">
-        <div class="bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-4 flex items-center justify-between rounded-t-xl">
-            <div class="flex items-center">
-                <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3">
-                    <i class="bi bi-robot text-white text-xl"></i>
-                </div>
-                <h3 class="text-lg font-bold text-white">AI Generation Guidelines</h3>
-            </div>
-            <button type="button" id="closeModal" class="text-white hover:bg-white/20 rounded-lg p-1 transition-colors">
-                <i class="bi bi-x-lg text-xl"></i>
-            </button>
+<!-- ══ Guidelines Modal ══ -->
+<div class="modal-overlay" id="guidelinesModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center">
+          <i class="bi bi-robot text-white text-lg"></i>
         </div>
-        <div class="p-6">
-            <ul class="space-y-3 text-sm text-gray-700">
-                <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-purple-500 mr-2 mt-0.5 flex-shrink-0"></i>
-                    <span>Upload content-rich materials for best extraction results</span>
-                </li>
-                <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-purple-500 mr-2 mt-0.5 flex-shrink-0"></i>
-                    <span>AI will analyze content and generate relevant questions</span>
-                </li>
-                <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-purple-500 mr-2 mt-0.5 flex-shrink-0"></i>
-                    <span>Select multiple question types for comprehensive coverage</span>
-                </li>
-                <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-purple-500 mr-2 mt-0.5 flex-shrink-0"></i>
-                    <span>AI-generated questions can be edited and refined</span>
-                </li>
-                <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-purple-500 mr-2 mt-0.5 flex-shrink-0"></i>
-                    <span>Processing time varies based on file size and complexity</span>
-                </li>
-                <li class="flex items-start">
-                    <i class="bi bi-check-circle-fill text-purple-500 mr-2 mt-0.5 flex-shrink-0"></i>
-                    <span>Maximum file size is 10MB</span>
-                </li>
-            </ul>
-        </div>
-        <div class="px-6 pb-6">
-            <button type="button" id="closeModalBtn" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all">
-                Got it!
-            </button>
-        </div>
+        <h3 class="text-white font-bold text-base">AI Generation Guidelines</h3>
+      </div>
+      <button class="modal-close" id="closeModal"><i class="bi bi-x-lg"></i></button>
     </div>
+    <div class="p-6 space-y-1 divide-y divide-gray-100">
+      <div class="guideline-item pt-0">
+        <i class="bi bi-check-circle-fill"></i>
+        <span>The AI <strong>creates new questions</strong> based on your module — it doesn't copy existing ones.</span>
+      </div>
+      <div class="guideline-item">
+        <i class="bi bi-check-circle-fill"></i>
+        <span>PDF, DOCX, XLSX and TXT files are supported (max 10 MB).</span>
+      </div>
+      <div class="guideline-item">
+        <i class="bi bi-check-circle-fill"></i>
+        <span>Content-rich, well-structured documents give the best question quality.</span>
+      </div>
+      <div class="guideline-item">
+        <i class="bi bi-check-circle-fill"></i>
+        <span>Processing time scales with document length — typically 15–60 seconds.</span>
+      </div>
+      <div class="guideline-item">
+        <i class="bi bi-check-circle-fill"></i>
+        <span>You review every question before it's saved to your workspace.</span>
+      </div>
+      <div class="guideline-item">
+        <i class="bi bi-check-circle-fill"></i>
+        <span>Generated questions are fully editable on the review page.</span>
+      </div>
+    </div>
+    <div class="px-6 pb-6">
+      <button id="closeModalBtn"
+        class="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-xl hover:opacity-90 transition-opacity">
+        Got it!
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Processing Overlay ══ -->
+<div id="progress-overlay">
+  <div class="progress-card">
+    <div class="progress-ring">
+      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="40" cy="40" r="34" stroke="#ede9fe" stroke-width="7"/>
+        <path d="M40 6 A34 34 0 0 1 74 40" stroke="#7c3aed" stroke-width="7" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <h3 class="text-lg font-bold text-gray-800 mb-2">AI is generating questions…</h3>
+    <p class="text-sm text-gray-500 mb-4" id="progress-sub">Reading your module content</p>
+    <div class="progress-dots">
+      <span></span><span></span><span></span>
+    </div>
+    <p class="text-xs text-gray-400 mt-4">This may take 15–60 seconds depending on file size.</p>
+  </div>
 </div>
 
 <script>
-(function() {
-    console.log('Generate questionnaire script loaded');
-    
-    // Department/Subject functionality
-    const departmentSelect = document.getElementById('id_department');
-    const subjectSelect = document.getElementById('id_subject');
-    
-    if (departmentSelect && subjectSelect) {
-        departmentSelect.className = 'w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors';
-        subjectSelect.className = 'w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors';
-        
-        departmentSelect.addEventListener('change', function() {
-            const departmentId = this.value;
-            
-            if (departmentId) {
-                fetch(`/questionnaires/get-subjects/?department=${departmentId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        subjectSelect.innerHTML = '<option value="">Select Subject</option>';
-                        data.subjects.forEach(subject => {
-                            const option = document.createElement('option');
-                            option.value = subject.id;
-                            option.textContent = `${subject.code} - ${subject.name}`;
-                            subjectSelect.appendChild(option);
-                        });
-                    })
-                    .catch(error => console.error('Error:', error));
-            } else {
-                subjectSelect.innerHTML = '<option value="">Select Subject</option>';
-            }
-        });
+(function () {
+  /* ── Apply Tailwind-ish classes to Django-rendered selects ── */
+  ['id_department','id_subject','id_exam_type'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.className = 'gen-input';
+      el.style.cssText = '';
     }
+  });
 
-    // Guidelines Modal functionality
-    const guidelinesBtn = document.getElementById('guidelinesBtn');
-    const guidelinesModal = document.getElementById('guidelinesModal');
-    const closeModal = document.getElementById('closeModal');
-    const closeModalBtn = document.getElementById('closeModalBtn');
-
-    function openModal() {
-        if (guidelinesModal) {
-            guidelinesModal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-        }
-    }
-
-    function closeModalFunc() {
-        if (guidelinesModal) {
-            guidelinesModal.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-    }
-
-    if (guidelinesBtn) {
-        guidelinesBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            openModal();
-        });
-    }
-
-    if (closeModal) {
-        closeModal.addEventListener('click', closeModalFunc);
-    }
-
-    if (closeModalBtn) {
-        closeModalBtn.addEventListener('click', closeModalFunc);
-    }
-
-    if (guidelinesModal) {
-        guidelinesModal.addEventListener('click', function(e) {
-            if (e.target === guidelinesModal) {
-                closeModalFunc();
-            }
-        });
-    }
-
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && guidelinesModal && guidelinesModal.style.display === 'flex') {
-            closeModalFunc();
-        }
+  /* ── Department → Subject AJAX ── */
+  var deptSel = document.getElementById('id_department');
+  var subjSel = document.getElementById('id_subject');
+  if (deptSel && subjSel) {
+    deptSel.addEventListener('change', function () {
+      var deptId = this.value;
+      subjSel.innerHTML = '<option value="">Loading…</option>';
+      if (!deptId) { subjSel.innerHTML = '<option value="">Select Subject</option>'; return; }
+      fetch('/questionnaires/get-subjects/?department=' + deptId)
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          subjSel.innerHTML = '<option value="">Select Subject</option>';
+          (data.subjects||[]).forEach(function(s){
+            var o = document.createElement('option');
+            o.value = s.id;
+            o.textContent = s.code + ' — ' + s.name;
+            subjSel.appendChild(o);
+          });
+        })
+        .catch(function(){ subjSel.innerHTML = '<option value="">Error loading subjects</option>'; });
     });
+  }
+
+  /* ── File Upload UX ── */
+  var fileInput = document.getElementById('id_file');
+  var zone      = document.getElementById('upload-zone');
+  var icon      = document.getElementById('upload-icon');
+  var txt       = document.getElementById('upload-text');
+  var sub       = document.getElementById('upload-sub');
+
+  function updateFileDisplay(file) {
+    if (!file) return;
+    zone.classList.add('has-file');
+    icon.className = 'bi bi-file-earmark-check upload-icon';
+    txt.textContent = file.name;
+    sub.textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+  }
+  if (fileInput) {
+    fileInput.addEventListener('change', function(){ updateFileDisplay(this.files[0]); });
+  }
+  if (zone) {
+    zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', function(){ zone.classList.remove('dragover'); });
+    zone.addEventListener('drop', function(e){
+      e.preventDefault(); zone.classList.remove('dragover');
+      if (e.dataTransfer.files[0]) {
+        fileInput.files = e.dataTransfer.files;
+        updateFileDisplay(e.dataTransfer.files[0]);
+      }
+    });
+  }
+
+  /* ── Form Submit → show overlay ── */
+  var form    = document.getElementById('gen-form');
+  var overlay = document.getElementById('progress-overlay');
+  var genBtn  = document.getElementById('gen-btn');
+  var genLbl  = document.getElementById('gen-btn-label');
+  var subs    = [
+    'Reading your module content…',
+    'Analysing key concepts…',
+    'Crafting questions…',
+    'Adding difficulty levels…',
+    'Almost ready…'
+  ];
+  var si = 0;
+  var subEl = document.getElementById('progress-sub');
+
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      /* basic client-side validation */
+      var title = document.getElementById('id_title');
+      var file  = document.getElementById('id_file');
+      var types = form.querySelectorAll('input[name="question_types"]:checked');
+
+      if (!title || !title.value.trim()) {
+        title && title.focus();
+        return;
+      }
+      if (!file || !file.files.length) {
+        zone && zone.classList.add('dragover');
+        setTimeout(function(){ zone && zone.classList.remove('dragover'); }, 800);
+        return;
+      }
+      if (!types.length) {
+        return; /* HTML5 required on at least one checkbox not trivial; rely on server */
+      }
+
+      /* Show overlay */
+      overlay && overlay.classList.add('show');
+      genBtn && (genBtn.disabled = true);
+      genBtn && genBtn.classList.add('loading');
+      genLbl && (genLbl.textContent = 'Generating…');
+
+      /* Rotate status messages */
+      if (subEl) {
+        var interval = setInterval(function(){
+          si = (si+1) % subs.length;
+          subEl.textContent = subs[si];
+        }, 4000);
+      }
+    });
+  }
+
+  /* ── Guidelines Modal ── */
+  var modal     = document.getElementById('guidelinesModal');
+  var openBtn   = document.getElementById('guidelinesBtn');
+  var closeX    = document.getElementById('closeModal');
+  var closeOk   = document.getElementById('closeModalBtn');
+
+  function openModal()  { modal && modal.classList.add('open'); document.body.style.overflow='hidden'; }
+  function closeModal() { modal && modal.classList.remove('open'); document.body.style.overflow=''; }
+
+  openBtn  && openBtn.addEventListener('click', openModal);
+  closeX   && closeX.addEventListener('click', closeModal);
+  closeOk  && closeOk.addEventListener('click', closeModal);
+  modal    && modal.addEventListener('click', function(e){ if(e.target===modal) closeModal(); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeModal(); });
 })();
 </script>
 {% endblock %}

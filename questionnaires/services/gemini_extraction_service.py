@@ -24,6 +24,10 @@ class GeminiQuestionnaireExtractor:
         except ImportError:
             raise ImportError("Please install google-genai: pip install google-genai")
 
+    # =========================================================================
+    # FILE EXTRACTION
+    # =========================================================================
+
     def extract_text_from_file(self, file_path: str) -> str:
         """Extract text content from various file formats"""
         extension = file_path.lower().split('.')[-1]
@@ -69,32 +73,43 @@ class GeminiQuestionnaireExtractor:
         except Exception as e:
             raise Exception(f"Error extracting Excel: {str(e)}")
 
-    def extract_questions_with_ai(self, content: str, question_types: List[str], mode: str = 'extract') -> Dict:
+    # =========================================================================
+    # AI PROCESSING  — main entry point
+    # =========================================================================
+
+    def extract_questions_with_ai(
+        self,
+        content: str,
+        question_types: List[str],
+        mode: str = 'extract',
+        num_questions: int = 10,
+    ) -> Dict:
         """
         Use Gemini AI to process questions from content.
 
         mode='extract'  → scans the file and copies questions already written there
         mode='generate' → creates new questions based on the file content
+        num_questions   → how many questions to generate per type (generate mode only)
         """
 
         if mode == 'generate':
-            prompt = self._build_generation_prompt(content, question_types)
+            prompt = self._build_generation_prompt(content, question_types, num_questions)
         else:
             prompt = self._build_extraction_prompt(content, question_types)
 
         try:
             response = self.client.models.generate_content(
                 model=self.model,
-                contents=prompt
+                contents=prompt,
             )
 
             response_text = response.text
 
-            # Clean up response
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0]
-            elif "```" in response_text:
-                response_text = response_text.split("```")[1].split("```")[0]
+            # Clean up markdown code fences if present
+            if '```json' in response_text:
+                response_text = response_text.split('```json')[1].split('```')[0]
+            elif '```' in response_text:
+                response_text = response_text.split('```')[1].split('```')[0]
 
             response_text = response_text.strip()
 
@@ -106,9 +121,16 @@ class GeminiQuestionnaireExtractor:
             return data
 
         except json.JSONDecodeError as e:
-            raise Exception(f"Failed to parse AI response as JSON: {str(e)}\nResponse preview: {response_text[:200]}")
+            raise Exception(
+                f"Failed to parse AI response as JSON: {str(e)}\n"
+                f"Response preview: {response_text[:200]}"
+            )
         except Exception as e:
             raise Exception(f"AI extraction failed: {str(e)}")
+
+    # =========================================================================
+    # PROMPTS
+    # =========================================================================
 
     def _build_extraction_prompt(self, content: str, question_types: List[str]) -> str:
         """
@@ -172,36 +194,47 @@ If no questions are found in the text, return: {{"questions": []}}
 
 JSON:"""
 
-    def _build_generation_prompt(self, content: str, question_types: List[str]) -> str:
+    def _build_generation_prompt(
+        self,
+        content: str,
+        question_types: List[str],
+        num_questions: int = 10,
+    ) -> str:
         """
         Prompt for GENERATING new questions based on the file content.
         Used by generate_questionnaire view.
         """
-        return f"""You are an expert teacher. Based on the educational content below, generate high-quality exam questions.
+        types_str   = ', '.join(question_types)
+        total       = num_questions * len(question_types)
 
-CONTENT:
+        return f"""You are an expert teacher creating exam questions.
+
+EDUCATIONAL CONTENT:
 {content[:8000]}
 
 TASK:
-Generate questions of the following types: {', '.join(question_types)}
-Create 5-10 high-quality questions per type based on the content.
+Generate exactly {num_questions} questions for EACH of the following question types: {types_str}
+Total questions = {num_questions} × {len(question_types)} type(s) = {total} questions.
 
-QUESTION TYPES GUIDE:
-- multiple_choice: question + 4 options (A-D) + correct answer (use lowercase: a, b, c, or d)
-- true_false: statement + correct answer (lowercase: "true" or "false")
-- identification: question requiring a specific term or concept
-- essay: open-ended analytical question
-- fill_blank: sentence with a blank + the answer
-- matching: two columns to match
+IMPORTANT RULES:
+- Base every question strictly on the content provided above. Do NOT invent facts outside it.
+- Vary difficulty across each type: roughly 30% easy, 50% medium, 20% hard.
+- Each question must be clear, unambiguous, and answerable from the content.
+- For multiple_choice : provide exactly 4 options (a–d) with exactly one correct answer.
+- For true_false      : correct_answer must be lowercase "true" or "false".
+- For identification  : correct_answer is a specific term or short phrase from the content.
+- For essay           : provide key points or a model answer in correct_answer.
+- For fill_blank      : write the sentence with "___" for the blank; correct_answer fills it.
+- For matching        : list items as "1. X | 2. Y | 3. Z" and answers as matching pairs.
 
-CRITICAL: Return ONLY a valid JSON object. No markdown, no code blocks, just pure JSON.
+CRITICAL: Return ONLY a valid JSON object. No markdown, no explanation, no code blocks.
 
-JSON Structure:
+Required JSON structure:
 {{
     "questions": [
         {{
             "type": "multiple_choice",
-            "question": "What is the primary function of X?",
+            "question": "Question text here?",
             "options": {{
                 "a": "First option",
                 "b": "Second option",
@@ -209,96 +242,145 @@ JSON Structure:
                 "d": "Fourth option"
             }},
             "correct_answer": "a",
-            "explanation": "Brief explanation why this is correct",
+            "explanation": "Why this is the correct answer.",
             "difficulty": "medium",
             "points": 1
         }},
         {{
             "type": "true_false",
-            "question": "Python is a compiled language.",
-            "correct_answer": "false",
-            "explanation": "Python is an interpreted language",
+            "question": "Statement that is true or false.",
+            "correct_answer": "true",
+            "explanation": "Brief explanation.",
             "difficulty": "easy",
             "points": 1
         }},
         {{
             "type": "identification",
-            "question": "What term describes a function that calls itself?",
-            "correct_answer": "Recursion",
-            "explanation": "Recursion is when a function calls itself",
+            "question": "What term refers to ...?",
+            "correct_answer": "Term",
+            "explanation": "Explanation.",
             "difficulty": "medium",
             "points": 1
+        }},
+        {{
+            "type": "fill_blank",
+            "question": "The ___ is responsible for ...",
+            "correct_answer": "missing word",
+            "explanation": "Explanation.",
+            "difficulty": "easy",
+            "points": 1
+        }},
+        {{
+            "type": "essay",
+            "question": "Discuss the significance of ...",
+            "correct_answer": "Key points: 1) ... 2) ... 3) ...",
+            "explanation": "",
+            "difficulty": "hard",
+            "points": 5
         }}
     ]
 }}
 
 JSON:"""
 
-    def process_questionnaire(self, questionnaire, question_types: List[str], mode: str = 'extract'):
+    # =========================================================================
+    # ORCHESTRATOR
+    # =========================================================================
+
+    def process_questionnaire(
+        self,
+        questionnaire,
+        question_types: List[str],
+        mode: str = 'extract',
+        num_questions: int = 10,
+    ):
+        """
+        Main method called by views.
+
+        Reads the file attached to `questionnaire`, sends the text to Gemini,
+        then persists each returned question as an ExtractedQuestion row.
+
+        Parameters
+        ----------
+        questionnaire : Questionnaire instance
+        question_types : list of QuestionType.name strings
+        mode           : 'extract' (copy existing) | 'generate' (create new)
+        num_questions  : questions per type when mode='generate'
+        """
         from questionnaires.models import ExtractedQuestion, QuestionType
 
-        # Build a lookup map from DB (case-insensitive + common aliases)
+        # ── Build a lookup: type name → QuestionType DB object ───────────────
         type_map = {}
         for qt in QuestionType.objects.filter(is_active=True):
             type_map[qt.name.lower()] = qt
-            type_map[qt.name] = qt
+            type_map[qt.name]         = qt
 
         # Common aliases the AI might return
         aliases = {
-            'multiple_choice': 'multiple_choice',
-            'multiplechoice': 'multiple_choice',
-            'mcq': 'multiple_choice',
-            'true_false': 'true_false',
-            'truefalse': 'true_false',
-            'true/false': 'true_false',
-            'fill_in_the_blank': 'fill_blank',
-            'fill_blank': 'fill_blank',
-            'fill in the blank': 'fill_blank',
-            'identification': 'identification',
-            'essay': 'essay',
-            'matching': 'matching',
-            'enumeration': 'enumeration',
-            'short_answer': 'identification',
+            'multiple_choice':    'multiple_choice',
+            'multiplechoice':     'multiple_choice',
+            'mcq':                'multiple_choice',
+            'true_false':         'true_false',
+            'truefalse':          'true_false',
+            'true/false':         'true_false',
+            'fill_in_the_blank':  'fill_blank',
+            'fill_blank':         'fill_blank',
+            'fill in the blank':  'fill_blank',
+            'identification':     'identification',
+            'essay':              'essay',
+            'matching':           'matching',
+            'enumeration':        'enumeration',
+            'short_answer':       'identification',
         }
 
+        # ── Extract text from the uploaded file ──────────────────────────────
         file_path = questionnaire.file.path
-        content = self.extract_text_from_file(file_path)
+        content   = self.extract_text_from_file(file_path)
 
         if not content.strip():
             raise Exception("No text content could be extracted from the file")
 
-        extracted_data = self.extract_questions_with_ai(content, question_types, mode=mode)
+        # ── Call Gemini ───────────────────────────────────────────────────────
+        extracted_data = self.extract_questions_with_ai(
+            content,
+            question_types,
+            mode=mode,
+            num_questions=num_questions,
+        )
 
+        # ── Persist questions ─────────────────────────────────────────────────
         created_questions = []
         for q_data in extracted_data.get('questions', []):
             try:
-                raw_type = q_data.get('type', '').strip().lower()
-
-                # Try direct match first, then alias lookup
+                raw_type      = q_data.get('type', '').strip().lower()
                 resolved_name = aliases.get(raw_type, raw_type)
                 question_type = type_map.get(resolved_name) or type_map.get(raw_type)
 
                 if not question_type:
-                    print(f"Warning: Question type '{raw_type}' not found in database. Available: {list(type_map.keys())}")
-                    # Fallback to first active type instead of skipping
+                    print(
+                        f"Warning: Question type '{raw_type}' not found in database. "
+                        f"Available: {list(type_map.keys())}"
+                    )
+                    # Fallback to first active type rather than silently dropping
                     question_type = QuestionType.objects.filter(is_active=True).first()
                     if not question_type:
                         continue
 
                 question = ExtractedQuestion.objects.create(
-                    questionnaire=questionnaire,
-                    question_type=question_type,
-                    question_text=q_data['question'],
-                    option_a=q_data.get('options', {}).get('a'),
-                    option_b=q_data.get('options', {}).get('b'),
-                    option_c=q_data.get('options', {}).get('c'),
-                    option_d=q_data.get('options', {}).get('d'),
-                    correct_answer=q_data.get('correct_answer', ''),
-                    explanation=q_data.get('explanation', ''),
-                    difficulty=q_data.get('difficulty', 'medium'),
-                    points=q_data.get('points', 1)
+                    questionnaire  = questionnaire,
+                    question_type  = question_type,
+                    question_text  = q_data['question'],
+                    option_a       = q_data.get('options', {}).get('a'),
+                    option_b       = q_data.get('options', {}).get('b'),
+                    option_c       = q_data.get('options', {}).get('c'),
+                    option_d       = q_data.get('options', {}).get('d'),
+                    correct_answer = q_data.get('correct_answer', ''),
+                    explanation    = q_data.get('explanation', ''),
+                    difficulty     = q_data.get('difficulty', 'medium'),
+                    points         = q_data.get('points', 1),
                 )
                 created_questions.append(question)
+
             except Exception as e:
                 print(f"Error creating question: {str(e)}")
                 continue
