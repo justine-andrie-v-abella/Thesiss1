@@ -7,6 +7,8 @@ from accounts.models import TeacherProfile, Department, Subject
 from django.contrib.auth.models import User
 import os
 from django.db import migrations
+import json as _json
+
 
 def questionnaire_upload_path(instance, filename):
     return f'questionnaires/{instance.department.code}/{instance.subject.code}/{filename}'
@@ -126,13 +128,18 @@ class ExtractedQuestion(models.Model):
     )
     question_type = models.ForeignKey(QuestionType, on_delete=models.PROTECT)
     question_text = models.TextField()
-
-    # For multiple choice
+ 
+    # For multiple choice: plain text (option A, B, C, D)
+    # For matching type:
+    #   option_a → JSON list: Column A items  e.g. ["1. CREATE", "2. DROP", ...]
+    #   option_b → JSON list: Column B items  e.g. ["A. Deletes object", "B. Creates object", ...]
+    #   option_c → JSON list: pairs           e.g. [{"item": "1. CREATE", "match": "B"}, ...]
+    #   option_d → unused
     option_a = models.TextField(blank=True, null=True)
     option_b = models.TextField(blank=True, null=True)
     option_c = models.TextField(blank=True, null=True)
     option_d = models.TextField(blank=True, null=True)
-
+ 
     # For various question types
     correct_answer = models.TextField()
     explanation    = models.TextField(blank=True, null=True)
@@ -146,26 +153,135 @@ class ExtractedQuestion(models.Model):
         ],
         default='medium',
     )
-
+ 
     is_approved = models.BooleanField(default=False)
     created_at  = models.DateTimeField(auto_now_add=True)
     updated_at  = models.DateTimeField(auto_now=True)
-
+ 
     class Meta:
         ordering = ['created_at']
-
+ 
     def __str__(self):
         return f"{self.question_type} - {self.question_text[:50]}"
-
+ 
+    # ── Type checks ───────────────────────────────────────────────────────────
+ 
+    @property
+    def is_matching(self):
+        """True if this question is a Matching Type."""
+        return self.question_type.name == 'matching'
+ 
+    @property
+    def is_multiple_choice(self):
+        """True if this question is Multiple Choice."""
+        return self.question_type.name == 'multiple_choice'
+ 
+    # ── Multiple choice ───────────────────────────────────────────────────────
+ 
     @property
     def options_list(self):
-        """Returns list of (letter, option) tuples for multiple choice"""
-        return [
+        """
+        For multiple choice: returns [(letter, text), ...] skipping empty options.
+        NOT intended for matching — use get_matching_data() instead.
+        """
+        pairs = [
             ('a', self.option_a),
             ('b', self.option_b),
             ('c', self.option_c),
             ('d', self.option_d),
         ]
+        return [(letter, text) for letter, text in pairs if text]
+ 
+    # ── Matching type ─────────────────────────────────────────────────────────
+ 
+def get_matching_data(self):
+    
+    # Parses JSON stored in option_a / option_b / option_c.
+ 
+    # option_a → JSON list: Column A items  ["1. CREATE", "2. TINYINT", ...]
+    # option_b → JSON list: Column B items  ["A. Deletes...", "B. Creates...", ...]
+    # option_c → JSON list: pairs           [{"item": "1. CREATE", "match": "B"}, ...]
+ 
+    # Returns dict or None.
+    
+    if not self.is_matching:
+        return None
+ 
+    # ── Debug: print exactly what is stored ──────────────────────────────
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.debug(
+        "get_matching_data id=%s option_a=%r option_b=%r option_c=%r",
+        self.pk, self.option_a, self.option_b, self.option_c,
+    )
+ 
+    # ── Guard: all three fields must be non-empty strings ────────────────
+    if not self.option_a or not self.option_b:
+        logger.warning(
+            "Matching question id=%s has empty option_a or option_b — "
+            "was it saved before the extractor fix? Re-upload to fix.",
+            self.pk,
+        )
+        return None
+ 
+    try:
+        column_a = _json.loads(self.option_a)
+        column_b = _json.loads(self.option_b)
+        pairs    = _json.loads(self.option_c) if self.option_c else []
+ 
+        # ── Guard: lists must actually have items ─────────────────────────
+        if not column_a or not column_b:
+            logger.warning(
+                "Matching question id=%s parsed OK but column_a or column_b "
+                "is an empty list. Re-upload to fix.",
+                self.pk,
+            )
+            return None
+ 
+        pairs_by_item = {
+            p['item']: p['match']
+            for p in pairs
+            if isinstance(p, dict) and 'item' in p and 'match' in p
+        }
+ 
+        return {
+            'column_a':      column_a,
+            'column_b':      column_b,
+            'pairs':         pairs,
+            'pairs_by_item': pairs_by_item,
+        }
+ 
+    except (ValueError, TypeError, KeyError) as exc:
+        logger.error(
+            "get_matching_data id=%s failed to parse JSON: %s",
+            self.pk, exc,
+        )
+        return None
+ 
+    def set_matching_data(self, column_a: list, column_b: list, pairs: list):
+        """
+        Convenience method for saving matching data to the option fields.
+ 
+        Args:
+            column_a : list of Column A strings  e.g. ["1. CREATE", "2. DROP"]
+            column_b : list of Column B strings  e.g. ["A. Deletes object", "B. Creates object"]
+            pairs    : list of dicts             e.g. [{"item": "1. CREATE", "match": "B"}]
+ 
+        Also builds a readable correct_answer string like "1-B, 2-A, ..."
+        if correct_answer has not already been set.
+        """
+        self.option_a = _json.dumps(column_a, ensure_ascii=False)
+        self.option_b = _json.dumps(column_b, ensure_ascii=False)
+        self.option_c = _json.dumps(pairs,    ensure_ascii=False)
+        self.option_d = None
+ 
+        # Auto-build correct_answer summary if empty
+        if not self.correct_answer and pairs:
+            self.correct_answer = ', '.join(
+                f"{p['item'].split('.')[0].strip()}-{p['match']}"
+                for p in pairs
+                if isinstance(p, dict) and 'item' in p and 'match' in p
+            )
 
 
 class GeneratedTest(models.Model):

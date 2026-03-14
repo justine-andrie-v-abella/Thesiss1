@@ -9,6 +9,7 @@ import openpyxl
 from typing import List, Dict
 from django.conf import settings
 
+
 class GeminiQuestionnaireExtractor:
     """Extract or generate questions from uploaded files using Google Gemini API"""
 
@@ -50,15 +51,121 @@ class GeminiQuestionnaireExtractor:
             with open(file_path, 'rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
                 for page in pdf_reader.pages:
-                    text += page.extract_text() + "\n"
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted + "\n"
         except Exception as e:
             raise Exception(f"Error extracting PDF: {str(e)}")
         return text
 
     def _extract_from_docx(self, file_path: str) -> str:
+        """
+        Extract text from DOCX preserving structure.
+
+        Tables are rendered in a way that makes two-column matching type
+        sections clearly recognizable to Gemini:
+
+            [TABLE]
+            Column A  |  Column B
+            1. CREATE  |  A. Permanently deletes a database object.
+            2. DROP    |  B. Creates new database objects.
+            [/TABLE]
+
+        This format is unambiguous — Gemini will always classify it as
+        'matching' rather than 'identification'.
+        """
         try:
             document = docx.Document(file_path)
-            return "\n".join([paragraph.text for paragraph in document.paragraphs])
+            parts = []
+
+            # Build a set of paragraphs that are inside tables so we can
+            # skip them when iterating document.paragraphs (python-docx
+            # exposes table cell paragraphs in both places).
+            table_para_ids = set()
+            for table in document.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for para in cell.paragraphs:
+                            table_para_ids.add(id(para))
+
+            # Iterate the document in reading order (paragraphs + tables)
+            for block in document.element.body:
+                tag = block.tag.split('}')[-1]  # strip namespace
+
+                if tag == 'p':
+                    # Regular paragraph
+                    para_text = block.text_content().strip() if hasattr(block, 'text_content') else ''
+                    # Use python-docx paragraph objects for clean text
+                    for para in document.paragraphs:
+                        if para._element is block:
+                            para_text = para.text.strip()
+                            break
+                    if para_text:
+                        parts.append(para_text)
+
+                elif tag == 'tbl':
+                    # Find the matching python-docx Table object
+                    table_obj = None
+                    for t in document.tables:
+                        if t._element is block:
+                            table_obj = t
+                            break
+
+                    if table_obj is None:
+                        continue
+
+                    rows = table_obj.rows
+                    if not rows:
+                        continue
+
+                    # Collect all cell values
+                    grid = []
+                    for row in rows:
+                        cells = [cell.text.strip() for cell in row.cells]
+                        # De-duplicate merged cells (python-docx repeats them)
+                        deduped = []
+                        for i, c in enumerate(cells):
+                            if i == 0 or c != cells[i - 1]:
+                                deduped.append(c)
+                        grid.append(deduped)
+
+                    # Detect two-column matching table:
+                    # - Has exactly 2 columns after dedup
+                    # - First column items look like "1. X", "2. X" (numbered)
+                    # - Second column items look like "A. X", "B. X" (lettered)
+                    col_count = max(len(r) for r in grid) if grid else 0
+                    is_matching_table = False
+
+                    if col_count == 2 and len(grid) >= 2:
+                        # Check if first data row (skip header if present)
+                        # has numbered left and lettered right
+                        data_rows = [r for r in grid if len(r) == 2 and r[0] and r[1]]
+                        if data_rows:
+                            first = data_rows[0]
+                            left_numbered  = first[0][:2].strip().rstrip('.').isdigit()
+                            right_lettered = first[1][:1].strip().upper().isalpha()
+                            is_matching_table = left_numbered or right_lettered
+
+                    if is_matching_table:
+                        # Format as an explicit matching block so Gemini
+                        # can't mistake it for anything else
+                        parts.append("[TABLE]")
+                        parts.append("Column A  |  Column B")
+                        for row in grid:
+                            if len(row) == 2:
+                                parts.append(f"{row[0]}  |  {row[1]}")
+                            elif len(row) == 1 and row[0]:
+                                parts.append(row[0])
+                        parts.append("[/TABLE]")
+                    else:
+                        # Generic table: just join cells with pipes
+                        for row in grid:
+                            line = '  |  '.join(c for c in row if c)
+                            if line:
+                                parts.append(line)
+
+            return "\n".join(parts)
+
         except Exception as e:
             raise Exception(f"Error extracting DOCX: {str(e)}")
 
@@ -74,7 +181,7 @@ class GeminiQuestionnaireExtractor:
             raise Exception(f"Error extracting Excel: {str(e)}")
 
     # =========================================================================
-    # AI PROCESSING  — main entry point
+    # AI PROCESSING
     # =========================================================================
 
     def extract_questions_with_ai(
@@ -84,14 +191,6 @@ class GeminiQuestionnaireExtractor:
         mode: str = 'extract',
         num_questions: int = 10,
     ) -> Dict:
-        """
-        Use Gemini AI to process questions from content.
-
-        mode='extract'  → scans the file and copies questions already written there
-        mode='generate' → creates new questions based on the file content
-        num_questions   → how many questions to generate per type (generate mode only)
-        """
-
         if mode == 'generate':
             prompt = self._build_generation_prompt(content, question_types, num_questions)
         else:
@@ -105,14 +204,12 @@ class GeminiQuestionnaireExtractor:
 
             response_text = response.text
 
-            # Clean up markdown code fences if present
             if '```json' in response_text:
                 response_text = response_text.split('```json')[1].split('```')[0]
             elif '```' in response_text:
                 response_text = response_text.split('```')[1].split('```')[0]
 
             response_text = response_text.strip()
-
             data = json.loads(response_text)
 
             if 'questions' not in data or not data['questions']:
@@ -133,64 +230,148 @@ class GeminiQuestionnaireExtractor:
     # =========================================================================
 
     def _build_extraction_prompt(self, content: str, question_types: List[str]) -> str:
-        """
-        Prompt for SCANNING the file and copying questions already written there.
-        Used by upload_questionnaire view.
-        """
-        return f"""You are a question scanner. Your ONLY job is to find and copy questions that are ALREADY WRITTEN in the text below.
+        return f"""You are a question scanner. Your ONLY job is to find and copy questions ALREADY WRITTEN in the text below.
 
 STRICT RULES:
-- DO NOT create, generate, invent, or add any new questions
-- DO NOT rephrase or rewrite — copy the question text EXACTLY word for word as it appears
-- ONLY include questions that are literally present in the provided text
-- If no questions are found, return {{"questions": []}}
+- DO NOT create, generate, invent, or add any new questions.
+- DO NOT rephrase or rewrite — copy the question text EXACTLY word for word.
+- ONLY include questions that are literally present in the provided text.
+- If no questions are found, return {{"questions": []}}.
 
-QUESTION TYPES TO LOOK FOR:
-{', '.join(question_types)}
+═══════════════════════════════════════════════════════
+SECTION RECOGNITION
+═══════════════════════════════════════════════════════
+Recognize ALL of these as question sections:
+- Roman numerals: I., II., III., IV., V., etc.
+- Labels like: Multiple Choice, True or False, Identification, Matching Type,
+  Fill in the Blank, Essay, Scenario-Based, Situation-Based, Spot the Error,
+  Enumeration, Bonus, Short Answer, Problem Solving, etc.
+- Numbered sub-questions inside any section are individual questions.
 
+═══════════════════════════════════════════════════════
+QUESTION TYPES
+═══════════════════════════════════════════════════════
+Use ONLY these types: {', '.join(question_types)}
+
+- "multiple_choice"  → has lettered options A B C D
+- "true_false"       → asks true or false
+- "identification"   → short answer; also Scenario-Based and Spot-the-Error
+- "essay"            → long open-ended answer
+- "fill_blank"       → sentence with ___ to complete
+- "matching"         → two-column table with Column A and Column B
+
+═══════════════════════════════════════════════════════
+MATCHING TYPE — CRITICAL INSTRUCTIONS
+═══════════════════════════════════════════════════════
+You will see matching tables formatted like this in the text:
+
+    [TABLE]
+    Column A  |  Column B
+    1. CREATE  |  A. Permanently deletes a database object.
+    2. TINYINT  |  B. Creates new database objects.
+    3. DROP  |  C. Modifies the structure of an existing table.
+    [/TABLE]
+
+OR like this (column A and column B listed separately):
+
+    Column A          Column B
+    1. CREATE         A. Permanently deletes a database object.
+    2. TINYINT        B. Creates new database objects.
+
+OR like a plain numbered/lettered list:
+
+    1. CREATE     2. TINYINT     3. DROP
+    A. Deletes    B. Creates     C. Modifies
+
+For ALL of these formats:
+- Treat the ENTIRE section as ONE question with type "matching"
+- Set "question" to the section heading or instruction text (e.g. "Matching Type" or "Match Column A to Column B")
+- Set "column_a" to ALL Column A items as a JSON array: ["1. CREATE", "2. TINYINT", ...]
+- Set "column_b" to ALL Column B items as a JSON array: ["A. Permanently deletes...", "B. Creates...", ...]
+- Set "matching_pairs" to the correct answer pairs IF an answer key is present, otherwise []
+- NEVER split a matching section into multiple identification questions
+
+═══════════════════════════════════════════════════════
+SCENARIO-BASED / SPOT THE ERROR / BONUS
+═══════════════════════════════════════════════════════
+Each numbered item = its own question.
+type: "identification" or "essay"
+Copy text exactly, including any code blocks.
+correct_answer: "" unless explicitly shown.
+
+═══════════════════════════════════════════════════════
 TEXT TO SCAN:
-{content[:8000]}
+═══════════════════════════════════════════════════════
+{content}
 
-FOR EACH QUESTION YOU FIND, return a JSON object with:
-- "type": classify as one of {question_types}
-- "question": exact question text copied from the file
-- "options": {{"a": "...", "b": "...", "c": "...", "d": "..."}} (multiple choice only)
-- "correct_answer": the answer if shown in the file, otherwise ""
-- "explanation": any explanation shown in the file, otherwise ""
-- "difficulty": estimate "easy", "medium", or "hard"
-- "points": point value if shown, otherwise 1
-
-CRITICAL: Return ONLY a valid JSON object. No markdown, no code blocks, just pure JSON.
-
-JSON Structure:
+═══════════════════════════════════════════════════════
+RETURN — valid JSON only, no markdown, no extra text
+═══════════════════════════════════════════════════════
 {{
     "questions": [
         {{
             "type": "multiple_choice",
-            "question": "exact question text from file",
-            "options": {{
-                "a": "exact option A from file",
-                "b": "exact option B from file",
-                "c": "exact option C from file",
-                "d": "exact option D from file"
-            }},
+            "question": "exact question text",
+            "options": {{"a": "...", "b": "...", "c": "...", "d": "..."}},
             "correct_answer": "a",
             "explanation": "",
             "difficulty": "medium",
             "points": 1
         }},
         {{
-            "type": "identification",
-            "question": "exact question text from file",
-            "correct_answer": "answer if shown",
+            "type": "matching",
+            "question": "Matching Type",
+            "column_a": ["1. CREATE", "2. TINYINT", "3. DROP", "4. DECIMAL(10,2)", "5. ALTER", "6. TRUNCATE", "7. CHAR(2)", "8. RENAME"],
+            "column_b": [
+                "A. Permanently deletes a database object.",
+                "B. Creates new database objects.",
+                "C. Modifies the structure of an existing table.",
+                "D. Removes all rows but keeps table structure.",
+                "E. Changes the name of a table.",
+                "F. Storing exact currency values without rounding errors.",
+                "G. Storing small whole numbers like age or status flags.",
+                "H. Storing fixed-length codes such as country abbreviations (PH, US, UK)"
+            ],
+            "matching_pairs": [],
+            "correct_answer": "",
             "explanation": "",
             "difficulty": "medium",
             "points": 1
+        }},
+        {{
+            "type": "identification",
+            "question": "exact question text",
+            "correct_answer": "",
+            "explanation": "",
+            "difficulty": "medium",
+            "points": 1
+        }},
+        {{
+            "type": "true_false",
+            "question": "exact statement",
+            "correct_answer": "true",
+            "explanation": "",
+            "difficulty": "easy",
+            "points": 1
+        }},
+        {{
+            "type": "fill_blank",
+            "question": "The ___ command removes all rows but keeps table structure.",
+            "correct_answer": "TRUNCATE",
+            "explanation": "",
+            "difficulty": "easy",
+            "points": 1
+        }},
+        {{
+            "type": "essay",
+            "question": "exact essay question",
+            "correct_answer": "",
+            "explanation": "",
+            "difficulty": "hard",
+            "points": 5
         }}
     ]
 }}
-
-If no questions are found in the text, return: {{"questions": []}}
 
 JSON:"""
 
@@ -200,12 +381,8 @@ JSON:"""
         question_types: List[str],
         num_questions: int = 10,
     ) -> str:
-        """
-        Prompt for GENERATING new questions based on the file content.
-        Used by generate_questionnaire view.
-        """
-        types_str   = ', '.join(question_types)
-        total       = num_questions * len(question_types)
+        types_str = ', '.join(question_types)
+        total     = num_questions * len(question_types)
 
         return f"""You are an expert teacher creating exam questions.
 
@@ -213,70 +390,46 @@ EDUCATIONAL CONTENT:
 {content[:8000]}
 
 TASK:
-Generate exactly {num_questions} questions for EACH of the following question types: {types_str}
-Total questions = {num_questions} × {len(question_types)} type(s) = {total} questions.
+Generate exactly {num_questions} questions for EACH of these types: {types_str}
+Total = {num_questions} × {len(question_types)} = {total} questions.
 
-IMPORTANT RULES:
-- Base every question strictly on the content provided above. Do NOT invent facts outside it.
-- Vary difficulty across each type: roughly 30% easy, 50% medium, 20% hard.
-- Each question must be clear, unambiguous, and answerable from the content.
-- For multiple_choice : provide exactly 4 options (a–d) with exactly one correct answer.
-- For true_false      : correct_answer must be lowercase "true" or "false".
-- For identification  : correct_answer is a specific term or short phrase from the content.
-- For essay           : provide key points or a model answer in correct_answer.
-- For fill_blank      : write the sentence with "___" for the blank; correct_answer fills it.
-- For matching        : list items as "1. X | 2. Y | 3. Z" and answers as matching pairs.
+RULES:
+- Base every question on the content above only.
+- Vary difficulty: ~30% easy, ~50% medium, ~20% hard.
+- multiple_choice : 4 options (a–d), one correct answer.
+- true_false      : correct_answer = "true" or "false" (lowercase).
+- identification  : correct_answer = specific term or phrase.
+- essay           : correct_answer = key points / model answer.
+- fill_blank      : use "___" in the question; correct_answer fills it.
+- matching        : populate column_a, column_b, and matching_pairs.
 
-CRITICAL: Return ONLY a valid JSON object. No markdown, no explanation, no code blocks.
+Return ONLY valid JSON, no markdown.
 
-Required JSON structure:
 {{
     "questions": [
         {{
             "type": "multiple_choice",
-            "question": "Question text here?",
-            "options": {{
-                "a": "First option",
-                "b": "Second option",
-                "c": "Third option",
-                "d": "Fourth option"
-            }},
+            "question": "...",
+            "options": {{"a": "...", "b": "...", "c": "...", "d": "..."}},
             "correct_answer": "a",
-            "explanation": "Why this is the correct answer.",
+            "explanation": "...",
             "difficulty": "medium",
             "points": 1
         }},
         {{
-            "type": "true_false",
-            "question": "Statement that is true or false.",
-            "correct_answer": "true",
-            "explanation": "Brief explanation.",
-            "difficulty": "easy",
-            "points": 1
-        }},
-        {{
-            "type": "identification",
-            "question": "What term refers to ...?",
-            "correct_answer": "Term",
-            "explanation": "Explanation.",
-            "difficulty": "medium",
-            "points": 1
-        }},
-        {{
-            "type": "fill_blank",
-            "question": "The ___ is responsible for ...",
-            "correct_answer": "missing word",
-            "explanation": "Explanation.",
-            "difficulty": "easy",
-            "points": 1
-        }},
-        {{
-            "type": "essay",
-            "question": "Discuss the significance of ...",
-            "correct_answer": "Key points: 1) ... 2) ... 3) ...",
+            "type": "matching",
+            "question": "Match each item in Column A with the correct description in Column B.",
+            "column_a": ["1. Term one", "2. Term two", "3. Term three"],
+            "column_b": ["A. Description one", "B. Description two", "C. Description three"],
+            "matching_pairs": [
+                {{"item": "1. Term one",   "match": "A"}},
+                {{"item": "2. Term two",   "match": "C"}},
+                {{"item": "3. Term three", "match": "B"}}
+            ],
+            "correct_answer": "1-A, 2-C, 3-B",
             "explanation": "",
-            "difficulty": "hard",
-            "points": 5
+            "difficulty": "medium",
+            "points": 1
         }}
     ]
 }}
@@ -294,53 +447,45 @@ JSON:"""
         mode: str = 'extract',
         num_questions: int = 10,
     ):
-        """
-        Main method called by views.
-
-        Reads the file attached to `questionnaire`, sends the text to Gemini,
-        then persists each returned question as an ExtractedQuestion row.
-
-        Parameters
-        ----------
-        questionnaire : Questionnaire instance
-        question_types : list of QuestionType.name strings
-        mode           : 'extract' (copy existing) | 'generate' (create new)
-        num_questions  : questions per type when mode='generate'
-        """
         from questionnaires.models import ExtractedQuestion, QuestionType
 
-        # ── Build a lookup: type name → QuestionType DB object ───────────────
         type_map = {}
         for qt in QuestionType.objects.filter(is_active=True):
             type_map[qt.name.lower()] = qt
             type_map[qt.name]         = qt
 
-        # Common aliases the AI might return
         aliases = {
-            'multiple_choice':    'multiple_choice',
-            'multiplechoice':     'multiple_choice',
-            'mcq':                'multiple_choice',
-            'true_false':         'true_false',
-            'truefalse':          'true_false',
-            'true/false':         'true_false',
-            'fill_in_the_blank':  'fill_blank',
-            'fill_blank':         'fill_blank',
-            'fill in the blank':  'fill_blank',
-            'identification':     'identification',
-            'essay':              'essay',
-            'matching':           'matching',
-            'enumeration':        'enumeration',
-            'short_answer':       'identification',
+            'multiple_choice':   'multiple_choice',
+            'multiplechoice':    'multiple_choice',
+            'mcq':               'multiple_choice',
+            'true_false':        'true_false',
+            'truefalse':         'true_false',
+            'true/false':        'true_false',
+            'fill_in_the_blank': 'fill_blank',
+            'fill_blank':        'fill_blank',
+            'fill in the blank': 'fill_blank',
+            'identification':    'identification',
+            'essay':             'essay',
+            'matching':          'matching',
+            'enumeration':       'enumeration',
+            'short_answer':      'identification',
+            'scenario':          'identification',
+            'scenario-based':    'identification',
+            'scenario_based':    'identification',
+            'situation-based':   'identification',
+            'spot the error':    'identification',
+            'spot_the_error':    'identification',
+            'bonus':             'identification',
+            'problem solving':   'essay',
+            'problem_solving':   'essay',
         }
 
-        # ── Extract text from the uploaded file ──────────────────────────────
         file_path = questionnaire.file.path
         content   = self.extract_text_from_file(file_path)
 
         if not content.strip():
             raise Exception("No text content could be extracted from the file")
 
-        # ── Call Gemini ───────────────────────────────────────────────────────
         extracted_data = self.extract_questions_with_ai(
             content,
             question_types,
@@ -348,8 +493,8 @@ JSON:"""
             num_questions=num_questions,
         )
 
-        # ── Persist questions ─────────────────────────────────────────────────
         created_questions = []
+
         for q_data in extracted_data.get('questions', []):
             try:
                 raw_type      = q_data.get('type', '').strip().lower()
@@ -357,24 +502,45 @@ JSON:"""
                 question_type = type_map.get(resolved_name) or type_map.get(raw_type)
 
                 if not question_type:
-                    print(
-                        f"Warning: Question type '{raw_type}' not found in database. "
-                        f"Available: {list(type_map.keys())}"
-                    )
-                    # Fallback to first active type rather than silently dropping
-                    question_type = QuestionType.objects.filter(is_active=True).first()
-                    if not question_type:
-                        continue
+                    print(f"Warning: type '{raw_type}' not in DB, skipping.")
+                    continue
+
+                option_a = option_b = option_c = option_d = None
+                correct_answer = q_data.get('correct_answer', '')
+
+                if resolved_name == 'matching':
+                    col_a = q_data.get('column_a', [])
+                    col_b = q_data.get('column_b', [])
+                    pairs = q_data.get('matching_pairs', [])
+
+                    option_a = json.dumps(col_a, ensure_ascii=False)
+                    option_b = json.dumps(col_b, ensure_ascii=False)
+                    option_c = json.dumps(pairs, ensure_ascii=False)
+                    option_d = None
+
+                    if not correct_answer and pairs:
+                        correct_answer = ', '.join(
+                            f"{p['item'].split('.')[0].strip()}-{p['match']}"
+                            for p in pairs
+                            if isinstance(p, dict) and 'item' in p and 'match' in p
+                        )
+
+                elif q_data.get('options'):
+                    opts     = q_data['options']
+                    option_a = opts.get('a')
+                    option_b = opts.get('b')
+                    option_c = opts.get('c')
+                    option_d = opts.get('d')
 
                 question = ExtractedQuestion.objects.create(
                     questionnaire  = questionnaire,
                     question_type  = question_type,
                     question_text  = q_data['question'],
-                    option_a       = q_data.get('options', {}).get('a'),
-                    option_b       = q_data.get('options', {}).get('b'),
-                    option_c       = q_data.get('options', {}).get('c'),
-                    option_d       = q_data.get('options', {}).get('d'),
-                    correct_answer = q_data.get('correct_answer', ''),
+                    option_a       = option_a,
+                    option_b       = option_b,
+                    option_c       = option_c,
+                    option_d       = option_d,
+                    correct_answer = correct_answer,
                     explanation    = q_data.get('explanation', ''),
                     difficulty     = q_data.get('difficulty', 'medium'),
                     points         = q_data.get('points', 1),
@@ -382,7 +548,7 @@ JSON:"""
                 created_questions.append(question)
 
             except Exception as e:
-                print(f"Error creating question: {str(e)}")
+                print(f"Error creating question: {e}")
                 continue
 
         if not created_questions:

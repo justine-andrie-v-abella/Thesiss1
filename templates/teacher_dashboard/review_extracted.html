@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-
+{% load questionnaire_filters %} 
 {% block title %}Review & Select Questions{% endblock %}
 
 {% block content %}
@@ -30,7 +30,6 @@
         </div>
 
         {% if source == 'generate' %}
-        <!-- Generate-mode badge -->
         <div class="flex items-center gap-2 px-4 py-2 bg-purple-100 border border-purple-300 rounded-xl">
             <i class="bi bi-stars text-purple-600"></i>
             <span class="text-purple-700 font-semibold text-sm">AI Generated Mode</span>
@@ -42,9 +41,7 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
             <div class="text-3xl font-bold" id="totalCount">{{ questions.count }}</div>
-            <div class="text-sm opacity-90">Total
-                {% if source == 'generate' %}Generated{% else %}Extracted{% endif %}
-            </div>
+            <div class="text-sm opacity-90">Total {% if source == 'generate' %}Generated{% else %}Extracted{% endif %}</div>
         </div>
         <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
             <div class="text-3xl font-bold" id="selectedCount">0</div>
@@ -60,7 +57,7 @@
         </div>
     </div>
 
-    <!-- Filter & Bulk Actions Bar -->
+    <!-- Filter & Bulk Actions -->
     <div class="bg-white rounded-lg shadow-md p-4 mb-6 flex flex-wrap items-end gap-4">
         <div class="flex-1 min-w-[180px]">
             <label class="block text-xs font-semibold text-gray-600 mb-1">
@@ -73,7 +70,6 @@
                 {% endfor %}
             </select>
         </div>
-
         <div class="flex-1 min-w-[180px]">
             <label class="block text-xs font-semibold text-gray-600 mb-1">
                 <i class="bi bi-bar-chart text-blue-500 mr-1"></i> Filter by Difficulty
@@ -85,7 +81,6 @@
                 <option value="hard">Hard</option>
             </select>
         </div>
-
         <div class="flex gap-2">
             <button type="button" id="selectAllBtn"
                 class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-semibold transition-colors">
@@ -106,6 +101,168 @@
 
         <div class="space-y-4" id="questionsList">
             {% for question in questions %}
+
+            {# ═══════════════════════════════════════════════════════ #}
+            {# MATCHING TYPE CARD                                       #}
+            {# ═══════════════════════════════════════════════════════ #}
+            {% if question.question_type.name == 'matching' %}
+            {% with md=question.get_matching_data %}
+            <div class="question-card bg-white rounded-xl shadow-md overflow-hidden border-l-4
+                {% if question.difficulty == 'easy' %}border-green-500
+                {% elif question.difficulty == 'hard' %}border-red-500
+                {% else %}border-yellow-500{% endif %}"
+                data-type="{{ question.question_type.name }}"
+                data-difficulty="{{ question.difficulty }}"
+                data-points="{{ question.points }}">
+            
+                <div class="p-5">
+                    <div class="flex items-start gap-4">
+            
+                        <!-- Checkbox -->
+                        <div class="flex-shrink-0 pt-1">
+                            <input type="checkbox" name="selected_questions" value="{{ question.id }}"
+                                class="question-checkbox w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                {% if question.is_approved %}checked{% endif %}>
+                        </div>
+            
+                        <div class="flex-1 min-w-0">
+            
+                            <!-- Badges -->
+                            <div class="flex flex-wrap gap-2 mb-3">
+                                <span class="px-2.5 py-1 bg-teal-100 text-teal-800 text-xs font-bold rounded-full flex items-center gap-1">
+                                    <i class="bi bi-arrow-left-right"></i> Matching Type
+                                </span>
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full
+                                    {% if question.difficulty == 'easy' %}bg-green-100 text-green-800
+                                    {% elif question.difficulty == 'hard' %}bg-red-100 text-red-800
+                                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                    {{ question.difficulty|title }}
+                                </span>
+                                <span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                                    {{ question.points }} pt{{ question.points|pluralize }}
+                                </span>
+                                {% if md %}
+                                <span class="px-2 py-0.5 bg-teal-50 text-teal-700 text-xs font-semibold rounded-full">
+                                    {{ md.column_a|length }} items
+                                </span>
+                                {% endif %}
+                            </div>
+            
+                            <!-- Instruction text -->
+                            <p class="text-gray-700 font-semibold text-sm mb-4">{{ question.question_text }}</p>
+            
+                            {% if md and md.column_a and md.column_b %}
+            
+                            <!-- ═══════════════════════════════════════════════════ -->
+                            <!-- TWO-COLUMN MATCHING TABLE                           -->
+                            <!-- Column A and Column B displayed side by side        -->
+                            <!-- ═══════════════════════════════════════════════════ -->
+                            <div class="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+            
+                                <!-- Header -->
+                                <div class="grid grid-cols-2 border-b-2 border-gray-200">
+                                    <div class="px-5 py-3 bg-teal-600 text-white text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                                        <i class="bi bi-list-ol text-sm"></i> Column A
+                                    </div>
+                                    <div class="px-5 py-3 bg-cyan-600 text-white text-xs font-bold uppercase tracking-widest flex items-center gap-2 border-l border-cyan-500">
+                                        <i class="bi bi-card-text text-sm"></i> Column B
+                                    </div>
+                                </div>
+            
+                                <!-- Rows: column_a[i] beside column_b[i] -->
+                                {% for col_a_item in md.column_a %}
+                                <div class="grid grid-cols-2 border-b border-gray-100
+                                    {% if forloop.counter|divisibleby:2 %}bg-gray-50{% else %}bg-white{% endif %}
+                                    hover:bg-teal-50 transition-colors duration-150">
+            
+                                    <!-- Column A cell -->
+                                    <div class="px-5 py-3 flex items-start gap-3 border-r border-gray-200">
+                                        <span class="w-6 h-6 rounded-full bg-teal-100 text-teal-700 text-xs font-bold
+                                                    flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            {{ forloop.counter }}
+                                        </span>
+                                        <span class="text-sm text-gray-800 font-medium leading-snug">
+                                            {{ col_a_item|slice:"3:" }}
+                                        </span>
+                                    </div>
+            
+                                    <!-- Column B cell (same row index) -->
+                                    <div class="px-5 py-3 flex items-start gap-3">
+                                        {% with b_index=forloop.counter0 %}
+                                        {% for col_b_item in md.column_b %}
+                                            {% if forloop.counter0 == b_index %}
+                                            <span class="w-6 h-6 rounded-full bg-cyan-100 text-cyan-700 text-xs font-bold
+                                                        flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                {{ col_b_item|slice:":1" }}
+                                            </span>
+                                            <span class="text-sm text-gray-700 leading-snug">
+                                                {{ col_b_item|slice:"3:" }}
+                                            </span>
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% endwith %}
+                                    </div>
+            
+                                </div>
+                                {% endfor %}
+            
+                                <!-- Answer key footer (shown only if pairs were extracted) -->
+                                {% if md.pairs %}
+                                <div class="bg-green-50 border-t-2 border-green-200 px-5 py-3 flex flex-wrap gap-x-3 gap-y-1 items-center">
+                                    <span class="text-xs font-bold text-green-700 flex-shrink-0 flex items-center gap-1 mr-1">
+                                        <i class="bi bi-key-fill"></i> Answer Key:
+                                    </span>
+                                    {% for pair in md.pairs %}
+                                    <span class="px-2 py-0.5 bg-white border border-green-300 rounded text-xs font-semibold text-green-800 shadow-sm">
+                                        {{ pair.item|slice:":1" }} → {{ pair.match }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <div class="bg-amber-50 border-t border-amber-200 px-5 py-2.5 flex items-center gap-2">
+                                    <i class="bi bi-info-circle text-amber-500 text-sm flex-shrink-0"></i>
+                                    <span class="text-xs text-amber-700">
+                                        No answer key found in the file — you can add it manually after saving.
+                                    </span>
+                                </div>
+                                {% endif %}
+            
+                            </div>
+                            <!-- /TWO-COLUMN MATCHING TABLE -->
+            
+                            {% else %}
+                            <!-- Fallback: JSON parsing failed -->
+                            <div class="bg-teal-50 border-l-4 border-teal-400 p-3 rounded text-sm">
+                                <span class="text-gray-500 font-medium">Answer Key: </span>
+                                <span class="text-teal-800 font-semibold">{{ question.correct_answer|default:"—" }}</span>
+                            </div>
+                            {% endif %}
+            
+                            {% if question.explanation %}
+                            <div class="mt-3 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300">
+                                <i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>{{ question.explanation }}
+                            </div>
+                            {% endif %}
+            
+                        </div>
+            
+                        <!-- Delete button -->
+                        <button type="button"
+                            class="delete-btn flex-shrink-0 bg-red-100 text-red-600 hover:bg-red-500 hover:text-white px-3 py-2 rounded transition-colors text-sm"
+                            data-question-id="{{ question.id }}"
+                            title="Remove Question">
+                            <i class="bi bi-trash"></i>
+                        </button>
+            
+                    </div>
+                </div>
+            </div>
+            {% endwith %}
+
+            {# ═══════════════════════════════════════════════════════ #}
+            {# ALL OTHER QUESTION TYPES                                 #}
+            {# ═══════════════════════════════════════════════════════ #}
+            {% else %}
             <div class="question-card bg-white rounded-lg shadow-md overflow-hidden border-l-4 transition-all
                 {% if question.difficulty == 'easy' %}border-green-500
                 {% elif question.difficulty == 'hard' %}border-red-500
@@ -115,13 +272,11 @@
                 data-points="{{ question.points }}">
                 <div class="p-5">
                     <div class="flex items-start gap-4">
-
                         <div class="flex-shrink-0 pt-1">
                             <input type="checkbox" name="selected_questions" value="{{ question.id }}"
                                 class="question-checkbox w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                                 {% if question.is_approved %}checked{% endif %}>
                         </div>
-
                         <div class="flex-1 min-w-0">
                             <div class="flex flex-wrap gap-2 mb-2">
                                 <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
@@ -137,7 +292,6 @@
                                     {{ question.points }} pt{{ question.points|pluralize }}
                                 </span>
                             </div>
-
                             <p class="text-gray-800 font-medium mb-3">{{ question.question_text }}</p>
 
                             {% if question.question_type.name == 'multiple_choice' %}
@@ -167,7 +321,6 @@
                             </div>
                             {% endif %}
                         </div>
-
                         <button type="button"
                             class="delete-btn flex-shrink-0 bg-red-100 text-red-600 hover:bg-red-500 hover:text-white px-3 py-2 rounded transition-colors text-sm"
                             data-question-id="{{ question.id }}"
@@ -177,6 +330,8 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
+
             {% empty %}
             <div class="bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded-lg flex items-center">
                 <i class="bi bi-exclamation-triangle text-yellow-600 text-2xl mr-3"></i>
@@ -192,8 +347,7 @@
         <!-- MANUAL ADD QUESTION PANEL                                     -->
         <!-- ============================================================ -->
         <div class="mt-6 bg-white rounded-xl shadow-lg border-l-4 border-indigo-500 overflow-hidden" id="manualAddPanel">
-            <div class="p-5 flex items-center justify-between cursor-pointer select-none"
-                 id="manualAddToggle">
+            <div class="p-5 flex items-center justify-between cursor-pointer select-none" id="manualAddToggle">
                 <div class="flex items-center gap-3">
                     <span class="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow">
                         <i class="bi bi-pencil-plus text-lg"></i>
@@ -215,10 +369,10 @@
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1">
                             <i class="bi bi-chat-left-text text-indigo-500 mr-1"></i>
-                            Question Text <span class="text-red-500">*</span>
+                            Question Text / Instructions <span class="text-red-500">*</span>
                         </label>
                         <textarea id="manualQuestionText" rows="3"
-                            placeholder="Type your question here…"
+                            placeholder="e.g. Match each item in Column A with the correct description in Column B."
                             class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 resize-none text-sm transition-colors"></textarea>
                     </div>
 
@@ -235,6 +389,7 @@
                                 <option value="identification">Identification</option>
                                 <option value="essay">Essay</option>
                                 <option value="fill_in_the_blank">Fill in the Blank</option>
+                                <option value="matching">Matching Type</option>
                             </select>
                         </div>
                         <div>
@@ -257,7 +412,7 @@
                         </div>
                     </div>
 
-                    <!-- Dynamic Answer Section -->
+                    <!-- ══ Dynamic Answer Section ══ -->
                     <div id="manualAnswerSection">
 
                         <!-- Multiple Choice -->
@@ -271,45 +426,33 @@
                                     <span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">A</span>
                                     <input type="text" placeholder="Option A" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">
                                     <label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
-                                        <input type="radio" name="manualCorrect" value="A" class="w-4 h-4 text-indigo-600 cursor-pointer">
-                                        Correct
+                                        <input type="radio" name="manualCorrect" value="A" class="w-4 h-4 text-indigo-600 cursor-pointer"> Correct
                                     </label>
-                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1" title="Remove option">
-                                        <i class="bi bi-x-circle"></i>
-                                    </button>
+                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1"><i class="bi bi-x-circle"></i></button>
                                 </div>
                                 <div class="flex items-center gap-2 mc-option-row">
                                     <span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">B</span>
                                     <input type="text" placeholder="Option B" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">
                                     <label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
-                                        <input type="radio" name="manualCorrect" value="B" class="w-4 h-4 text-indigo-600 cursor-pointer">
-                                        Correct
+                                        <input type="radio" name="manualCorrect" value="B" class="w-4 h-4 text-indigo-600 cursor-pointer"> Correct
                                     </label>
-                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1" title="Remove option">
-                                        <i class="bi bi-x-circle"></i>
-                                    </button>
+                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1"><i class="bi bi-x-circle"></i></button>
                                 </div>
                                 <div class="flex items-center gap-2 mc-option-row">
                                     <span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">C</span>
                                     <input type="text" placeholder="Option C" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">
                                     <label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
-                                        <input type="radio" name="manualCorrect" value="C" class="w-4 h-4 text-indigo-600 cursor-pointer">
-                                        Correct
+                                        <input type="radio" name="manualCorrect" value="C" class="w-4 h-4 text-indigo-600 cursor-pointer"> Correct
                                     </label>
-                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1" title="Remove option">
-                                        <i class="bi bi-x-circle"></i>
-                                    </button>
+                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1"><i class="bi bi-x-circle"></i></button>
                                 </div>
                                 <div class="flex items-center gap-2 mc-option-row">
                                     <span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">D</span>
                                     <input type="text" placeholder="Option D" class="mc-option-input flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm">
                                     <label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
-                                        <input type="radio" name="manualCorrect" value="D" class="w-4 h-4 text-indigo-600 cursor-pointer">
-                                        Correct
+                                        <input type="radio" name="manualCorrect" value="D" class="w-4 h-4 text-indigo-600 cursor-pointer"> Correct
                                     </label>
-                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1" title="Remove option">
-                                        <i class="bi bi-x-circle"></i>
-                                    </button>
+                                    <button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 hidden text-sm px-1"><i class="bi bi-x-circle"></i></button>
                                 </div>
                             </div>
                             <button type="button" id="addOptionBtn"
@@ -342,9 +485,86 @@
                                 placeholder="Enter the expected answer…"
                                 class="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
                         </div>
+
+                        <!-- ══════════════════════════════════════════════════ -->
+                        <!-- MATCHING TYPE MANUAL INPUT                         -->
+                        <!-- ══════════════════════════════════════════════════ -->
+                        <div id="matchingSection" class="hidden">
+                            <div class="bg-teal-50 border border-teal-200 rounded-xl p-4">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <i class="bi bi-arrow-left-right text-teal-600 text-base"></i>
+                                    <span class="text-sm font-bold text-teal-800">Matching Pairs</span>
+                                    <span class="text-xs text-teal-600 font-normal">— enter Column A items and their matching Column B descriptions, then pick the correct answer letter</span>
+                                </div>
+
+                                <!-- Column headers -->
+                                <div class="grid grid-cols-[1fr_1fr_6rem_2rem] gap-2 mb-2 px-1">
+                                    <div class="text-xs font-bold text-teal-700 uppercase tracking-wide flex items-center gap-1">
+                                        <span class="w-5 h-5 rounded-full bg-teal-600 text-white text-xs flex items-center justify-center">A</span>
+                                        Column A (term)
+                                    </div>
+                                    <div class="text-xs font-bold text-cyan-700 uppercase tracking-wide flex items-center gap-1">
+                                        <span class="w-5 h-5 rounded-full bg-cyan-600 text-white text-xs flex items-center justify-center">B</span>
+                                        Column B (description)
+                                    </div>
+                                    <div class="text-xs font-bold text-gray-500 uppercase tracking-wide text-center">Correct Match</div>
+                                    <div></div>
+                                </div>
+
+                                <!-- Pair rows container -->
+                                <div class="space-y-2" id="matchingPairs">
+                                    <!-- Row 1 -->
+                                    <div class="matching-pair-row grid grid-cols-[1fr_1fr_6rem_2rem] gap-2 items-center">
+                                        <input type="text" placeholder="e.g. CREATE" class="match-col-a px-3 py-2 border-2 border-teal-200 rounded-lg focus:outline-none focus:border-teal-400 text-sm bg-white">
+                                        <input type="text" placeholder="e.g. Creates new database objects" class="match-col-b px-3 py-2 border-2 border-cyan-200 rounded-lg focus:outline-none focus:border-cyan-400 text-sm bg-white">
+                                        <select class="match-answer px-2 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm text-center font-semibold">
+                                            <option value="">—</option>
+                                        </select>
+                                        <button type="button" class="remove-pair-btn text-red-400 hover:text-red-600 text-lg flex items-center justify-center opacity-0 cursor-default" title="Remove row">
+                                            <i class="bi bi-x-circle-fill"></i>
+                                        </button>
+                                    </div>
+                                    <!-- Row 2 -->
+                                    <div class="matching-pair-row grid grid-cols-[1fr_1fr_6rem_2rem] gap-2 items-center">
+                                        <input type="text" placeholder="e.g. DROP" class="match-col-a px-3 py-2 border-2 border-teal-200 rounded-lg focus:outline-none focus:border-teal-400 text-sm bg-white">
+                                        <input type="text" placeholder="e.g. Permanently deletes a database object" class="match-col-b px-3 py-2 border-2 border-cyan-200 rounded-lg focus:outline-none focus:border-cyan-400 text-sm bg-white">
+                                        <select class="match-answer px-2 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm text-center font-semibold">
+                                            <option value="">—</option>
+                                        </select>
+                                        <button type="button" class="remove-pair-btn text-red-400 hover:text-red-600 text-lg flex items-center justify-center opacity-0 cursor-default" title="Remove row">
+                                            <i class="bi bi-x-circle-fill"></i>
+                                        </button>
+                                    </div>
+                                    <!-- Row 3 -->
+                                    <div class="matching-pair-row grid grid-cols-[1fr_1fr_6rem_2rem] gap-2 items-center">
+                                        <input type="text" placeholder="e.g. ALTER" class="match-col-a px-3 py-2 border-2 border-teal-200 rounded-lg focus:outline-none focus:border-teal-400 text-sm bg-white">
+                                        <input type="text" placeholder="e.g. Modifies the structure of an existing table" class="match-col-b px-3 py-2 border-2 border-cyan-200 rounded-lg focus:outline-none focus:border-cyan-400 text-sm bg-white">
+                                        <select class="match-answer px-2 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm text-center font-semibold">
+                                            <option value="">—</option>
+                                        </select>
+                                        <button type="button" class="remove-pair-btn text-red-400 hover:text-red-600 text-lg flex items-center justify-center opacity-0 cursor-default" title="Remove row">
+                                            <i class="bi bi-x-circle-fill"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Add pair button -->
+                                <button type="button" id="addMatchingPairBtn"
+                                    class="mt-3 text-xs text-teal-700 hover:text-teal-900 font-bold flex items-center gap-1.5 transition-colors px-3 py-1.5 bg-white border border-teal-200 rounded-lg hover:border-teal-400 hover:bg-teal-50">
+                                    <i class="bi bi-plus-circle-fill"></i> Add another pair
+                                </button>
+
+                                <p class="text-xs text-teal-600 mt-2 flex items-center gap-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    The "Correct Match" dropdown auto-updates as you add rows. Pick the Column B letter that matches each Column A item.
+                                </p>
+                            </div>
+                        </div>
+                        <!-- /MATCHING TYPE MANUAL INPUT -->
+
                     </div>
 
-                    <!-- Explanation (optional) -->
+                    <!-- Explanation -->
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1">
                             <i class="bi bi-lightbulb text-yellow-500 mr-1"></i> Explanation
@@ -373,11 +593,9 @@
 
 
         <!-- ============================================================ -->
-        <!-- SAVE SECTION — switches based on source                      -->
+        <!-- SAVE SECTION                                                  -->
         <!-- ============================================================ -->
-
         {% if source == 'generate' %}
-        <!-- ══ GENERATE MODE: Save to Workspace ══ -->
         <div class="mt-8 bg-white rounded-xl shadow-lg overflow-hidden border-t-4 border-purple-500">
             <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 flex items-center gap-3">
                 <span class="w-8 h-8 rounded-full bg-white/20 text-white font-bold flex items-center justify-center text-sm">3</span>
@@ -386,10 +604,7 @@
                     <p class="text-white/70 text-xs mt-0.5">Choose a folder — selected questions will be added directly to your workspace</p>
                 </div>
             </div>
-
             <div class="p-6 space-y-5">
-
-                <!-- Selection summary -->
                 <div class="bg-purple-50 rounded-lg p-4 border border-purple-200">
                     <h4 class="text-sm font-bold text-purple-800 mb-2">Selection Summary</h4>
                     <div class="flex flex-wrap gap-4 text-sm text-purple-700">
@@ -398,8 +613,6 @@
                         <span id="summaryTypes" class="text-indigo-600 font-medium"></span>
                     </div>
                 </div>
-
-                <!-- Final title -->
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         <i class="bi bi-pencil text-purple-500 mr-1"></i> Final Title
@@ -407,54 +620,37 @@
                     <input type="text" name="final_title" value="{{ questionnaire.title }}"
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500">
                 </div>
-
-                <!-- Workspace folder picker -->
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         <i class="bi bi-folder2-open text-purple-500 mr-1"></i>
                         Save into Workspace Folder <span class="text-red-500">*</span>
                     </label>
-
-                    <!-- Loading state -->
                     <div id="folderLoadingState" class="flex items-center gap-2 text-sm text-gray-400 py-3">
                         <div class="w-4 h-4 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin"></div>
                         Loading your folders…
                     </div>
-
-                    <!-- Folder list (populated by JS) -->
                     <div id="folderPickerGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
-
-                    <!-- No folders state -->
                     <div id="noFoldersState" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
                         <i class="bi bi-exclamation-triangle text-amber-500 text-lg flex-shrink-0 mt-0.5"></i>
                         <div>
                             <p class="text-amber-800 font-semibold text-sm">No workspace folders yet</p>
-                            <p class="text-amber-700 text-xs mt-1">Create a folder in your workspace first, then come back here.</p>
                             <a href="{% url 'questionnaires:workspace' %}" target="_blank"
                                 class="inline-flex items-center gap-1 mt-2 text-xs font-bold text-purple-600 hover:text-purple-800 underline">
                                 <i class="bi bi-folder-plus"></i> Open Workspace to create a folder
                             </a>
                         </div>
                     </div>
-
                     <input type="hidden" name="workspace_folder_id" id="selectedFolderId" value="">
-                    <p class="text-xs text-gray-400 mt-2" id="folderPickerHint">
-                        <i class="bi bi-info-circle mr-1"></i>
-                        Questions will also be saved to My Uploads so you can access them later.
-                    </p>
                 </div>
-
-                <!-- OR create a new folder inline -->
                 <div class="border-t border-gray-100 pt-4">
                     <button type="button" id="inlineNewFolderToggle"
                         class="flex items-center gap-2 text-sm font-semibold text-purple-600 hover:text-purple-800 transition-colors">
                         <i class="bi bi-folder-plus"></i> Or create a new folder right here
                         <i class="bi bi-chevron-down text-xs" id="inlineFolderChevron"></i>
                     </button>
-
                     <div id="inlineNewFolderForm" class="hidden mt-3 flex gap-2">
                         <input type="text" id="newFolderName" maxlength="80"
-                            placeholder="New folder name (e.g. Midterm Exam)…"
+                            placeholder="New folder name…"
                             class="flex-1 px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 text-sm">
                         <button type="button" id="createFolderInlineBtn"
                             class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-sm transition-colors flex items-center gap-1.5 flex-shrink-0">
@@ -462,8 +658,6 @@
                         </button>
                     </div>
                 </div>
-
-                <!-- Action buttons -->
                 <div class="flex gap-4 pt-2">
                     <button type="submit" id="saveToWorkspaceBtn"
                         class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
@@ -480,15 +674,12 @@
         </div>
 
         {% else %}
-        <!-- ══ EXTRACT MODE: original Save & Download section ══ -->
         <div class="mt-8 bg-white rounded-xl shadow-lg p-6 border-t-4 border-blue-500">
             <div class="flex items-center mb-5">
                 <span class="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm mr-3">3</span>
                 <h3 class="text-xl font-bold text-gray-800">Save & Download Questionnaire</h3>
             </div>
-
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         <i class="bi bi-pencil text-blue-500 mr-1"></i> Final Title
@@ -496,7 +687,6 @@
                     <input type="text" name="final_title" value="{{ questionnaire.title }}"
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500">
                 </div>
-
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         <i class="bi bi-tag text-blue-500 mr-1"></i> Questionnaire Type
@@ -507,28 +697,19 @@
                         Select questions above to auto-detect type
                     </div>
                     <input type="hidden" name="questionnaire_type" id="questionnaireType" value="">
-                    <p class="text-xs text-gray-500 mt-1">
-                        <i class="bi bi-magic text-purple-500 mr-1"></i>
-                        Automatically set based on your selection
-                    </p>
                 </div>
-
                 <div class="md:col-span-2">
                     <label class="block text-sm font-semibold text-gray-700 mb-3">
                         <i class="bi bi-file-earmark-arrow-down text-green-500 mr-1"></i> Save Options
                     </label>
                     <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border-2 border-gray-200">
                         <span class="text-sm font-medium text-gray-700">Save Only</span>
-
                         <button type="button" id="downloadToggle"
                             class="relative w-14 h-7 rounded-full transition-colors duration-300 bg-gray-300 focus:outline-none"
                             role="switch" aria-checked="false">
-                            <span id="toggleKnob"
-                                class="absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform duration-300"></span>
+                            <span id="toggleKnob" class="absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform duration-300"></span>
                         </button>
-
                         <span class="text-sm font-medium text-gray-700">Also Download</span>
-
                         <div id="formatOptions" class="hidden gap-3 ml-4">
                             <label class="flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-400 transition-colors text-sm font-medium">
                                 <input type="radio" name="download_format" value="docx" checked class="text-blue-600">
@@ -546,8 +727,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Summary -->
             <div class="bg-blue-50 rounded-lg p-4 mb-5 border border-blue-200">
                 <h4 class="text-sm font-bold text-blue-800 mb-2">Selection Summary</h4>
                 <div class="flex flex-wrap gap-4 text-sm text-blue-700">
@@ -556,8 +735,6 @@
                     <span id="summaryTypes" class="text-purple-600 font-medium"></span>
                 </div>
             </div>
-
-            <!-- Action Buttons -->
             <div class="flex gap-4">
                 <button type="submit" id="saveBtn"
                     class="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-lg flex items-center justify-center">
@@ -615,9 +792,6 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 #spinner { animation: spin 1s linear infinite; }
 
-#manualAddBody { transition: none; }
-#manualAddBody.open { display: block; }
-
 @keyframes badgePop {
     0%   { transform: scale(0.8); opacity: 0; }
     70%  { transform: scale(1.1); }
@@ -631,28 +805,21 @@
 }
 .new-card-anim { animation: slideIn 0.3s ease-out; }
 
-/* Folder picker card */
 .folder-pick-card {
-    border: 2px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 12px 14px;
-    cursor: pointer;
-    transition: all .2s;
+    border: 2px solid #e5e7eb; border-radius: 12px;
+    padding: 12px 14px; cursor: pointer; transition: all .2s;
     display: flex; align-items: center; gap: 10px;
-    background: #fff;
-    user-select: none;
+    background: #fff; user-select: none;
 }
 .folder-pick-card:hover { border-color: #a78bfa; background: #faf5ff; }
 .folder-pick-card.selected {
-    border-color: #7c3aed;
-    background: #f5f3ff;
+    border-color: #7c3aed; background: #f5f3ff;
     box-shadow: 0 0 0 3px #ede9fe;
 }
 .folder-pick-card .folder-icon {
     width: 36px; height: 36px; border-radius: 9px;
     background: linear-gradient(135deg, #7c3aed, #6d28d9);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .folder-pick-card .folder-name { font-size: .875rem; font-weight: 600; color: #374151; }
 .folder-pick-card .folder-count { font-size: .75rem; color: #9ca3af; }
@@ -661,11 +828,16 @@
     opacity: 0; transition: opacity .15s;
 }
 .folder-pick-card.selected .folder-check { opacity: 1; }
+
+/* Matching table hover rows */
+.matching-table-wrap .grid:hover { background-color: #f0fdfa !important; }
+
+/* Matching manual input remove button visibility */
+.matching-pair-row:hover .remove-pair-btn { opacity: 1 !important; cursor: pointer !important; }
 </style>
 
 <script>
 (function () {
-    // Detect generate vs extract mode from the hidden input
     var sourceInput = document.querySelector('input[name="source"]');
     var IS_GENERATE = sourceInput && sourceInput.value === 'generate';
 
@@ -674,8 +846,7 @@
     // ================================================================
     function updateStats() {
         var checked = document.querySelectorAll('.question-checkbox:checked');
-        var pts   = 0;
-        var types = new Set();
+        var pts = 0, types = new Set();
 
         checked.forEach(function (cb) {
             var card = cb.closest('.question-card');
@@ -686,71 +857,58 @@
         });
 
         var cnt = checked.length;
-        setText('selectedCount',  cnt);
+        setText('selectedCount', cnt);
         setText('selectedPoints', pts);
         setText('summarySelected', cnt);
-        setText('summaryPoints',   pts);
-        setText('typesCount',      types.size);
+        setText('summaryPoints', pts);
+        setText('typesCount', types.size);
 
-        // Auto-detect type (extract mode only)
         var typeHidden  = document.getElementById('questionnaireType');
         var typeDisplay = document.getElementById('typeDisplay');
-
         if (typeHidden && typeDisplay) {
             if (cnt === 0) {
-                typeHidden.value        = '';
-                typeDisplay.textContent = 'Select questions above to auto-detect type';
+                typeHidden.value = ''; typeDisplay.textContent = 'Select questions above to auto-detect type';
                 setText('summaryTypes', '');
             } else if (types.size === 1) {
                 var st = Array.from(types)[0];
-                typeHidden.value        = st;
-                typeDisplay.textContent = st.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}) + ' Only';
+                typeHidden.value = st;
+                typeDisplay.textContent = st.replace(/_/g,' ').replace(/\b\w/g, function(c){return c.toUpperCase();}) + ' Only';
                 setText('summaryTypes', 'Type: ' + typeDisplay.textContent);
             } else {
-                typeHidden.value        = 'mixed';
+                typeHidden.value = 'mixed';
                 typeDisplay.textContent = 'Mixed (' + Array.from(types).map(function(t){
-                    return t.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+                    return t.replace(/_/g,' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
                 }).join(', ') + ')';
                 setText('summaryTypes', typeDisplay.textContent);
             }
         } else {
-            // Generate mode summary
-            var st = document.getElementById('summaryTypes');
-            if (st) {
-                if (types.size === 0) {
-                    st.textContent = '';
-                } else {
-                    st.textContent = Array.from(types).map(function(t){
-                        return t.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
-                    }).join(', ');
-                }
+            var st2 = document.getElementById('summaryTypes');
+            if (st2) {
+                st2.textContent = types.size === 0 ? '' : Array.from(types).map(function(t){
+                    return t.replace(/_/g,' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
+                }).join(', ');
             }
         }
 
         setText('totalCount', document.querySelectorAll('.question-card').length);
 
-        // Update workspace save button
         if (IS_GENERATE) {
             var folderId = document.getElementById('selectedFolderId') && document.getElementById('selectedFolderId').value;
             var wsBtn    = document.getElementById('saveToWorkspaceBtn');
             var wsBtnTxt = document.getElementById('saveToWorkspaceBtnText');
             if (wsBtn) {
                 if (cnt > 0 && folderId) {
-                    wsBtn.disabled = false;
-                    wsBtn.classList.remove('opacity-50','cursor-not-allowed');
+                    wsBtn.disabled = false; wsBtn.classList.remove('opacity-50','cursor-not-allowed');
                     wsBtnTxt.textContent = 'Save ' + cnt + ' Question(s) to Workspace';
                 } else if (cnt === 0) {
-                    wsBtn.disabled = true;
-                    wsBtn.classList.add('opacity-50','cursor-not-allowed');
+                    wsBtn.disabled = true; wsBtn.classList.add('opacity-50','cursor-not-allowed');
                     wsBtnTxt.textContent = 'Select questions first';
                 } else {
-                    wsBtn.disabled = true;
-                    wsBtn.classList.add('opacity-50','cursor-not-allowed');
+                    wsBtn.disabled = true; wsBtn.classList.add('opacity-50','cursor-not-allowed');
                     wsBtnTxt.textContent = 'Select a folder first';
                 }
             }
         }
-
         if (!IS_GENERATE) updateSaveButtonText();
     }
 
@@ -773,12 +931,11 @@
         });
         updateStats();
     }
-
     document.getElementById('filterType').addEventListener('change', applyFilters);
     document.getElementById('filterDifficulty').addEventListener('change', applyFilters);
 
     // ================================================================
-    // SELECT ALL / DESELECT ALL
+    // SELECT / DESELECT ALL
     // ================================================================
     document.getElementById('selectAllBtn').addEventListener('click', function () {
         document.querySelectorAll('.question-card').forEach(function (card) {
@@ -786,57 +943,44 @@
         });
         updateStats();
     });
-
     document.getElementById('deselectAllBtn').addEventListener('click', function () {
         document.querySelectorAll('.question-checkbox').forEach(function (cb) { cb.checked = false; });
         updateStats();
     });
 
     // ================================================================
-    // DELETE QUESTION
+    // DELETE
     // ================================================================
     function bindDeleteBtn(btn) {
         btn.addEventListener('click', function () {
             if (!confirm('Remove this question?')) return;
             var questionId = btn.getAttribute('data-question-id');
-            var card       = btn.closest('.question-card');
- 
-            // Manual questions only exist in the DOM — just remove them
+            var card = btn.closest('.question-card');
+
             if (!questionId || btn.getAttribute('data-manual') === 'true') {
-                fadeRemove(card);
-                return;
+                fadeRemove(card); return;
             }
- 
+
             var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            var fd   = new FormData();
+            var fd = new FormData();
             fd.append('csrfmiddlewaretoken', csrf);
             fd.append('action', 'delete_question');
-            fd.append('question_id', questionId);  // this is now the session list index
- 
+            fd.append('question_id', questionId);
+
             fetch(window.location.href, { method: 'POST', body: fd })
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    if (data.ok) {
-                        fadeRemove(card);
-                        // Re-index remaining AI question cards so their
-                        // data-question-id stays in sync with the session list
-                        reindexQuestionCards();
-                    } else {
-                        alert(data.error || 'Failed to remove question.');
-                    }
+                .then(function(r){ return r.json(); })
+                .then(function(data){
+                    if (data.ok) { fadeRemove(card); reindexQuestionCards(); }
+                    else alert(data.error || 'Failed to remove question.');
                 })
-                .catch(function () {
-                    alert('Something went wrong. Please refresh and try again.');
-                });
+                .catch(function(){ alert('Something went wrong. Please refresh.'); });
         });
     }
- 
-    // After a session-list deletion the remaining items shift down by one.
-    // Re-number every non-manual card's data-question-id to match.
+
     function reindexQuestionCards() {
         var idx = 0;
         document.querySelectorAll('.question-card').forEach(function (card) {
-            if (card.dataset.manual === 'true') return;  // skip manual cards
+            if (card.dataset.manual === 'true') return;
             var cb  = card.querySelector('.question-checkbox');
             var btn = card.querySelector('.delete-btn');
             if (cb)  cb.setAttribute('value', idx);
@@ -847,8 +991,7 @@
 
     function fadeRemove(el) {
         el.style.transition = 'opacity 0.3s, transform 0.3s';
-        el.style.opacity    = '0';
-        el.style.transform  = 'translateX(-10px)';
+        el.style.opacity = '0'; el.style.transform = 'translateX(-10px)';
         setTimeout(function () { el.remove(); updateStats(); }, 300);
     }
 
@@ -859,7 +1002,7 @@
     // ================================================================
     var manualBodyEl    = document.getElementById('manualAddBody');
     var manualChevronEl = document.getElementById('manualAddChevron');
-    var panelOpen       = false;
+    var panelOpen = false;
 
     document.getElementById('manualAddToggle').addEventListener('click', function () {
         panelOpen = !panelOpen;
@@ -873,18 +1016,22 @@
     });
 
     // ================================================================
-    // MANUAL ADD — switch answer section
+    // MANUAL ADD — switch answer section based on type
     // ================================================================
     var mcSection          = document.getElementById('mcSection');
     var tfSection          = document.getElementById('tfSection');
     var shortAnswerSection = document.getElementById('shortAnswerSection');
+    var matchingSection    = document.getElementById('matchingSection');
 
     function showAnswerSection(type) {
         mcSection.classList.add('hidden');
         tfSection.classList.add('hidden');
         shortAnswerSection.classList.add('hidden');
-        if (type === 'multiple_choice') mcSection.classList.remove('hidden');
+        matchingSection.classList.add('hidden');
+
+        if (type === 'multiple_choice')  mcSection.classList.remove('hidden');
         else if (type === 'true_false')  tfSection.classList.remove('hidden');
+        else if (type === 'matching')    matchingSection.classList.remove('hidden');
         else shortAnswerSection.classList.remove('hidden');
     }
 
@@ -900,9 +1047,9 @@
     document.getElementById('addOptionBtn').addEventListener('click', function () {
         var rows = document.querySelectorAll('#mcOptions .mc-option-row');
         var idx  = rows.length;
-        if (idx >= letters.length) { alert('Maximum 10 options allowed.'); return; }
+        if (idx >= letters.length) { alert('Maximum 10 options.'); return; }
         var letter = letters[idx];
-        var row    = document.createElement('div');
+        var row = document.createElement('div');
         row.className = 'flex items-center gap-2 mc-option-row';
         row.innerHTML =
             '<span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">' + letter + '</span>' +
@@ -910,9 +1057,7 @@
             '<label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer"><input type="radio" name="manualCorrect" value="' + letter + '" class="w-4 h-4 text-indigo-600 cursor-pointer"> Correct</label>' +
             '<button type="button" class="remove-mc-opt text-red-400 hover:text-red-600 text-sm px-1"><i class="bi bi-x-circle"></i></button>';
         document.getElementById('mcOptions').appendChild(row);
-        row.querySelector('.remove-mc-opt').addEventListener('click', function () {
-            row.remove(); relabelOptions();
-        });
+        row.querySelector('.remove-mc-opt').addEventListener('click', function () { row.remove(); relabelOptions(); });
     });
 
     function relabelOptions() {
@@ -930,11 +1075,93 @@
     document.querySelectorAll('.remove-mc-opt').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var rows = document.querySelectorAll('#mcOptions .mc-option-row');
-            if (rows.length <= 2) { alert('At least 2 options are required.'); return; }
+            if (rows.length <= 2) { alert('At least 2 options required.'); return; }
             btn.closest('.mc-option-row').remove();
             relabelOptions();
         });
     });
+
+    // ================================================================
+    // MANUAL MATCHING — add/remove rows + sync dropdowns
+    // ================================================================
+    var MATCH_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P'];
+
+    function syncMatchingDropdowns() {
+        var rows = document.querySelectorAll('#matchingPairs .matching-pair-row');
+        var n    = rows.length;
+
+        rows.forEach(function (row, i) {
+            var sel    = row.querySelector('.match-answer');
+            var rmvBtn = row.querySelector('.remove-pair-btn');
+            var curVal = sel.value;
+
+            // Rebuild options
+            sel.innerHTML = '<option value="">—</option>';
+            for (var j = 0; j < n; j++) {
+                var opt = document.createElement('option');
+                opt.value       = MATCH_LETTERS[j];
+                opt.textContent = MATCH_LETTERS[j];
+                if (curVal === MATCH_LETTERS[j]) opt.selected = true;
+                sel.appendChild(opt);
+            }
+
+            // Show/hide remove button
+            if (n > 2) {
+                rmvBtn.style.opacity = ''; rmvBtn.style.cursor = '';
+            } else {
+                rmvBtn.style.opacity = '0'; rmvBtn.style.cursor = 'default';
+            }
+        });
+    }
+
+    function bindMatchingRow(row) {
+        row.querySelector('.remove-pair-btn').addEventListener('click', function () {
+            var rows = document.querySelectorAll('#matchingPairs .matching-pair-row');
+            if (rows.length <= 2) return;
+            row.remove();
+            syncMatchingDropdowns();
+        });
+    }
+
+    // Init existing rows
+    document.querySelectorAll('#matchingPairs .matching-pair-row').forEach(function (row) {
+        bindMatchingRow(row);
+    });
+    syncMatchingDropdowns();
+
+    document.getElementById('addMatchingPairBtn').addEventListener('click', function () {
+        var rows = document.querySelectorAll('#matchingPairs .matching-pair-row');
+        if (rows.length >= MATCH_LETTERS.length) { alert('Maximum ' + MATCH_LETTERS.length + ' pairs.'); return; }
+
+        var row = document.createElement('div');
+        row.className = 'matching-pair-row grid grid-cols-[1fr_1fr_6rem_2rem] gap-2 items-center';
+        row.innerHTML =
+            '<input type="text" placeholder="Column A term" class="match-col-a px-3 py-2 border-2 border-teal-200 rounded-lg focus:outline-none focus:border-teal-400 text-sm bg-white">' +
+            '<input type="text" placeholder="Column B description" class="match-col-b px-3 py-2 border-2 border-cyan-200 rounded-lg focus:outline-none focus:border-cyan-400 text-sm bg-white">' +
+            '<select class="match-answer px-2 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm text-center font-semibold"><option value="">—</option></select>' +
+            '<button type="button" class="remove-pair-btn text-red-400 hover:text-red-600 text-lg flex items-center justify-center" title="Remove row"><i class="bi bi-x-circle-fill"></i></button>';
+        document.getElementById('matchingPairs').appendChild(row);
+        bindMatchingRow(row);
+        syncMatchingDropdowns();
+    });
+
+    // Helper: collect matching data from the manual form
+    function collectMatchingData() {
+        var rows   = document.querySelectorAll('#matchingPairs .matching-pair-row');
+        var colA   = [], colB = [], pairs = [];
+
+        rows.forEach(function (row, i) {
+            var aText = row.querySelector('.match-col-a').value.trim();
+            var bText = row.querySelector('.match-col-b').value.trim();
+            var ans   = row.querySelector('.match-answer').value;
+            var letter = MATCH_LETTERS[i];
+            colA.push((i + 1) + '. ' + aText);
+            colB.push(letter + '. ' + bText);
+            pairs.push({ item: (i + 1) + '. ' + aText, match: ans });
+        });
+
+        return { colA: colA, colB: colB, pairs: pairs };
+    }
 
     // ================================================================
     // MANUAL ADD — clear form
@@ -945,7 +1172,8 @@
         document.getElementById('manualDifficulty').value   = 'medium';
         document.getElementById('manualPoints').value       = '1';
         document.getElementById('manualExplanation').value  = '';
-        document.getElementById('manualShortAnswer').value  = '';
+        if (document.getElementById('manualShortAnswer'))
+            document.getElementById('manualShortAnswer').value = '';
 
         var mcOpts = document.getElementById('mcOptions');
         mcOpts.innerHTML = ['A','B','C','D'].map(function (l) {
@@ -957,7 +1185,21 @@
             '</div>';
         }).join('');
 
-        document.querySelectorAll('input[name="tfAnswer"]').forEach(function (r) { r.checked = false; });
+        document.querySelectorAll('input[name="tfAnswer"]').forEach(function(r){ r.checked=false; });
+
+        // Reset matching rows to 3 blank rows
+        var mp = document.getElementById('matchingPairs');
+        mp.innerHTML = [0,1,2].map(function(i){
+            return '<div class="matching-pair-row grid grid-cols-[1fr_1fr_6rem_2rem] gap-2 items-center">' +
+                '<input type="text" placeholder="Column A term" class="match-col-a px-3 py-2 border-2 border-teal-200 rounded-lg focus:outline-none focus:border-teal-400 text-sm bg-white">' +
+                '<input type="text" placeholder="Column B description" class="match-col-b px-3 py-2 border-2 border-cyan-200 rounded-lg focus:outline-none focus:border-cyan-400 text-sm bg-white">' +
+                '<select class="match-answer px-2 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm text-center font-semibold"><option value="">—</option></select>' +
+                '<button type="button" class="remove-pair-btn text-red-400 hover:text-red-600 text-lg flex items-center justify-center opacity-0 cursor-default" title="Remove row"><i class="bi bi-x-circle-fill"></i></button>' +
+            '</div>';
+        }).join('');
+        document.querySelectorAll('#matchingPairs .matching-pair-row').forEach(bindMatchingRow);
+        syncMatchingDropdowns();
+
         showAnswerSection('multiple_choice');
     }
 
@@ -969,55 +1211,132 @@
     var manualQuestionCounter = 0;
 
     document.getElementById('addManualQuestionBtn').addEventListener('click', function () {
-        var qText   = document.getElementById('manualQuestionText').value.trim();
-        var qType   = document.getElementById('manualType').value;
-        var qDiff   = document.getElementById('manualDifficulty').value;
-        var qPts    = parseInt(document.getElementById('manualPoints').value) || 1;
-        var qExpl   = document.getElementById('manualExplanation').value.trim();
+        var qText = document.getElementById('manualQuestionText').value.trim();
+        var qType = document.getElementById('manualType').value;
+        var qDiff = document.getElementById('manualDifficulty').value;
+        var qPts  = parseInt(document.getElementById('manualPoints').value) || 1;
+        var qExpl = document.getElementById('manualExplanation').value.trim();
         var correct = '';
 
         if (!qText) { alert('Please enter the question text.'); document.getElementById('manualQuestionText').focus(); return; }
 
-        var optionsHTML = '';
+        var optionsHTML    = '';
+        var hiddenInputs   = '';
+        var borderColor    = qDiff==='easy'?'border-green-500':(qDiff==='hard'?'border-red-500':'border-yellow-500');
+        var diffBadge      = qDiff==='easy'?'bg-green-100 text-green-800':(qDiff==='hard'?'bg-red-100 text-red-800':'bg-yellow-100 text-yellow-800');
+        var typeLabel      = qType.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
 
-        if (qType === 'multiple_choice') {
-            var rows    = document.querySelectorAll('#mcOptions .mc-option-row');
-            var options = [];
+        // ── Matching type ──────────────────────────────────────────────
+        if (qType === 'matching') {
+            var md = collectMatchingData();
+
+            if (md.colA.some(function(s){ return s.replace(/^\d+\.\s*/,'').trim() === ''; })) {
+                alert('Please fill in all Column A items.'); return;
+            }
+            if (md.colB.some(function(s){ return s.replace(/^[A-Z]\.\s*/,'').trim() === ''; })) {
+                alert('Please fill in all Column B descriptions.'); return;
+            }
+
+            // Build correct_answer summary
+            var pairStrs = md.pairs.map(function(p){
+                return p.item.split('.')[0].trim() + (p.match ? '-' + p.match : '-?');
+            });
+            correct = pairStrs.join(', ');
+
+            // Build preview table HTML
+            optionsHTML =
+                '<div class="matching-table-wrap rounded-xl overflow-hidden border border-teal-200 shadow-sm mt-3">' +
+                    '<div class="grid grid-cols-[1fr_2rem_1fr] bg-gradient-to-r from-teal-600 to-cyan-600">' +
+                        '<div class="px-4 py-2.5 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2"><i class="bi bi-list-ol"></i> Column A</div>' +
+                        '<div class="flex items-center justify-center"><i class="bi bi-arrow-left-right text-white/60 text-xs"></i></div>' +
+                        '<div class="px-4 py-2.5 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2"><i class="bi bi-card-text"></i> Column B</div>' +
+                    '</div>' +
+                    md.pairs.map(function(pair, i){
+                        var aText = md.colA[i] ? md.colA[i].replace(/^\d+\.\s*/,'') : '';
+                        var matchedB = '';
+                        if (pair.match) {
+                            var bIdx = MATCH_LETTERS.indexOf(pair.match);
+                            if (bIdx >= 0 && md.colB[bIdx]) matchedB = md.colB[bIdx].replace(/^[A-Z]\.\s*/,'');
+                        }
+                        var rowBg = (i % 2 === 0) ? 'bg-white' : 'bg-gray-50';
+                        return '<div class="grid grid-cols-[1fr_2rem_1fr] ' + rowBg + ' border-t border-teal-100">' +
+                            '<div class="px-4 py-3 flex items-start gap-2">' +
+                                '<span class="w-6 h-6 rounded-full bg-teal-100 text-teal-700 text-xs font-bold flex items-center justify-center flex-shrink-0">' + (i+1) + '</span>' +
+                                '<span class="text-sm text-gray-800 font-medium leading-snug">' + escapeHtml(aText) + '</span>' +
+                            '</div>' +
+                            '<div class="flex items-center justify-center">' + (pair.match ? '<i class="bi bi-arrow-right text-teal-400 text-xs"></i>' : '<i class="bi bi-three-dots text-gray-300 text-xs"></i>') + '</div>' +
+                            '<div class="px-4 py-3 flex items-start gap-2">' +
+                                (pair.match ? '<span class="w-6 h-6 rounded-full bg-cyan-100 text-cyan-700 text-xs font-bold flex items-center justify-center flex-shrink-0">' + pair.match + '</span><span class="text-sm text-gray-700 leading-snug">' + escapeHtml(matchedB) + '</span>' : '<span class="text-xs text-gray-400 italic">No match assigned</span>') +
+                            '</div>' +
+                        '</div>';
+                    }).join('') +
+                    '<div class="bg-cyan-50 border-t border-teal-200 px-4 py-2.5 flex flex-wrap gap-2 items-center">' +
+                        '<span class="text-xs font-bold text-cyan-700 mr-1 flex-shrink-0"><i class="bi bi-grid-3x3-gap mr-1"></i>All Column B choices:</span>' +
+                        md.colB.map(function(b, i){
+                            return '<span class="px-2.5 py-1 bg-white border border-cyan-200 rounded-lg text-xs text-gray-700 font-medium shadow-sm"><span class="font-bold text-cyan-600">' + MATCH_LETTERS[i] + '.</span> ' + escapeHtml(b.replace(/^[A-Z]\.\s*/,'')) + '</span>';
+                        }).join('') +
+                    '</div>' +
+                '</div>';
+
+            hiddenInputs =
+                '<input type="hidden" name="manual_matching_col_a[]" value="' + escapeAttr(JSON.stringify(md.colA)) + '">' +
+                '<input type="hidden" name="manual_matching_col_b[]" value="' + escapeAttr(JSON.stringify(md.colB)) + '">' +
+                '<input type="hidden" name="manual_matching_pairs[]" value="' + escapeAttr(JSON.stringify(md.pairs)) + '">';
+
+        // ── Multiple choice ────────────────────────────────────────────
+        } else if (qType === 'multiple_choice') {
+            var rows        = document.querySelectorAll('#mcOptions .mc-option-row');
+            var options     = [];
             var correctRadio = document.querySelector('input[name="manualCorrect"]:checked');
-            rows.forEach(function (row, i) {
+            rows.forEach(function(row, i){
                 options.push({ letter: letters[i], text: row.querySelector('.mc-option-input').value.trim() });
             });
-            if (options.some(function (o) { return !o.text; })) { alert('Please fill in all answer choices.'); return; }
-            if (!correctRadio) { alert('Please mark one option as the correct answer.'); return; }
+            if (options.some(function(o){ return !o.text; })) { alert('Please fill in all answer choices.'); return; }
+            if (!correctRadio) { alert('Please mark one option as correct.'); return; }
             correct = correctRadio.value;
+
             optionsHTML = '<div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-2 mt-2">' +
-                options.map(function (o) {
+                options.map(function(o){
                     var isC = o.letter === correct;
                     return '<div class="flex items-center p-2 rounded text-sm ' + (isC ? 'bg-green-50 border-2 border-green-400 font-semibold text-green-800' : 'bg-gray-50 text-gray-700') + '">' +
                         '<span class="font-bold mr-2">' + o.letter + '.</span>' + escapeHtml(o.text) +
                         (isC ? '<i class="bi bi-check-circle-fill ml-auto text-green-600"></i>' : '') + '</div>';
                 }).join('') + '</div>';
+
+            hiddenInputs = buildMcHiddenInputs();
+
+        // ── True/False ─────────────────────────────────────────────────
         } else if (qType === 'true_false') {
             var tfRadio = document.querySelector('input[name="tfAnswer"]:checked');
             if (!tfRadio) { alert('Please select True or False.'); return; }
             correct = tfRadio.value;
             optionsHTML = '<div class="bg-green-50 border-l-4 border-green-400 p-3 rounded text-sm mt-2"><span class="text-gray-500 font-medium">Answer: </span><span class="text-green-800 font-semibold">' + correct + '</span></div>';
+
+        // ── Short/Essay/Fill ───────────────────────────────────────────
         } else {
             var shortAns = document.getElementById('manualShortAnswer').value.trim();
             correct = shortAns || '(open-ended)';
             optionsHTML = '<div class="bg-green-50 border-l-4 border-green-400 p-3 rounded text-sm mt-2"><span class="text-gray-500 font-medium">Answer: </span><span class="text-green-800 font-semibold">' + escapeHtml(correct) + '</span></div>';
         }
 
-        var explHTML    = qExpl ? '<div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300"><i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>' + escapeHtml(qExpl) + '</div>' : '';
-        var borderColor = qDiff === 'easy' ? 'border-green-500' : (qDiff === 'hard' ? 'border-red-500' : 'border-yellow-500');
-        var diffBadge   = qDiff === 'easy' ? 'bg-green-100 text-green-800' : (qDiff === 'hard' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800');
-        var typeLabel   = qType.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+        var explHTML = qExpl ? '<div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300"><i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>' + escapeHtml(qExpl) + '</div>' : '';
+
+        // ── Type badge colour ──────────────────────────────────────────
+        var typeBadgeClass = qType === 'matching'
+            ? 'bg-teal-100 text-teal-800'
+            : 'bg-blue-100 text-blue-800';
+        var typeBadgeIcon = qType === 'matching'
+            ? '<i class="bi bi-arrow-left-right mr-1"></i>'
+            : '';
+        var pairsCountBadge = (qType === 'matching')
+            ? '<span class="px-2 py-0.5 bg-teal-50 text-teal-700 text-xs font-semibold rounded-full">' + document.querySelectorAll('#matchingPairs .matching-pair-row').length + ' pairs</span>'
+            : '';
 
         manualQuestionCounter++;
         var uid = 'manual_' + manualQuestionCounter;
 
         var card = document.createElement('div');
-        card.className = 'question-card bg-white rounded-lg shadow-md overflow-hidden border-l-4 ' + borderColor + ' new-card-anim transition-all';
+        card.className = 'question-card bg-white rounded-xl shadow-md overflow-hidden border-l-4 ' + borderColor + ' new-card-anim transition-all';
         card.dataset.type       = qType;
         card.dataset.difficulty = qDiff;
         card.dataset.points     = qPts;
@@ -1029,9 +1348,10 @@
                 '<div class="flex-shrink-0 pt-1"><input type="checkbox" name="manual_questions[]" value="' + uid + '" class="question-checkbox w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer" checked></div>' +
                 '<div class="flex-1 min-w-0">' +
                     '<div class="flex flex-wrap gap-2 mb-2">' +
-                        '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">' + typeLabel + '</span>' +
+                        '<span class="px-2 py-0.5 text-xs font-semibold rounded-full ' + typeBadgeClass + '">' + typeBadgeIcon + typeLabel + '</span>' +
                         '<span class="px-2 py-0.5 text-xs font-semibold rounded-full ' + diffBadge + '">' + capitalize(qDiff) + '</span>' +
                         '<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">' + qPts + ' pt' + (qPts!==1?'s':'') + '</span>' +
+                        pairsCountBadge +
                         '<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full manual-badge"><i class="bi bi-pencil-fill mr-1"></i>Manual</span>' +
                     '</div>' +
                     '<p class="text-gray-800 font-medium mb-1">' + escapeHtml(qText) + '</p>' +
@@ -1042,7 +1362,7 @@
                     '<input type="hidden" name="manual_points[]"         value="' + qPts                + '">' +
                     '<input type="hidden" name="manual_correct_answer[]" value="' + escapeAttr(correct) + '">' +
                     '<input type="hidden" name="manual_explanation[]"    value="' + escapeAttr(qExpl)   + '">' +
-                    (qType === 'multiple_choice' ? buildMcHiddenInputs() : '') +
+                    hiddenInputs +
                 '</div>' +
                 '<button type="button" class="delete-btn flex-shrink-0 bg-red-100 text-red-600 hover:bg-red-500 hover:text-white px-3 py-2 rounded transition-colors text-sm" data-manual="true" title="Remove Question"><i class="bi bi-trash"></i></button>' +
             '</div></div>';
@@ -1071,7 +1391,6 @@
     // DOWNLOAD TOGGLE (extract mode only)
     // ================================================================
     var downloadEnabled = false;
-
     var dlToggle = document.getElementById('downloadToggle');
     if (dlToggle) {
         dlToggle.addEventListener('click', function () {
@@ -1098,7 +1417,7 @@
         var btnIcon = document.getElementById('saveBtnIcon');
         if (!btnText) return;
         if (downloadEnabled) { btnText.textContent='Save & Download'; btnIcon.className='bi bi-download mr-2'; }
-        else                 { btnText.textContent='Save Questions';  btnIcon.className='bi bi-check-circle mr-2'; }
+        else                  { btnText.textContent='Save Questions';  btnIcon.className='bi bi-check-circle mr-2'; }
     }
 
     // ================================================================
@@ -1106,22 +1425,16 @@
     // ================================================================
     if (IS_GENERATE) {
         var selectedFolderIdEl = document.getElementById('selectedFolderId');
-        var folderGrid         = document.getElementById('folderPickerGrid');
-        var folderLoading      = document.getElementById('folderLoadingState');
-        var noFoldersEl        = document.getElementById('noFoldersState');
+        var folderGrid    = document.getElementById('folderPickerGrid');
+        var folderLoading = document.getElementById('folderLoadingState');
+        var noFoldersEl   = document.getElementById('noFoldersState');
 
-        // Load folders from workspace API
         fetch('/questionnaires/workspace/folders/list/')
             .then(function(r){ return r.json(); })
             .then(function(data){
                 folderLoading.classList.add('hidden');
-
                 var folders = data.folders || [];
-                if (folders.length === 0) {
-                    noFoldersEl.classList.remove('hidden');
-                    return;
-                }
-
+                if (folders.length === 0) { noFoldersEl.classList.remove('hidden'); return; }
                 folderGrid.classList.remove('hidden');
                 folders.forEach(function(folder){
                     var card = document.createElement('div');
@@ -1129,30 +1442,19 @@
                     card.dataset.folderId = folder.id;
                     card.innerHTML =
                         '<div class="folder-icon"><i class="bi bi-folder2-open text-white text-base"></i></div>' +
-                        '<div class="flex-1 min-w-0">' +
-                            '<div class="folder-name truncate">' + escapeHtml(folder.name) + '</div>' +
-                            '<div class="folder-count">' + folder.question_count + ' question(s)</div>' +
-                        '</div>' +
+                        '<div class="flex-1 min-w-0"><div class="folder-name truncate">' + escapeHtml(folder.name) + '</div><div class="folder-count">' + folder.question_count + ' question(s)</div></div>' +
                         '<i class="bi bi-check-circle-fill folder-check"></i>';
-
                     card.addEventListener('click', function(){
-                        // Deselect all
-                        document.querySelectorAll('.folder-pick-card').forEach(function(c){
-                            c.classList.remove('selected');
-                        });
+                        document.querySelectorAll('.folder-pick-card').forEach(function(c){ c.classList.remove('selected'); });
                         card.classList.add('selected');
                         selectedFolderIdEl.value = folder.id;
-                        updateStats(); // refreshes save button
+                        updateStats();
                     });
-
                     folderGrid.appendChild(card);
                 });
             })
-            .catch(function(){
-                folderLoading.innerHTML = '<span class="text-red-500 text-sm">Failed to load folders. Please refresh.</span>';
-            });
+            .catch(function(){ folderLoading.innerHTML = '<span class="text-red-500 text-sm">Failed to load folders.</span>'; });
 
-        // Inline create folder toggle
         var inlineToggle  = document.getElementById('inlineNewFolderToggle');
         var inlineForm    = document.getElementById('inlineNewFolderForm');
         var inlineChevron = document.getElementById('inlineFolderChevron');
@@ -1160,20 +1462,13 @@
 
         inlineToggle && inlineToggle.addEventListener('click', function(){
             inlineOpen = !inlineOpen;
-            if (inlineOpen) {
-                inlineForm.classList.remove('hidden');
-                inlineChevron.className = 'bi bi-chevron-up text-xs';
-            } else {
-                inlineForm.classList.add('hidden');
-                inlineChevron.className = 'bi bi-chevron-down text-xs';
-            }
+            if (inlineOpen) { inlineForm.classList.remove('hidden'); inlineChevron.className='bi bi-chevron-up text-xs'; }
+            else             { inlineForm.classList.add('hidden');    inlineChevron.className='bi bi-chevron-down text-xs'; }
         });
 
-        // Inline create folder submit
         document.getElementById('createFolderInlineBtn').addEventListener('click', function(){
             var name = document.getElementById('newFolderName').value.trim();
             if (!name) { alert('Please enter a folder name.'); return; }
-
             var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
             fetch('/questionnaires/workspace/folders/create/', {
                 method: 'POST',
@@ -1183,45 +1478,26 @@
             .then(function(r){ return r.json(); })
             .then(function(data){
                 if (data.error) { alert(data.error); return; }
-
-                // Add new card to folder grid
-                folderGrid.classList.remove('hidden');
-                noFoldersEl.classList.add('hidden');
-
+                folderGrid.classList.remove('hidden'); noFoldersEl.classList.add('hidden');
                 var card = document.createElement('div');
                 card.className = 'folder-pick-card';
                 card.dataset.folderId = data.id;
                 card.innerHTML =
                     '<div class="folder-icon"><i class="bi bi-folder2-open text-white text-base"></i></div>' +
-                    '<div class="flex-1 min-w-0">' +
-                        '<div class="folder-name truncate">' + escapeHtml(data.name) + '</div>' +
-                        '<div class="folder-count">0 question(s)</div>' +
-                    '</div>' +
+                    '<div class="flex-1 min-w-0"><div class="folder-name truncate">' + escapeHtml(data.name) + '</div><div class="folder-count">0 question(s)</div></div>' +
                     '<i class="bi bi-check-circle-fill folder-check"></i>';
-
                 card.addEventListener('click', function(){
                     document.querySelectorAll('.folder-pick-card').forEach(function(c){ c.classList.remove('selected'); });
-                    card.classList.add('selected');
-                    selectedFolderIdEl.value = data.id;
-                    updateStats();
+                    card.classList.add('selected'); selectedFolderIdEl.value = data.id; updateStats();
                 });
-
                 folderGrid.prepend(card);
-
-                // Auto-select the new folder
                 document.querySelectorAll('.folder-pick-card').forEach(function(c){ c.classList.remove('selected'); });
-                card.classList.add('selected');
-                selectedFolderIdEl.value = data.id;
-
-                // Reset inline form
+                card.classList.add('selected'); selectedFolderIdEl.value = data.id;
                 document.getElementById('newFolderName').value = '';
-                inlineForm.classList.add('hidden');
-                inlineChevron.className = 'bi bi-chevron-down text-xs';
-                inlineOpen = false;
-
+                inlineForm.classList.add('hidden'); inlineChevron.className='bi bi-chevron-down text-xs'; inlineOpen=false;
                 updateStats();
             })
-            .catch(function(){ alert('Failed to create folder. Please try again.'); });
+            .catch(function(){ alert('Failed to create folder.'); });
         });
     }
 
@@ -1230,43 +1506,30 @@
     // ================================================================
     document.getElementById('questionsForm').addEventListener('submit', function (e) {
         e.preventDefault();
-
-        var checkedBoxes = document.querySelectorAll('.question-checkbox:checked');
+        var checkedBoxes  = document.querySelectorAll('.question-checkbox:checked');
         var totalSelected = checkedBoxes.length;
 
-        if (totalSelected === 0) {
-            alert('Please select at least one question to save.');
-            return;
-        }
+        if (totalSelected === 0) { alert('Please select at least one question.'); return; }
 
-        // Generate mode validation: must have a folder selected
         if (IS_GENERATE) {
             var folderId = document.getElementById('selectedFolderId').value;
-            if (!folderId) {
-                alert('Please select a workspace folder to save questions into.');
-                return;
-            }
+            if (!folderId) { alert('Please select a workspace folder.'); return; }
         } else {
-            // Extract mode: need type detection
             var typeVal = document.getElementById('questionnaireType') && document.getElementById('questionnaireType').value;
-            if (!typeVal) {
-                alert('Could not detect questionnaire type. Please select at least one question.');
-                return;
-            }
+            if (!typeVal) { alert('Could not detect questionnaire type. Please select at least one question.'); return; }
         }
 
         var format = 'none';
         if (!IS_GENERATE && downloadEnabled) {
-            var checkedRadio = document.querySelector('input[name="download_format"]:checked');
-            if (checkedRadio) format = checkedRadio.value;
+            var cr = document.querySelector('input[name="download_format"]:checked');
+            if (cr) format = cr.value;
         }
 
         var loadingModal = document.getElementById('loadingModal');
         document.getElementById('loadingMessage').textContent = IS_GENERATE
             ? 'Saving ' + totalSelected + ' question(s) to workspace…'
             : (downloadEnabled ? 'Saving and generating file…' : 'Saving ' + totalSelected + ' question(s)…');
-        loadingModal.classList.remove('hidden');
-        loadingModal.classList.add('flex');
+        loadingModal.classList.remove('hidden'); loadingModal.classList.add('flex');
 
         var formData = new FormData();
         formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
@@ -1275,18 +1538,13 @@
         formData.append('final_title', document.querySelector('[name=final_title]').value);
         formData.append('download_format', format);
 
-        if (IS_GENERATE) {
-            formData.append('workspace_folder_id', document.getElementById('selectedFolderId').value);
-        } else {
-            formData.append('questionnaire_type', document.getElementById('questionnaireType').value);
-        }
+        if (IS_GENERATE) formData.append('workspace_folder_id', document.getElementById('selectedFolderId').value);
+        else formData.append('questionnaire_type', document.getElementById('questionnaireType').value);
 
         // AI-extracted questions
         document.querySelectorAll('.question-checkbox:checked').forEach(function (cb) {
             var card = cb.closest('.question-card');
-            if (card && card.dataset.manual !== 'true') {
-                formData.append('selected_questions', cb.value);
-            }
+            if (card && card.dataset.manual !== 'true') formData.append('selected_questions', cb.value);
         });
 
         // Manual questions
@@ -1299,29 +1557,23 @@
                 });
             });
 
-        // For extract mode without download — submit normally
         if (!IS_GENERATE && !downloadEnabled) {
             var tmpForm = document.createElement('form');
-            tmpForm.method = 'POST';
-            tmpForm.action = window.location.href;
+            tmpForm.method = 'POST'; tmpForm.action = window.location.href;
             document.body.appendChild(tmpForm);
-            formData.forEach(function (value, key) {
+            formData.forEach(function(value, key){
                 var input = document.createElement('input');
-                input.type = 'hidden'; input.name = key; input.value = value;
+                input.type='hidden'; input.name=key; input.value=value;
                 tmpForm.appendChild(input);
             });
-            tmpForm.submit();
-            return;
+            tmpForm.submit(); return;
         }
 
-        // All other cases — fetch
         fetch(window.location.href, { method: 'POST', body: formData })
-            .then(function (response) {
+            .then(function(response){
                 var ct = response.headers.get('content-type') || '';
-
-                // File download response (extract + download mode)
                 if (!IS_GENERATE && (ct.includes('application/') || ct.includes('text/plain'))) {
-                    return response.blob().then(function (blob) {
+                    return response.blob().then(function(blob){
                         var disposition = response.headers.get('content-disposition') || '';
                         var filename    = 'questionnaire.' + format;
                         var match       = disposition.match(/filename="?([^"]+)"?/);
@@ -1334,22 +1586,14 @@
                         showSuccess(totalSelected, format);
                     });
                 }
-
-                // JSON response (generate mode workspace save)
                 return response.json().then(function(data){
-                    loadingModal.classList.add('hidden');
-                    loadingModal.classList.remove('flex');
-
-                    if (data.success) {
-                        showSuccess(totalSelected, 'workspace', data.folder_name || '');
-                    } else {
-                        alert(data.error || 'Failed to save questions. Please try again.');
-                    }
+                    loadingModal.classList.add('hidden'); loadingModal.classList.remove('flex');
+                    if (data.success) showSuccess(totalSelected, 'workspace', data.folder_name || '');
+                    else alert(data.error || 'Failed to save. Please try again.');
                 });
             })
-            .catch(function () {
-                loadingModal.classList.add('hidden');
-                loadingModal.classList.remove('flex');
+            .catch(function(){
+                loadingModal.classList.add('hidden'); loadingModal.classList.remove('flex');
                 alert('Something went wrong. Please try again.');
             });
     });
@@ -1360,7 +1604,6 @@
     function showSuccess(count, format, folderName) {
         document.getElementById('loadingModal').classList.add('hidden');
         document.getElementById('loadingModal').classList.remove('flex');
-
         if (IS_GENERATE) {
             document.getElementById('modalMessage').textContent    = count + ' question(s) saved to your workspace!';
             document.getElementById('modalSubMessage').textContent = folderName ? 'Folder: "' + folderName + '"' : 'Questions are also saved in My Uploads.';
@@ -1368,18 +1611,16 @@
             document.getElementById('modalMessage').textContent    = count + ' question(s) saved successfully!';
             document.getElementById('modalSubMessage').textContent = format !== 'none'
                 ? 'Your ' + format.toUpperCase() + ' file has been downloaded.'
-                : 'Your questions are saved. You can download anytime from My Uploads.';
+                : 'Questions saved. You can download anytime from My Uploads.';
         }
-
         var sm = document.getElementById('successModal');
-        sm.classList.remove('hidden');
-        sm.classList.add('flex');
+        sm.classList.remove('hidden'); sm.classList.add('flex');
     }
 
-    document.getElementById('modalGoWorkspace').addEventListener('click', function () {
+    document.getElementById('modalGoWorkspace').addEventListener('click', function(){
         window.location.href = "{% url 'questionnaires:workspace' %}";
     });
-    document.getElementById('modalGoUploads').addEventListener('click', function () {
+    document.getElementById('modalGoUploads').addEventListener('click', function(){
         window.location.href = "{% url 'questionnaires:my_uploads' %}";
     });
 
@@ -1393,7 +1634,6 @@
     function escapeAttr(str) { return String(str).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
     function capitalize(str) { return str.charAt(0).toUpperCase() + str.slice(1); }
 
-    // Init
     updateStats();
 })();
 </script>

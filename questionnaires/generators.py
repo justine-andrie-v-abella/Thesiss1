@@ -10,18 +10,43 @@ import io
 import os
 from django.conf import settings
 
+# ============================================================================
+# Path to your custom Word template
+# Edit this path if you move the template file
+# ============================================================================
+TEMPLATE_PATH = r"C:\DJANGO PROJECTS\THESISattempt4\bisu_template.docx"
+
 
 class BISUQuestionnaireGenerator:
     """
-    Generates questionnaires in BISU official format.
+    Generates questionnaires using the BISU official Word template.
+    The template (bisu_template.docx) handles all static design:
+      - School logo, header branding, borders, fonts, layout
+    This code only fills in the dynamic content:
+      - Exam title, course info, student fields, questions
     """
 
-    def __init__(self):
-        self.doc = Document()
-        self._setup_page_margins()
+    def __init__(self, template_path=None):
+        """
+        Load the BISU Word template as the base document.
+        Falls back to a blank document if the template is not found.
+        """
+        path = template_path or TEMPLATE_PATH
+
+        if os.path.exists(path):
+            self.doc = Document(path)
+            print(f"✅ Loaded template: {path}")
+        else:
+            print(f"⚠️  Template not found at: {path}")
+            print("    Falling back to blank document. Please check the TEMPLATE_PATH.")
+            self.doc = Document()
+            self._setup_page_margins()
 
     def _setup_page_margins(self):
-        """Set page margins to match BISU format"""
+        """
+        Fallback margins — only used when template is NOT found.
+        When the template IS loaded, its margins are used automatically.
+        """
         section = self.doc.sections[0]
         section.page_width = Inches(8.5)
         section.page_height = Inches(11)
@@ -31,142 +56,169 @@ class BISUQuestionnaireGenerator:
         section.right_margin = Inches(1.0)
 
     def generate_questionnaire(self, questionnaire_data):
-        """Generate a complete questionnaire document."""
-        self._add_header(
-            questionnaire_data.get('department', 'College Of Computing and Information Sciences'),
-            questionnaire_data.get('semester', '1st Semester, A.Y.2025-2026')
-        )
-        self._add_title_section(
-            questionnaire_data['title'],
-            questionnaire_data['course_code'],
-            questionnaire_data['course_name'],
-            questionnaire_data['program'],
-            questionnaire_data['instructor']
-        )
-        self._add_student_info_fields()
-        self._add_general_directions(
-            questionnaire_data.get('general_directions', self._get_default_directions())
-        )
+        """
+        Generate a complete questionnaire document.
+
+        The template already contains the static header (logo, school name,
+        department, decorative lines, etc.). This method appends the
+        dynamic content after the template's existing content.
+
+        If your template has placeholder text like {{TITLE}}, {{COURSE}},
+        etc., use the find-and-replace approach below instead.
+        """
+
+        # --- Option A: Append content after template's existing content ---
+        # Use this if your template has a pre-designed header but is otherwise blank.
+
+        self._fill_placeholders(questionnaire_data)
         self._add_questions_by_type(questionnaire_data['questions'])
+
         return self.doc
 
-    def _add_header(self, department, semester):
-        """Add BISU header"""
-        # University name (bold, centered)
-        p = self.doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = p.add_run("BOHOL ISLAND STATE UNIVERSITY")
-        run.bold = True
-        run.font.size = Pt(12)
-        run.font.name = 'Calibri'
+    # =========================================================================
+    # PLACEHOLDER REPLACEMENT
+    # In your Word template, type these exact placeholder texts where you want
+    # dynamic values to appear:
+    #
+    #   {{TITLE}}        → Exam title  (e.g. "MIDTERM EXAMINATION")
+    #   {{COURSE_CODE}}  → Subject code (e.g. "CC 101")
+    #   {{COURSE_NAME}}  → Subject name (e.g. "Introduction to Computing")
+    #   {{PROGRAM}}      → Department/program code (e.g. "BSCS")
+    #   {{INSTRUCTOR}}   → Instructor name
+    #   {{DEPARTMENT}}   → Full department name
+    #   {{SEMESTER}}     → Semester string
+    #   {{DIRECTIONS}}   → General directions paragraph
+    #
+    # Save your template, then this code will replace them automatically.
+    # =========================================================================
 
-        # Department
-        p = self.doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = p.add_run(department)
-        run.font.size = Pt(10)
-        run.font.name = 'Calibri'
+    def _fill_placeholders(self, data):
+        """Replace {{PLACEHOLDER}} text in the template with actual values."""
+        replacements = {
+            '{{TITLE}}':       data.get('title', 'Examination'),
+            '{{COURSE_CODE}}': data.get('course_code', ''),
+            '{{COURSE_NAME}}': data.get('course_name', ''),
+            '{{PROGRAM}}':     data.get('program', ''),
+            '{{INSTRUCTOR}}':  data.get('instructor', ''),
+            '{{DEPARTMENT}}':  data.get('department', ''),
+            '{{SEMESTER}}':    data.get('semester', ''),
+            '{{DIRECTIONS}}':  data.get('general_directions', self._get_default_directions()),
+        }
 
-        # Semester
-        p = self.doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = p.add_run(semester)
-        run.font.size = Pt(10)
-        run.font.name = 'Calibri'
-        run.italic = True
+        # 1. Replace in main body paragraphs
+        for paragraph in self.doc.paragraphs:
+            self._replace_all(paragraph, replacements)
 
-        self.doc.add_paragraph()
+        # 2. Replace inside tables in the main body
+        for table in self.doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        self._replace_all(paragraph, replacements)
 
-    def _add_title_section(self, title, course_code, course_name, program, instructor):
-        """Add exam title and course info in a 2-column layout using a table"""
-        table = self.doc.add_table(rows=2, cols=2)
-        table.style = 'Table Grid'
+        # 3. Replace in headers AND footers (Word stores these separately per section)
+        for section in self.doc.sections:
+            for header_footer in [
+                section.header,
+                section.footer,
+                section.even_page_header,
+                section.even_page_footer,
+                section.first_page_header,
+                section.first_page_footer,
+            ]:
+                if header_footer is None:
+                    continue
 
-        # Hide borders
-        from docx.oxml.ns import qn
-        from docx.oxml import OxmlElement
+                # Paragraphs directly in the header/footer
+                for paragraph in header_footer.paragraphs:
+                    self._replace_all(paragraph, replacements)
 
-        def set_no_border(cell):
-            tc = cell._tc
-            tcPr = tc.get_or_add_tcPr()
-            tcBorders = OxmlElement('w:tcBorders')
-            for side in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
-                border = OxmlElement(f'w:{side}')
-                border.set(qn('w:val'), 'none')
-                tcBorders.append(border)
-            tcPr.append(tcBorders)
+                # Tables inside the header/footer
+                for table in header_footer.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            for paragraph in cell.paragraphs:
+                                self._replace_all(paragraph, replacements)
 
-        # Row 0: Title | Program
-        cell_left = table.rows[0].cells[0]
-        cell_right = table.rows[0].cells[1]
-        set_no_border(cell_left)
-        set_no_border(cell_right)
+    def _replace_all(self, paragraph, replacements):
+        """Apply all replacements to a single paragraph."""
+        for placeholder, value in replacements.items():
+            if placeholder in paragraph.text:
+                self._replace_in_paragraph(paragraph, placeholder, value)
 
-        p = cell_left.paragraphs[0]
-        r = p.add_run(title)
-        r.bold = True
-        r.font.size = Pt(11)
-        r.font.name = 'Calibri'
+    # =========================================================================
+    # PLACEHOLDER FONT STYLES
+    # Customize the font of each placeholder here.
+    # Any placeholder not listed below will keep the template's original font.
+    #
+    # Available style keys:
+    #   'font_name'  → e.g. 'Arial', 'Calibri', 'Times New Roman'
+    #   'font_size'  → in points, e.g. Pt(14)
+    #   'bold'       → True or False
+    #   'italic'     → True or False
+    #   'underline'  → True or False
+    #   'color'      → RGBColor(r, g, b) — remove key to keep template color
+    # =========================================================================
+    PLACEHOLDER_STYLES = {
+        '{{TITLE}}': {
+            'font_name': 'Arial narrow',
+            'font_size': Pt(14),
+            'bold':      True,
+            'italic':    False,
+            'underline': False,
+            # 'color': RGBColor(0, 0, 128),  # uncomment for custom color
+        },
+        '{{DEPARTMENT}}': {
+            'font_name': 'Arial',
+            'font_size': Pt(10),
+            'bold':      False,
+            'italic':    False,
+            'underline': False,
+        },
+        # Add more placeholders below if needed, e.g.:
+        # '{{INSTRUCTOR}}': {
+        #     'font_name': 'Calibri',
+        #     'font_size': Pt(10),
+        #     'bold': False,
+        #     'italic': True,
+        # },
+    }
 
-        p = cell_right.paragraphs[0]
-        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        r = p.add_run(program)
-        r.font.size = Pt(10)
-        r.font.name = 'Calibri'
+    def _replace_in_paragraph(self, paragraph, placeholder, value):
+        """
+        Replace placeholder text inside a paragraph while preserving formatting.
+        Word sometimes splits a placeholder across multiple runs, so we
+        consolidate the full text, replace it, then rewrite the first run.
+        If a style is defined in PLACEHOLDER_STYLES, it is applied to the run.
+        """
+        full_text = ''.join(run.text for run in paragraph.runs)
+        if placeholder not in full_text:
+            return
 
-        # Row 1: Course | Instructor
-        cell_left = table.rows[1].cells[0]
-        cell_right = table.rows[1].cells[1]
-        set_no_border(cell_left)
-        set_no_border(cell_right)
+        new_text = full_text.replace(placeholder, value)
 
-        p = cell_left.paragraphs[0]
-        r = p.add_run(f"{course_code} – {course_name}")
-        r.font.size = Pt(10)
-        r.font.name = 'Calibri'
+        # Write the new text into the first run, clear the rest
+        if paragraph.runs:
+            first_run = paragraph.runs[0]
+            first_run.text = new_text
+            for run in paragraph.runs[1:]:
+                run.text = ''
 
-        p = cell_right.paragraphs[0]
-        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        r = p.add_run(instructor)
-        r.font.size = Pt(10)
-        r.font.name = 'Calibri'
-
-        self.doc.add_paragraph()
-
-    def _add_student_info_fields(self):
-        """Add Name and Section fields using a table"""
-        table = self.doc.add_table(rows=1, cols=2)
-
-        # Left: Name
-        cell = table.rows[0].cells[0]
-        p = cell.paragraphs[0]
-        r = p.add_run("Name: ________________________________________________")
-        r.font.size = Pt(10)
-        r.font.name = 'Calibri'
-
-        # Right: Section
-        cell = table.rows[0].cells[1]
-        p = cell.paragraphs[0]
-        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        r = p.add_run("Section: _____________________")
-        r.font.size = Pt(10)
-        r.font.name = 'Calibri'
-
-        self.doc.add_paragraph()
-
-    def _add_general_directions(self, directions):
-        """Add general directions section"""
-        p = self.doc.add_paragraph()
-        r = p.add_run("GENERAL DIRECTION: ")
-        r.bold = True
-        r.font.size = Pt(10)
-        r.font.name = 'Calibri'
-
-        r2 = p.add_run(directions)
-        r2.font.size = Pt(10)
-        r2.font.name = 'Calibri'
-
-        self.doc.add_paragraph()
+            # Apply custom font style if defined for this placeholder
+            style = self.PLACEHOLDER_STYLES.get(placeholder)
+            if style:
+                if 'font_name' in style:
+                    first_run.font.name = style['font_name']
+                if 'font_size' in style:
+                    first_run.font.size = style['font_size']
+                if 'bold' in style:
+                    first_run.bold = style['bold']
+                if 'italic' in style:
+                    first_run.italic = style['italic']
+                if 'underline' in style:
+                    first_run.underline = style['underline']
+                if 'color' in style:
+                    first_run.font.color.rgb = style['color']
 
     def _get_default_directions(self):
         return (
@@ -178,24 +230,29 @@ class BISUQuestionnaireGenerator:
             "Wishing you all the best of luck on your exam!"
         )
 
+    # =========================================================================
+    # QUESTION SECTIONS
+    # These are appended after the template content / placeholders.
+    # =========================================================================
+
     def _add_questions_by_type(self, questions_by_type):
-        """Add questions grouped by type"""
+        """Add questions grouped by type/part."""
         question_number = 1
 
         for section_key, section_data in questions_by_type.items():
             if not section_data.get('questions'):
                 continue
 
-            # Section header (bold)
+            # Section header
             p = self.doc.add_paragraph()
             r = p.add_run(f"{section_data['title']}.")
             r.bold = True
-            r.font.size = Pt(10)
-            r.font.name = 'Calibri'
+            r.font.size = Pt(12)
+            r.font.name = 'Arial'
 
             r2 = p.add_run(f" {section_data['instruction']}")
-            r2.font.size = Pt(10)
-            r2.font.name = 'Calibri'
+            r2.font.size = Pt(12)
+            r2.font.name = 'Arial'
 
             self.doc.add_paragraph()
 
@@ -206,14 +263,12 @@ class BISUQuestionnaireGenerator:
             self.doc.add_paragraph()
 
     def _add_question(self, question, number):
-        """Add a single question"""
-        # Question text
+        """Add a single question with its options."""
         p = self.doc.add_paragraph()
         r = p.add_run(f"{number}. {question.question_text}")
-        r.font.size = Pt(10)
-        r.font.name = 'Calibri'
+        r.font.size = Pt(12)
+        r.font.name = 'Arial'
 
-        # Multiple choice options in a table for alignment
         if question.question_type.name == 'multiple_choice':
             opts = [
                 ('a', question.option_a),
@@ -221,7 +276,6 @@ class BISUQuestionnaireGenerator:
                 ('c', question.option_c),
                 ('d', question.option_d),
             ]
-            # 2 options per row in a 2-column table
             table = self.doc.add_table(rows=2, cols=2)
             for i, (letter, text) in enumerate(opts):
                 row = i // 2
@@ -229,9 +283,8 @@ class BISUQuestionnaireGenerator:
                 cell = table.rows[row].cells[col]
                 p = cell.paragraphs[0]
                 r = p.add_run(f"{letter}. {text or ''}")
-                r.font.size = Pt(9)
-                r.font.name = 'Calibri'
-                # Highlight correct answer
+                r.font.size = Pt(12)
+                r.font.name = 'Arial'
                 if question.correct_answer.lower() == letter:
                     r.font.color.rgb = RGBColor(0, 128, 0)
 
@@ -240,24 +293,28 @@ class BISUQuestionnaireGenerator:
         elif question.question_type.name == 'true_false':
             p = self.doc.add_paragraph()
             r = p.add_run("   A. True          B. False")
-            r.font.size = Pt(9)
-            r.font.name = 'Calibri'
+            r.font.size = Pt(12)
+            r.font.name = 'Arial'
+
+    # =========================================================================
+    # SAVE METHODS
+    # =========================================================================
 
     def save_to_buffer(self):
-        """Save document to an in-memory buffer (no file needed)"""
+        """Save document to an in-memory buffer (for HTTP responses)."""
         buffer = io.BytesIO()
         self.doc.save(buffer)
         buffer.seek(0)
         return buffer
 
     def save_docx(self, filepath):
-        """Save as DOCX file"""
+        """Save as DOCX file."""
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         self.doc.save(filepath)
         return filepath
 
     def save_pdf(self, filepath):
-        """Save as PDF (requires docx2pdf or LibreOffice)"""
+        """Save as PDF (requires docx2pdf or LibreOffice)."""
         docx_path = filepath.replace('.pdf', '_temp.docx')
         self.save_docx(docx_path)
         try:
@@ -273,21 +330,23 @@ class BISUQuestionnaireGenerator:
             return docx_path
 
 
+# =============================================================================
+# MAIN ENTRY POINT
+# =============================================================================
+
 def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
     """
-    Main function to generate BISU questionnaire from database objects.
+    Generate BISU questionnaire from database objects using the Word template.
 
     Returns:
-        tuple: (docx_path, pdf_path) - pdf_path may be None if conversion fails
+        tuple: (docx_path, pdf_path) — pdf_path may be None if conversion fails
     """
     from collections import defaultdict
 
-    # Group questions by type
     questions_by_type = defaultdict(list)
     for q in selected_questions:
         questions_by_type[q.question_type.name].append(q)
 
-    # Section configuration
     section_config = {
         'identification': {
             'title_label': 'Identification',
@@ -315,7 +374,6 @@ def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
         },
     }
 
-    # Build ordered sections (only types that have questions)
     sections = {}
     part_number = 1
     for qtype, config in section_config.items():
@@ -327,39 +385,35 @@ def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
             }
             part_number += 1
 
-    # Get instructor full name safely
     try:
         instructor_name = questionnaire_obj.uploader.user.get_full_name() or \
                           questionnaire_obj.uploader.user.username
     except Exception:
         instructor_name = "Instructor"
 
-    # Prepare data
     questionnaire_data = {
-        'title': questionnaire_obj.title or 'Examination',
-        'course_code': questionnaire_obj.subject.code,
-        'course_name': questionnaire_obj.subject.name,
-        'program': questionnaire_obj.department.code,
-        'instructor': instructor_name,
-        'department': questionnaire_obj.department.name,
-        'semester': '1st Semester, A.Y.2025-2026',
-        'questions': sections,
+        'title':             questionnaire_obj.title or 'Examination',
+        'course_code':       questionnaire_obj.subject.code,
+        'course_name':       questionnaire_obj.subject.name,
+        'program':           questionnaire_obj.department.code,
+        'instructor':        instructor_name,
+        'department':        questionnaire_obj.department.name,
+        'semester':          '1st Semester, A.Y.2025-2026',
+        'questions':         sections,
     }
 
-    # Generate document
+    # Generate using the Word template
     generator = BISUQuestionnaireGenerator()
     generator.generate_questionnaire(questionnaire_data)
 
-    # Save to files
     output_dir = os.path.join(settings.MEDIA_ROOT, 'generated_questionnaires')
     os.makedirs(output_dir, exist_ok=True)
 
-    # Sanitize filename
     safe_name = f"{questionnaire_obj.subject.code}_{questionnaire_obj.title}".replace(' ', '_')
     safe_name = "".join(c for c in safe_name if c.isalnum() or c in ('_', '-'))
 
     docx_path = os.path.join(output_dir, f"{safe_name}.docx")
-    pdf_path = os.path.join(output_dir, f"{safe_name}.pdf")
+    pdf_path  = os.path.join(output_dir, f"{safe_name}.pdf")
 
     generator.save_docx(docx_path)
 
