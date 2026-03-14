@@ -135,7 +135,9 @@
 <!-- Stats bar -->
 <div class="flex items-center justify-between mb-4">
     <p class="text-sm text-gray-500">
-        Showing <strong class="text-gray-700">{{ page_obj.paginator.count }}</strong> questionnaire{{ page_obj.paginator.count|pluralize }} from <strong class="text-gray-700">{{ department.name }}</strong>
+        Showing <strong class="text-gray-700">{{ page_obj.paginator.count }}</strong>
+        questionnaire{{ page_obj.paginator.count|pluralize }} from
+        <strong class="text-gray-700">{{ department.name }}</strong>
     </p>
 </div>
 
@@ -217,11 +219,20 @@
         </div>
 
         <!-- Card Footer -->
-        <div class="bg-gray-50 px-5 py-4 flex items-center space-x-2">
-            <a href="{% url 'questionnaires:download_questionnaire' quest.pk %}"
-                class="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
-                <i class="bi bi-download mr-1"></i> Download
-            </a>
+        <div class="bg-gray-50 px-5 py-4">
+            {% if quest.is_extracted %}
+            <button type="button"
+                data-quest-id="{{ quest.pk }}"
+                data-quest-title="{{ quest.title }}"
+                class="view-questions-btn w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all flex items-center justify-center shadow">
+                <i class="bi bi-eye mr-2"></i> View Questions
+            </button>
+            {% else %}
+            <button type="button" disabled
+                class="w-full bg-gray-200 text-gray-400 font-semibold py-2.5 px-4 rounded-lg flex items-center justify-center cursor-not-allowed">
+                <i class="bi bi-hourglass-split mr-2"></i> Questions Not Extracted
+            </button>
+            {% endif %}
         </div>
     </div>
     {% endfor %}
@@ -281,11 +292,273 @@
 </div>
 {% endif %}
 
+
+<!-- ══════════════════════════════════════════════════════
+     VIEW QUESTIONS MODAL  (read-only)
+═══════════════════════════════════════════════════════ -->
+<div id="viewQuestionsModal"
+    class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden items-start justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
+
+        <!-- Modal Header -->
+        <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5 rounded-t-2xl flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-white" id="viewModalTitle">Questions</h2>
+                <p class="text-white/80 text-sm mt-0.5">Read-only view of extracted questions</p>
+            </div>
+            <button type="button" id="closeViewModal"
+                class="text-white hover:bg-white/20 rounded-lg p-2 transition-colors">
+                <i class="bi bi-x-lg text-xl"></i>
+            </button>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-3 gap-0 border-b border-gray-200">
+            <div class="p-4 text-center border-r border-gray-200">
+                <div class="text-2xl font-bold text-blue-600" id="viewModalTotal">0</div>
+                <div class="text-xs text-gray-500">Total Questions</div>
+            </div>
+            <div class="p-4 text-center border-r border-gray-200">
+                <div class="text-2xl font-bold text-purple-600" id="viewModalVisible">0</div>
+                <div class="text-xs text-gray-500">Showing</div>
+            </div>
+            <div class="p-4 text-center">
+                <div class="text-2xl font-bold text-orange-600" id="viewModalPoints">0</div>
+                <div class="text-xs text-gray-500">Total Points</div>
+            </div>
+        </div>
+
+        <!-- Filters Row -->
+        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
+            <select id="viewFilterType"
+                class="px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
+                <option value="all">All Types</option>
+            </select>
+            <select id="viewFilterDiff"
+                class="px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
+                <option value="all">All Difficulties</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+            <span class="ml-auto text-xs text-gray-400 italic flex items-center gap-1">
+                <i class="bi bi-eye text-indigo-400"></i> View only — no downloads
+            </span>
+        </div>
+
+        <!-- Questions List -->
+        <div id="viewModalQuestionsList" class="p-6 space-y-3 max-h-[55vh] overflow-y-auto"></div>
+
+        <!-- Modal Footer -->
+        <div class="px-6 py-4 bg-gray-50 rounded-b-2xl border-t border-gray-200 flex justify-end">
+            <button type="button" id="closeViewModalFooter"
+                class="px-5 py-2.5 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold rounded-lg text-sm transition-colors">
+                <i class="bi bi-x mr-1"></i> Close
+            </button>
+        </div>
+    </div>
+</div>
+
+
 {% endblock %}
 
 {% block extra_css %}
 <style>
 .line-clamp-2 { display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
 .line-clamp-3 { display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+'use strict';
+
+var modal         = document.getElementById('viewQuestionsModal');
+var modalList     = document.getElementById('viewModalQuestionsList');
+var filterType    = document.getElementById('viewFilterType');
+var filterDiff    = document.getElementById('viewFilterDiff');
+var allQuestions  = [];
+
+/* ── Open modal on "View Questions" click ── */
+document.querySelectorAll('.view-questions-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        var qid   = btn.getAttribute('data-quest-id');
+        var title = btn.getAttribute('data-quest-title');
+        document.getElementById('viewModalTitle').textContent = title;
+        resetModal();
+        openModal();
+        loadQuestions(qid);
+    });
+});
+
+function openModal() {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.style.overflow = '';
+    resetModal();
+}
+
+function resetModal() {
+    modalList.innerHTML = '';
+    allQuestions = [];
+    filterType.innerHTML = '<option value="all">All Types</option>';
+    filterDiff.value = 'all';
+    document.getElementById('viewModalTotal').textContent   = '0';
+    document.getElementById('viewModalVisible').textContent = '0';
+    document.getElementById('viewModalPoints').textContent  = '0';
+}
+
+document.getElementById('closeViewModal').addEventListener('click', closeModal);
+document.getElementById('closeViewModalFooter').addEventListener('click', closeModal);
+modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+/* ── Fetch questions from the existing endpoint ── */
+function loadQuestions(qid) {
+    modalList.innerHTML =
+        '<div class="flex items-center justify-center py-12 text-gray-400">' +
+            '<div class="text-center">' +
+                '<div style="width:40px;height:40px;border:4px solid #e0e7ff;border-top-color:#6366f1;' +
+                     'border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite;"></div>' +
+                '<p class="text-sm">Loading questions...</p>' +
+            '</div>' +
+        '</div>';
+
+    fetch('/questionnaires/get-questions/' + qid + '/')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            allQuestions = data.questions || [];
+            buildTypeFilter(allQuestions);
+            renderQuestions(allQuestions);
+        })
+        .catch(function () {
+            modalList.innerHTML =
+                '<div class="text-center py-12 text-red-500">' +
+                    '<i class="bi bi-exclamation-circle text-4xl mb-3 block"></i>' +
+                    '<p class="font-semibold">Failed to load questions.</p>' +
+                    '<p class="text-sm text-gray-400 mt-1">Please try again.</p>' +
+                '</div>';
+        });
+}
+
+/* ── Build type filter dropdown from actual data ── */
+function buildTypeFilter(questions) {
+    var types = {};
+    questions.forEach(function (q) { types[q.type] = q.type_display; });
+    var h = '<option value="all">All Types</option>';
+    Object.keys(types).forEach(function (k) {
+        h += '<option value="' + k + '">' + types[k] + '</option>';
+    });
+    filterType.innerHTML = h;
+}
+
+/* ── Filter change handlers ── */
+filterType.addEventListener('change', applyFilters);
+filterDiff.addEventListener('change', applyFilters);
+
+function applyFilters() {
+    var type = filterType.value;
+    var diff = filterDiff.value;
+    var visible = allQuestions.filter(function (q) {
+        return (type === 'all' || q.type === type) &&
+               (diff === 'all' || q.difficulty === diff);
+    });
+    renderQuestions(visible);
+}
+
+/* ── Render questions (read-only, no checkboxes) ── */
+function renderQuestions(questions) {
+    if (!questions || !questions.length) {
+        modalList.innerHTML =
+            '<div class="text-center py-12 text-gray-400">' +
+                '<i class="bi bi-inbox text-5xl mb-3 block"></i>' +
+                '<p class="font-semibold">No questions match the current filters.</p>' +
+            '</div>';
+        updateStats(0, 0);
+        return;
+    }
+
+    var dBorder = { easy: 'border-green-500', medium: 'border-yellow-500', hard: 'border-red-500' };
+    var dBadge  = { easy: 'bg-green-100 text-green-800', medium: 'bg-yellow-100 text-yellow-800', hard: 'bg-red-100 text-red-800' };
+    var L       = ['A', 'B', 'C', 'D'];
+
+    var totalPts = 0;
+    var html = '';
+
+    questions.forEach(function (q, i) {
+        totalPts += (parseInt(q.points) || 1);
+        html +=
+            '<div class="bg-white rounded-lg border-l-4 ' + (dBorder[q.difficulty] || 'border-gray-300') + ' shadow-sm p-4">' +
+                '<div class="flex flex-wrap gap-1.5 mb-2">' +
+                    '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">' + esc(q.type_display) + '</span>' +
+                    '<span class="px-2 py-0.5 ' + (dBadge[q.difficulty] || 'bg-gray-100 text-gray-700') + ' text-xs font-semibold rounded-full">' + esc(q.difficulty) + '</span>' +
+                    '<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">' + (q.points || 1) + ' pt</span>' +
+                '</div>' +
+                '<p class="text-gray-800 font-medium text-sm mb-3">' + (i + 1) + '. ' + esc(q.question_text) + '</p>';
+
+        /* Multiple choice options */
+        if (q.type === 'multiple_choice' && q.options && q.options.length) {
+            html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-1 ml-2">';
+            q.options.forEach(function (opt, idx) {
+                var isCorrect = q.correct_answer && q.correct_answer.toUpperCase() === L[idx];
+                html +=
+                    '<div class="flex items-center p-1.5 rounded text-xs ' +
+                        (isCorrect
+                            ? 'bg-green-50 border border-green-400 text-green-800 font-semibold'
+                            : 'bg-gray-50 text-gray-700') + '">' +
+                        '<span class="font-bold mr-1">' + L[idx] + '.</span>' + esc(opt) +
+                        (isCorrect ? '<i class="bi bi-check-circle-fill ml-auto text-green-600"></i>' : '') +
+                    '</div>';
+            });
+            html += '</div>';
+        } else if (q.correct_answer) {
+            /* Short answer / identification / etc. */
+            html +=
+                '<div class="bg-green-50 border-l-4 border-green-400 p-2 rounded text-xs mt-1">' +
+                    '<span class="text-gray-500">Answer: </span>' +
+                    '<span class="text-green-800 font-semibold">' + esc(q.correct_answer) + '</span>' +
+                '</div>';
+        }
+
+        /* Explanation */
+        if (q.explanation) {
+            html +=
+                '<div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300">' +
+                    '<i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>' + esc(q.explanation) +
+                '</div>';
+        }
+
+        html += '</div>'; /* close card */
+    });
+
+    modalList.innerHTML = html;
+    updateStats(questions.length, totalPts);
+}
+
+function updateStats(visible, pts) {
+    document.getElementById('viewModalTotal').textContent   = allQuestions.length;
+    document.getElementById('viewModalVisible').textContent = visible;
+    document.getElementById('viewModalPoints').textContent  = pts;
+}
+
+/* ── HTML escape helper ── */
+function esc(s) {
+    if (!s) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+})();
+</script>
 {% endblock %}

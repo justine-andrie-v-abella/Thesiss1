@@ -1308,10 +1308,8 @@ def workspace_add_questions(request, folder_id):
     if not isinstance(question_ids, list):
         return JsonResponse({'error': 'question_ids must be a list'}, status=400)
 
-    allowed_questions = ExtractedQuestion.objects.filter(
-        pk__in=question_ids,
-        questionnaire__subject__departments=teacher.department,
-    )
+    # ✅ Removed department filter — just verify the questions exist
+    allowed_questions = ExtractedQuestion.objects.filter(pk__in=question_ids)
 
     added = 0
     already = 0
@@ -1363,9 +1361,21 @@ def download_workspace(request):
 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
 
+    # ✅ Security check: only allow questions saved in this teacher's folders
+    owned_ids = set(
+        WorkspaceFolderQuestion.objects.filter(
+            folder__teacher=teacher,
+            question_id__in=question_ids,
+        ).values_list('question_id', flat=True)
+    )
+
+    if not owned_ids:
+        messages.error(request, 'None of the selected questions belong to your workspace.')
+        return redirect('questionnaires:workspace')
+
+    # ✅ No department filter — ownership via folder is the correct check
     selected_questions = ExtractedQuestion.objects.filter(
-        pk__in=question_ids,
-        questionnaire__subject__departments=teacher.department,
+        pk__in=owned_ids,
     ).select_related(
         'question_type', 'questionnaire',
         'questionnaire__subject', 'questionnaire__department',
