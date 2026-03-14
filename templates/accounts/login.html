@@ -2,252 +2,322 @@
 
 {% block content %}
 <style>
-    body {
-        background: url("{% static 'images/violet-bisu-H-plain.png' %}") no-repeat center center fixed;
-        background-size: cover;
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0;
-        padding: 20px;
-    }
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
 
-    .card {
-        background: linear-gradient(135deg, 
-            rgba(255, 255, 255, 0.92) 0%, 
-            rgba(255, 255, 255, 0.85) 100%);
-        backdrop-filter: blur(12px);
-        border-radius: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.4);
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
-        max-width: 450px;
-        width: 100%;
-        margin: 0 auto;
-    }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    .card-body {
-        padding: 50px 40px;
-        text-align: center;
-    }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 24px 80px;
+    font-family: 'DM Sans', sans-serif;
+    /* The image IS the purple — no overlay needed */
+    background: url("{% static 'images/violet-bisu-H-plain.png' %}") no-repeat center center fixed;
+    background-size: cover;
+  }
 
-    .login-icon {
-        font-size: 3rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin-bottom: 1.5rem;
-        display: inline-block;
-    }
+  /* ── Card — white/light, no tint ── */
+  .card-wrap {
+    width: 100%;
+    max-width: 480px;
+    animation: fadeUp 0.55s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  @keyframes fadeUp {
+    from { opacity:0; transform: translateY(28px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
 
-    .card-title {
-        color: #2c3e50;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-        font-size: 1.8rem;
-    }
+  .card {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.6);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    padding: 50px 48px 42px;
+    text-align: center;
+  }
 
-    .text-muted {
-        color: #6c757d !important;
-        margin-bottom: 2rem;
-        font-size: 1rem;
-    }
+  /* ── Logo ── */
+  .logo-wrap {
+    margin-bottom: 20px;
+    animation: fadeUp 0.55s 0.08s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .bisu-logo {
+    width: 90px;
+    height: 90px;
+    object-fit: contain;
+  }
 
-    .form-label {
-        color: #2c3e50;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-        text-align: left;
-        display: block;
-    }
+  /* ── Title & subtitle ── */
+  .brand-name {
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    letter-spacing: -0.2px;
+    animation: fadeUp 0.55s 0.12s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .brand-sub {
+    font-size: 0.95rem;
+    color: #5a6c7d;
+    line-height: 1.6;
+    margin-bottom: 32px;
+    animation: fadeUp 0.55s 0.16s cubic-bezier(0.22,1,0.36,1) both;
+  }
 
-    .form-control {
-        border-radius: 10px;
-        border: 1px solid #e1e5e9;
-        padding: 14px 16px;
-        transition: all 0.3s ease;
-        font-size: 1rem;
-    }
+  /* ── Alerts ── */
+  .alert-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(102,126,234,0.08);
+    border: 1px solid rgba(102,126,234,0.25);
+    border-left: 3px solid #667eea;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 0.875rem;
+    color: #3a3a6e;
+    text-align: left;
+  }
+  .alert-box i { flex-shrink: 0; color: #667eea; }
 
-    .form-control:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.2);
-        transform: translateY(-1px);
-    }
+  /* ── Form ── */
+  .form-wrap { text-align: left; }
 
-    .input-group-text {
-        background-color: #f8f9fa;
-        border: 1px solid #e1e5e9;
-        border-right: none;
-        border-radius: 10px 0 0 10px;
-        padding: 0 15px;
-    }
+  .field-group {
+    margin-bottom: 18px;
+    animation: fadeUp 0.55s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .field-group:nth-child(1) { animation-delay: 0.20s; }
+  .field-group:nth-child(2) { animation-delay: 0.25s; }
 
-    .input-group .form-control {
-        border-left: none;
-        border-radius: 0 10px 10px 0;
-    }
+  .field-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 8px;
+  }
 
-    .btn-login {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border: none;
-        padding: 14px;
-        font-weight: 600;
-        border-radius: 10px;
-        transition: all 0.3s ease;
-        color: white;
-        font-size: 1.1rem;
-        width: 100%;
-        margin-top: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
+  .field-input-wrap { position: relative; }
 
-    .btn-login:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
-        color: white;
-    }
+  .field-icon {
+    position: absolute;
+    left: 14px; top: 50%; transform: translateY(-50%);
+    color: #9ba8b5;
+    font-size: 1rem;
+    pointer-events: none;
+    transition: color 0.2s;
+  }
+  .field-input-wrap:focus-within .field-icon { color: #667eea; }
 
-    .btn-login i {
-        margin-right: 8px;
-    }
+  .field-input {
+    width: 100%;
+    padding: 13px 16px 13px 42px;
+    border: 1.5px solid #e1e5e9;
+    border-radius: 10px;
+    background: #fff;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    color: #2c3e50;
+    transition: border-color 0.25s, box-shadow 0.25s;
+    outline: none;
+  }
+  .field-input::placeholder { color: #b0bec5; }
+  .field-input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
+  }
 
-    .back-link {
-        color: #6c757d;
-        text-decoration: none;
-        transition: color 0.3s ease;
-        font-size: 0.95rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        margin-top: 1.5rem;
-    }
+  .pw-toggle {
+    position: absolute;
+    right: 14px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; padding: 0;
+    color: #9ba8b5; cursor: pointer; font-size: 1rem;
+    transition: color 0.2s;
+  }
+  .pw-toggle:hover { color: #667eea; }
 
-    .back-link:hover {
-        color: #667eea;
-    }
+  /* ── Submit — purple/indigo like the landing page CTA ── */
+  .btn-submit {
+    width: 100%;
+    padding: 14px;
+    margin-top: 8px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 6px 20px rgba(102,126,234,0.4);
+    animation: fadeUp 0.55s 0.30s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .btn-submit:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px rgba(102,126,234,0.5);
+  }
+  .btn-submit:active { transform: translateY(0); }
 
-    .back-link i {
-        margin-right: 6px;
-    }
+  /* ── Back link ── */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 22px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6c757d;
+    text-decoration: none;
+    transition: color 0.2s;
+    animation: fadeUp 0.55s 0.35s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .back-link:hover { color: #667eea; }
 
-    .mb-3, .mb-4 {
-        text-align: left;
-    }
+  /* ── Footer bar — matches landing page ── */
+  .page-footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 20;
+    background: rgba(20,10,50,0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 14px 32px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+  }
+  .footer-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: rgba(255,255,255,0.80);
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+  .footer-item i { color: rgba(255,255,255,0.55); }
 
-    @media (max-width: 768px) {
-        .card-body {
-            padding: 40px 30px;
-        }
-        
-        .card-title {
-            font-size: 1.6rem;
-        }
-        
-        .login-icon {
-            font-size: 2.5rem;
-        }
-        
-        .form-control {
-            padding: 12px 14px;
-        }
-        
-        .btn-login {
-            padding: 12px;
-            font-size: 1rem;
-        }
-    }
-
-    @media (max-width: 480px) {
-        .card-body {
-            padding: 35px 25px;
-        }
-        
-        .card-title {
-            font-size: 1.4rem;
-        }
-        
-        .login-icon {
-            font-size: 2.2rem;
-        }
-        
-        .form-control {
-            padding: 10px 12px;
-        }
-        
-        .btn-login {
-            padding: 11px;
-        }
-    }
+  /* ── Responsive ── */
+  @media (max-width: 520px) {
+    .card { padding: 38px 26px 32px; }
+    .brand-name { font-size: 1.45rem; }
+    .bisu-logo { width: 76px; height: 76px; }
+    body { padding-bottom: 100px; }
+    .page-footer { gap: 14px; padding: 12px 16px; }
+    .footer-item { font-size: 0.74rem; }
+  }
+  @media (max-width: 400px) {
+    .page-footer .footer-item:nth-child(n+3) { display: none; }
+  }
 </style>
 
-<div class="card">
-    <div class="card-body">
-        <!-- Header -->
-        <div class="mb-4">
-            <div class="login-icon">
-                <i class="bi bi-lock-fill"></i>
-            </div>
-            <h2 class="card-title">
-                Login to Your Account
-            </h2>
-            <p class="text-muted">Access the BISU Test Banking System</p>
-        </div>
+<!-- Card -->
+<div class="card-wrap">
+  <div class="card">
 
-        {% if messages %}
-            {% for message in messages %}
-            <div class="alert alert-danger d-flex align-items-center mb-4"
-                style="border-radius: 10px; font-size: 0.95rem;">
-                <i class="bi bi-wifi-off me-2"></i>
-                {{ message }}
-            </div>
-            {% endfor %}
-        {% endif %}
-
-        <!-- Login Form -->
-        <form method="post">
-            {% csrf_token %}
-            
-            <!-- Username Field -->
-            <div class="mb-3">
-                <label for="username" class="form-label">Username</label>
-                <div class="input-group">
-                    <span class="input-group-text">
-                        <i class="bi bi-person text-muted"></i>
-                    </span>
-                    <input type="text" class="form-control" id="username" name="username" 
-                           placeholder="Enter your username" required autofocus>
-                </div>
-            </div>
-
-            <!-- Password Field -->
-            <div class="mb-4">
-                <label for="password" class="form-label">Password</label>
-                <div class="input-group">
-                    <span class="input-group-text">
-                        <i class="bi bi-key text-muted"></i>
-                    </span>
-                    <input type="password" class="form-control" id="password" name="password" 
-                           placeholder="Enter your password" required>
-                </div>
-            </div>
-
-            <!-- Login Button -->
-            <button type="submit" class="btn btn-login">
-                <i class="bi bi-box-arrow-in-right"></i> Login
-            </button>
-        </form>
-
-        <!-- Back to Home Link -->
-        <div class="mt-4">
-            <a href="{% url 'home' %}" class="back-link">
-                <i class="bi bi-arrow-left"></i> Back to Home
-            </a>
-        </div>
-
+    <!-- Logo -->
+    <div class="logo-wrap">
+      <img src="{% static 'images/bisulogo.png' %}" alt="BISU Logo" class="bisu-logo">
     </div>
+
+    <!-- Title -->
+    <h1 class="brand-name">BISU Test Banking System</h1>
+    <p class="brand-sub">A centralized digital repository of test questionnaires for BISU Balilihan</p>
+
+    <!-- Alerts -->
+    {% if messages %}
+      {% for message in messages %}
+      <div class="alert-box">
+        <i class="bi bi-wifi-off"></i>
+        <span>{{ message }}</span>
+      </div>
+      {% endfor %}
+    {% endif %}
+
+    <!-- Form -->
+    <div class="form-wrap">
+      <form method="post" autocomplete="off">
+        {% csrf_token %}
+
+        <div class="field-group">
+          <label for="username" class="field-label">Username</label>
+          <div class="field-input-wrap">
+            <i class="bi bi-person field-icon"></i>
+            <input type="text" id="username" name="username"
+              class="field-input" placeholder="Enter your username"
+              required autofocus autocomplete="username">
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="password" class="field-label">Password</label>
+          <div class="field-input-wrap">
+            <i class="bi bi-key field-icon"></i>
+            <input type="password" id="password" name="password"
+              class="field-input" placeholder="Enter your password"
+              required autocomplete="current-password">
+            <button type="button" class="pw-toggle" id="pwToggle" aria-label="Toggle password">
+              <i class="bi bi-eye" id="pwIcon"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit">
+          <i class="bi bi-box-arrow-in-right"></i> Login to Continue
+        </button>
+      </form>
+    </div>
+
+    <!-- Back link -->
+    <div style="text-align:center;">
+      <a href="{% url 'home' %}" class="back-link">
+        <i class="bi bi-arrow-left"></i> Back to Home
+      </a>
+    </div>
+
+  </div>
 </div>
+
+<!-- Footer — matches landing page -->
+<footer class="page-footer">
+  <div class="footer-item">
+    <i class="bi bi-telephone-fill"></i>
+    <span>(038) 416-0797</span>
+  </div>
+  <div class="footer-item">
+    <i class="bi bi-people-fill"></i>
+    <span>bisubalilihanofficial</span>
+  </div>
+  <div class="footer-item">
+    <i class="bi bi-envelope-fill"></i>
+    <span>balilihan@bisu.edu.ph</span>
+  </div>
+  <div class="footer-item">
+    <i class="bi bi-globe"></i>
+    <span>www.bisubalilihan.com</span>
+  </div>
+</footer>
+
+<script>
+  var pwInput = document.getElementById('password');
+  var pwIcon  = document.getElementById('pwIcon');
+  document.getElementById('pwToggle').addEventListener('click', function () {
+    var hidden = pwInput.type === 'password';
+    pwInput.type     = hidden ? 'text' : 'password';
+    pwIcon.className = hidden ? 'bi bi-eye-slash' : 'bi bi-eye';
+  });
+</script>
+
 {% endblock %}
