@@ -1558,15 +1558,32 @@
             });
 
         if (!IS_GENERATE && !downloadEnabled) {
-            var tmpForm = document.createElement('form');
-            tmpForm.method = 'POST'; tmpForm.action = window.location.href;
-            document.body.appendChild(tmpForm);
-            formData.forEach(function(value, key){
-                var input = document.createElement('input');
-                input.type='hidden'; input.name=key; input.value=value;
-                tmpForm.appendChild(input);
-            });
-            tmpForm.submit(); return;
+            fetch(window.location.href, { method: 'POST', body: formData })
+                .then(function(response) {
+                    // Server returns a redirect (302) which fetch follows;
+                    // the final response is the redirected page's HTML.
+                    // We just send the browser there directly.
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                        return;
+                    }
+                    // Fallback: try JSON (e.g. error payload)
+                    return response.json().then(function(data) {
+                        loadingModal.classList.add('hidden');
+                        loadingModal.classList.remove('flex');
+                        if (data.success) {
+                            showSuccess(totalSelected, 'none');
+                        } else {
+                            alert(data.error || 'Failed to save. Please try again.');
+                        }
+                    });
+                })
+                .catch(function() {
+                    loadingModal.classList.add('hidden');
+                    loadingModal.classList.remove('flex');
+                    alert('Something went wrong. Please try again.');
+                });
+            return;
         }
 
         fetch(window.location.href, { method: 'POST', body: formData })

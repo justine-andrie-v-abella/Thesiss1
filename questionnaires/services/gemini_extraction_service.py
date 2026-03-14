@@ -3,6 +3,7 @@
 # ============================================================================
 
 import json
+import re
 import PyPDF2
 import docx
 import openpyxl
@@ -21,7 +22,7 @@ class GeminiQuestionnaireExtractor:
         try:
             from google import genai
             self.client = genai.Client(api_key=self.api_key)
-            self.model = 'gemini-2.5-flash'
+            self.model  = 'gemini-2.5-flash'
         except ImportError:
             raise ImportError("Please install google-genai: pip install google-genai")
 
@@ -30,7 +31,7 @@ class GeminiQuestionnaireExtractor:
     # =========================================================================
 
     def extract_text_from_file(self, file_path: str) -> str:
-        """Extract text content from various file formats"""
+        """Route to the correct extractor based on file extension."""
         extension = file_path.lower().split('.')[-1]
 
         if extension == 'pdf':
@@ -60,95 +61,62 @@ class GeminiQuestionnaireExtractor:
 
     def _extract_from_docx(self, file_path: str) -> str:
         """
-        Extract text from DOCX preserving structure.
-
-        Tables are rendered in a way that makes two-column matching type
-        sections clearly recognizable to Gemini:
-
-            [TABLE]
-            Column A  |  Column B
-            1. CREATE  |  A. Permanently deletes a database object.
-            2. DROP    |  B. Creates new database objects.
-            [/TABLE]
-
-        This format is unambiguous — Gemini will always classify it as
-        'matching' rather than 'identification'.
+        Extract text from DOCX in reading order.
+        Handles both real Word tables and paragraph-based column layouts.
+        After raw extraction, runs _reconstruct_matching_sections() to
+        reformat split Column A / Column B blocks into [TABLE] format.
         """
         try:
             document = docx.Document(file_path)
-            parts = []
+            parts    = []
 
-            # Build a set of paragraphs that are inside tables so we can
-            # skip them when iterating document.paragraphs (python-docx
-            # exposes table cell paragraphs in both places).
-            table_para_ids = set()
-            for table in document.tables:
-                for row in table.rows:
-                    for cell in row.cells:
-                        for para in cell.paragraphs:
-                            table_para_ids.add(id(para))
+            para_map  = {p._element: p for p in document.paragraphs}
+            table_map = {t._element: t for t in document.tables}
 
-            # Iterate the document in reading order (paragraphs + tables)
-            for block in document.element.body:
-                tag = block.tag.split('}')[-1]  # strip namespace
+            for child in document.element.body:
+                tag = child.tag.split('}')[-1]
 
+                # ── Plain paragraph ───────────────────────────────────────
                 if tag == 'p':
-                    # Regular paragraph
-                    para_text = block.text_content().strip() if hasattr(block, 'text_content') else ''
-                    # Use python-docx paragraph objects for clean text
-                    for para in document.paragraphs:
-                        if para._element is block:
-                            para_text = para.text.strip()
-                            break
-                    if para_text:
-                        parts.append(para_text)
+                    para = para_map.get(child)
+                    if para and para.text.strip():
+                        parts.append(para.text.strip())
 
+                # ── Real Word table ───────────────────────────────────────
                 elif tag == 'tbl':
-                    # Find the matching python-docx Table object
-                    table_obj = None
-                    for t in document.tables:
-                        if t._element is block:
-                            table_obj = t
-                            break
-
-                    if table_obj is None:
+                    table = table_map.get(child)
+                    if table is None:
                         continue
 
-                    rows = table_obj.rows
-                    if not rows:
-                        continue
-
-                    # Collect all cell values
                     grid = []
-                    for row in rows:
-                        cells = [cell.text.strip() for cell in row.cells]
-                        # De-duplicate merged cells (python-docx repeats them)
-                        deduped = []
-                        for i, c in enumerate(cells):
-                            if i == 0 or c != cells[i - 1]:
-                                deduped.append(c)
-                        grid.append(deduped)
+                    for row in table.rows:
+                        seen  = set()
+                        cells = []
+                        for cell in row.cells:
+                            txt     = cell.text.strip()
+                            cell_id = id(cell._tc)
+                            if cell_id not in seen:
+                                seen.add(cell_id)
+                                cells.append(txt)
+                        if any(cells):
+                            grid.append(cells)
 
-                    # Detect two-column matching table:
-                    # - Has exactly 2 columns after dedup
-                    # - First column items look like "1. X", "2. X" (numbered)
-                    # - Second column items look like "A. X", "B. X" (lettered)
-                    col_count = max(len(r) for r in grid) if grid else 0
-                    is_matching_table = False
+                    if not grid:
+                        continue
 
-                    if col_count == 2 and len(grid) >= 2:
-                        # Check if first data row (skip header if present)
-                        # has numbered left and lettered right
+                    col_count   = max(len(r) for r in grid)
+                    is_matching = False
+
+                    if col_count == 2:
                         data_rows = [r for r in grid if len(r) == 2 and r[0] and r[1]]
-                        if data_rows:
-                            first = data_rows[0]
-                            left_numbered  = first[0][:2].strip().rstrip('.').isdigit()
-                            right_lettered = first[1][:1].strip().upper().isalpha()
-                            is_matching_table = left_numbered or right_lettered
+                        for dr in data_rows:
+                            left_num  = dr[0][:1].isdigit()
+                            right_let = dr[1][:1].isalpha() and dr[1][1:2] in ('.', ')')
+                            if left_num or right_let:
+                                is_matching = True
+                                break
 
-                    if is_matching_table:
-                        # Format as an explicit matching block so Gemini
-                        # can't mistake it for anything else
+                    if is_matching:
                         parts.append("[TABLE]")
                         parts.append("Column A  |  Column B")
                         for row in grid:
@@ -158,16 +126,106 @@ class GeminiQuestionnaireExtractor:
                                 parts.append(row[0])
                         parts.append("[/TABLE]")
                     else:
-                        # Generic table: just join cells with pipes
                         for row in grid:
-                            line = '  |  '.join(c for c in row if c)
+                            line = "  |  ".join(c for c in row if c)
                             if line:
                                 parts.append(line)
 
-            return "\n".join(parts)
+            raw_text = "\n".join(parts)
+            return self._reconstruct_matching_sections(raw_text)
 
         except Exception as e:
             raise Exception(f"Error extracting DOCX: {str(e)}")
+
+    def _reconstruct_matching_sections(self, text: str) -> str:
+        """
+        Detects matching sections formatted as two separate paragraph blocks
+        (all Column A items listed, then all Column B items listed) and
+        stitches them into a proper [TABLE] block that Gemini can read.
+        """
+        lines   = text.splitlines()
+        result  = []
+        i       = 0
+        LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+        while i < len(lines):
+            line = lines[i].strip()
+
+            col_header = (
+                re.search(r'column\s*a', line, re.I) and
+                re.search(r'column\s*b', line, re.I)
+            )
+
+            if col_header:
+                # Already inside a real [TABLE] block — keep as-is
+                if result and result[-1].strip() == '[TABLE]':
+                    result.append(line)
+                    i += 1
+                    continue
+
+                col_a_items = []
+                col_b_items = []
+                mixed_line  = None
+
+                i += 1
+                while i < len(lines):
+                    ln = lines[i].strip()
+                    if not ln:
+                        i += 1
+                        continue
+
+                    # Stop at the next Roman-numeral section
+                    if re.match(r'^(II|III|IV|V|VI|VII|VIII|IX|X)[\.\s]', ln):
+                        break
+                    if re.match(r'^bonus', ln, re.I):
+                        break
+
+                    # Line that has both a short term AND a long description
+                    pipe_split = re.split(r'\s{3,}|\t|\s*\|\s*', ln, maxsplit=1)
+                    if len(pipe_split) == 2:
+                        left, right = pipe_split[0].strip(), pipe_split[1].strip()
+                        if left and right and len(left.split()) <= 5:
+                            mixed_line = (left, right)
+                            i += 1
+                            continue
+
+                    words           = ln.split()
+                    looks_like_term = (len(words) <= 6) and (ln[-1] not in '.?!')
+
+                    if looks_like_term and not col_b_items:
+                        col_a_items.append(ln)
+                    else:
+                        col_b_items.append(ln)
+
+                    i += 1
+
+                if mixed_line:
+                    col_a_items.append(mixed_line[0])
+                    col_b_items.insert(0, mixed_line[1])
+
+                if col_a_items and col_b_items:
+                    result.append("[TABLE]")
+                    result.append("Column A  |  Column B")
+                    max_rows = max(len(col_a_items), len(col_b_items))
+                    for idx in range(max_rows):
+                        a_txt = col_a_items[idx] if idx < len(col_a_items) else ""
+                        b_txt = col_b_items[idx] if idx < len(col_b_items) else ""
+                        if a_txt and not a_txt[0].isdigit():
+                            a_txt = f"{idx + 1}. {a_txt}"
+                        if b_txt and (len(b_txt) < 2 or b_txt[1] not in ('.', ')')):
+                            b_txt = f"{LETTERS[idx]}. {b_txt}"
+                        result.append(f"{a_txt}  |  {b_txt}")
+                    result.append("[/TABLE]")
+                else:
+                    result.extend(col_a_items)
+                    result.extend(col_b_items)
+
+                continue
+
+            result.append(line)
+            i += 1
+
+        return "\n".join(result)
 
     def _extract_from_excel(self, file_path: str) -> str:
         try:
@@ -272,23 +330,12 @@ You will see matching tables formatted like this in the text:
     3. DROP  |  C. Modifies the structure of an existing table.
     [/TABLE]
 
-OR like this (column A and column B listed separately):
-
-    Column A          Column B
-    1. CREATE         A. Permanently deletes a database object.
-    2. TINYINT        B. Creates new database objects.
-
-OR like a plain numbered/lettered list:
-
-    1. CREATE     2. TINYINT     3. DROP
-    A. Deletes    B. Creates     C. Modifies
-
-For ALL of these formats:
+For ALL matching formats:
 - Treat the ENTIRE section as ONE question with type "matching"
-- Set "question" to the section heading or instruction text (e.g. "Matching Type" or "Match Column A to Column B")
+- Set "question" to the section heading (e.g. "Matching Type")
 - Set "column_a" to ALL Column A items as a JSON array: ["1. CREATE", "2. TINYINT", ...]
 - Set "column_b" to ALL Column B items as a JSON array: ["A. Permanently deletes...", "B. Creates...", ...]
-- Set "matching_pairs" to the correct answer pairs IF an answer key is present, otherwise []
+- Set "matching_pairs" to [] if no answer key is present
 - NEVER split a matching section into multiple identification questions
 
 ═══════════════════════════════════════════════════════

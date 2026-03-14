@@ -1,7 +1,7 @@
 # ============================================================================
-# FILE: questionnaires/views.py
+# FILE: questionnaires/views.py 
 # ============================================================================
-
+ 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
@@ -17,15 +17,15 @@ from .forms import QuestionnaireUploadForm, QuestionnaireEditForm, Questionnaire
 from accounts.models import TeacherProfile, Department, Subject, ActivityLog
 from .services import QuestionnaireExtractor
 from django.conf import settings
-
+import json as _json
+ 
 def get_client_ip(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
         return x_forwarded_for.split(',')[0].strip()
     return request.META.get('REMOTE_ADDR')
-
+ 
 def get_extractor():
-    """Get the appropriate AI extractor based on available API keys"""
     if hasattr(settings, 'GEMINI_API_KEY') and settings.GEMINI_API_KEY:
         from .services.gemini_extraction_service import GeminiQuestionnaireExtractor
         return GeminiQuestionnaireExtractor()
@@ -34,23 +34,24 @@ def get_extractor():
         return QuestionnaireExtractor()
     else:
         raise ValueError("No AI API key configured. Please add GEMINI_API_KEY to your .env file.")
-
+ 
 def is_admin(user):
     return user.is_authenticated and user.is_staff
-
+ 
 def is_teacher(user):
     return user.is_authenticated and not user.is_staff and hasattr(user, 'teacher_profile')
-
-
+ 
+ 
 # ============================================================================
 # HELPER: build a list of plain dicts from ExtractedQuestion objects
-# so we can store them in the session (no DB objects in session).
 # ============================================================================
-
+ 
 def _questions_to_session(questions):
     """
     Convert a list/queryset of ExtractedQuestion objects into a list of
     plain dicts safe for Django session storage.
+    NOTE: option_a/b/c for matching questions contain raw JSON strings —
+    we store them as-is so _FakeQuestion can parse them back.
     """
     result = []
     for q in questions:
@@ -61,63 +62,55 @@ def _questions_to_session(questions):
             'points':         q.points,
             'correct_answer': q.correct_answer,
             'explanation':    q.explanation or '',
+            # For MC: plain strings. For matching: JSON strings.
             'option_a':       q.option_a or '',
             'option_b':       q.option_b or '',
             'option_c':       q.option_c or '',
             'option_d':       q.option_d or '',
         })
     return result
-
-
+ 
+ 
 def _clear_pending_session(request):
-    """Remove all pending questionnaire data from session."""
     request.session.pop('pending_questionnaire', None)
     request.session.pop('pending_questions', None)
     request.session.modified = True
-
-
+ 
+ 
 # ============================================================================
-# UPLOAD VIEW  —  now stores in session, does NOT save to DB
+# UPLOAD VIEW
 # ============================================================================
-
+ 
 @login_required
 def upload_questionnaire(request):
     if request.user.is_staff:
         messages.error(request, 'Admins cannot upload questionnaires')
         return redirect('accounts:admin_dashboard')
-
+ 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
-
+ 
     if request.method == 'POST':
         form = QuestionnaireUploadForm(request.POST, request.FILES, user=request.user)
-
+ 
         if form.is_valid():
-            # ── Build a temporary (unsaved) Questionnaire so the extractor
-            #    can read the file field. We'll only persist it on Save. ──────
             questionnaire = form.save(commit=False)
             questionnaire.uploader   = teacher
             questionnaire.department = teacher.department
             questionnaire.exam_type  = form.cleaned_data['exam_type']
-
-            # Save ONLY to get a file on disk (needed by the extractor).
-            # We mark extraction_status='processing' temporarily.
             questionnaire.extraction_status = 'processing'
             questionnaire.save()
-
+ 
             try:
                 type_names = list(
                     QuestionType.objects.filter(is_active=True).values_list('name', flat=True)
                 )
-
+ 
                 extractor = get_extractor()
-                # process_questionnaire saves ExtractedQuestion rows to DB.
-                # We'll grab them, serialise to dicts, then delete everything.
                 created_questions = extractor.process_questionnaire(
                     questionnaire, type_names, mode='extract'
                 )
-
+ 
                 if not created_questions:
-                    # Nothing extracted — clean up and bail
                     questionnaire.file.delete(save=False)
                     questionnaire.delete()
                     messages.error(
@@ -130,13 +123,11 @@ def upload_questionnaire(request):
                         'teacher_dashboard/upload_questionnaire.html',
                         {'form': form},
                     )
-
-                # ── Serialise questions to plain dicts ────────────────────────
+ 
                 session_questions = _questions_to_session(
                     questionnaire.extracted_questions.select_related('question_type').all()
                 )
-
-                # ── Store form data + questions in session ────────────────────
+ 
                 request.session['pending_questionnaire'] = {
                     'title':       questionnaire.title,
                     'description': questionnaire.description,
@@ -146,33 +137,31 @@ def upload_questionnaire(request):
                 }
                 request.session['pending_questions'] = session_questions
                 request.session.modified = True
-
-                # ── Delete the temporary DB records — nothing persists yet ────
+ 
                 questionnaire.extracted_questions.all().delete()
                 questionnaire.file.delete(save=False)
                 questionnaire.delete()
-
+ 
                 messages.success(
                     request,
                     f'Extracted {len(session_questions)} questions! '
                     f'Now select the ones you want to keep.',
                 )
                 return redirect('questionnaires:review_extracted')
-
+ 
             except Exception as e:
-                # Clean up on failure
                 try:
                     questionnaire.file.delete(save=False)
                     questionnaire.delete()
                 except Exception:
                     pass
-
+ 
                 ActivityLog.objects.create(
                     activity_type='extraction_failed',
                     user=request.user,
                     description='Extraction failed — file was not saved.',
                 )
-
+ 
                 messages.error(
                     request,
                     f'AI extraction failed: {str(e)}. '
@@ -185,32 +174,32 @@ def upload_questionnaire(request):
                 )
         else:
             messages.error(request, 'Please correct the errors below.')
-
+ 
     else:
         form = QuestionnaireUploadForm(user=request.user)
-
+ 
     return render(
         request,
         'teacher_dashboard/upload_questionnaire.html',
         {'form': form},
     )
-
-
+ 
+ 
 # ============================================================================
-# GENERATE VIEW  —  now stores in session, does NOT save to DB
+# GENERATE VIEW
 # ============================================================================
-
+ 
 @login_required
 def generate_questionnaire(request):
     if request.user.is_staff:
         messages.error(request, 'Admins cannot generate questionnaires.')
         return redirect('accounts:admin_dashboard')
-
+ 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
-
+ 
     if request.method == 'POST':
         form = QuestionnaireUploadForm(request.POST, request.FILES, user=request.user)
-
+ 
         if form.is_valid():
             questionnaire                    = form.save(commit=False)
             questionnaire.uploader          = teacher
@@ -218,9 +207,8 @@ def generate_questionnaire(request):
             questionnaire.exam_type         = form.cleaned_data['exam_type']
             questionnaire.extraction_status = 'processing'
             questionnaire.save()
-
+ 
             try:
-                # ── Determine which question types the teacher wants ──────────
                 question_types_qs = form.cleaned_data.get('question_types')
                 if question_types_qs:
                     type_names = [qt.name for qt in question_types_qs]
@@ -229,13 +217,13 @@ def generate_questionnaire(request):
                         QuestionType.objects.filter(is_active=True)
                                             .values_list('name', flat=True)
                     )
-
+ 
                 try:
                     num_questions = int(request.POST.get('num_questions', 10))
                     num_questions = max(1, min(num_questions, 30))
                 except (ValueError, TypeError):
                     num_questions = 10
-
+ 
                 extractor = get_extractor()
                 created_questions = extractor.process_questionnaire(
                     questionnaire,
@@ -243,7 +231,7 @@ def generate_questionnaire(request):
                     mode='generate',
                     num_questions=num_questions,
                 )
-
+ 
                 if not created_questions:
                     questionnaire.file.delete(save=False)
                     questionnaire.delete()
@@ -257,13 +245,11 @@ def generate_questionnaire(request):
                         'teacher_dashboard/generate_questionnaire.html',
                         {'form': form},
                     )
-
-                # ── Serialise generated questions to plain dicts ──────────────
+ 
                 session_questions = _questions_to_session(
                     questionnaire.extracted_questions.select_related('question_type').all()
                 )
-
-                # ── Store in session ──────────────────────────────────────────
+ 
                 request.session['pending_questionnaire'] = {
                     'title':       questionnaire.title,
                     'description': questionnaire.description,
@@ -273,32 +259,31 @@ def generate_questionnaire(request):
                 }
                 request.session['pending_questions'] = session_questions
                 request.session.modified = True
-
-                # ── Delete temporary DB records ───────────────────────────────
+ 
                 questionnaire.extracted_questions.all().delete()
                 questionnaire.file.delete(save=False)
                 questionnaire.delete()
-
+ 
                 messages.success(
                     request,
                     f'AI generated {len(session_questions)} question(s)! '
                     f'Review and save the ones you want to your workspace.',
                 )
                 return redirect('questionnaires:review_extracted')
-
+ 
             except Exception as e:
                 try:
                     questionnaire.file.delete(save=False)
                     questionnaire.delete()
                 except Exception:
                     pass
-
+ 
                 ActivityLog.objects.create(
                     activity_type='extraction_failed',
                     user=request.user,
                     description='AI question generation failed — file was not saved.',
                 )
-
+ 
                 messages.error(
                     request,
                     f'AI generation failed: {str(e)}. '
@@ -311,98 +296,121 @@ def generate_questionnaire(request):
                 )
         else:
             messages.error(request, 'Please correct the errors below.')
-
+ 
     else:
         form = QuestionnaireUploadForm(user=request.user)
-
+ 
     return render(
         request,
         'teacher_dashboard/generate_questionnaire.html',
         {'form': form},
     )
-
-
+ 
+ 
 # ============================================================================
-# CANCEL PENDING  —  clears session and redirects back to upload
+# CANCEL PENDING
 # ============================================================================
-
+ 
 @login_required
 def cancel_pending(request):
-    """
-    Called when the teacher clicks 'Cancel & Discard' on the extract-mode
-    review page.  Clears session data so nothing is left behind, then
-    sends the teacher back to the upload page.
-
-    NOTE: generate mode does NOT use this — its workspace button stays
-    pointing to the workspace page as before.
-    """
     _clear_pending_session(request)
     messages.info(request, 'Upload cancelled. No questions were saved.')
     return redirect('questionnaires:upload_questionnaire')
-
-
+ 
+ 
 # ============================================================================
-# REVIEW VIEW  —  session-based (no pk), writes to DB only on Save
+# REVIEW VIEW  —  session-based
 # ============================================================================
-
+ 
 @login_required
 def review_extracted_questions(request):
-    """
-    GET  : render review page from session data (nothing in DB yet).
-    POST : on 'save_selected' — persist Questionnaire + chosen questions to DB,
-           clear session.
-           on 'delete_question' — remove a question from the session list.
-    """
     if request.user.is_staff:
         messages.error(request, 'Admins cannot review extracted questions.')
         return redirect('accounts:admin_dashboard')
-
-    # ── Redirect if no session data (e.g. user navigated here directly) ──────
+ 
     pending_meta = request.session.get('pending_questionnaire')
     pending_qs   = request.session.get('pending_questions', [])
-
+ 
     if not pending_meta:
         messages.error(request, 'No pending questionnaire found. Please upload again.')
         return redirect('questionnaires:upload_questionnaire')
-
+ 
     source = pending_meta.get('source', 'extract')
-
-    # ── Helper: build a fake object the template can iterate ─────────────────
+ 
+    # ── Fake objects the template can iterate ────────────────────────────────
+ 
     class _FakeQuestionType:
         def __init__(self, name):
             self.name = name
             self._display = name.replace('_', ' ').title()
         def get_name_display(self):
             return self._display
-
+ 
     class _FakeQuestion:
         def __init__(self, index, data):
-            self.id            = index          # used as checkbox value
-            self.question_text = data['question_text']
-            self.difficulty    = data['difficulty']
-            self.points        = data['points']
+            self.id             = index
+            self.question_text  = data['question_text']
+            self.difficulty     = data['difficulty']
+            self.points         = data['points']
             self.correct_answer = data['correct_answer']
-            self.explanation   = data.get('explanation', '')
-            self.is_approved   = True
-            self.question_type = _FakeQuestionType(data['question_type'])
-            # options_list matches the template: [('a', text), ...]
-            self.options_list  = [
+            self.explanation    = data.get('explanation', '')
+            self.is_approved    = True
+            self.question_type  = _FakeQuestionType(data['question_type'])
+            self._data          = data           # keep raw dict for matching
+ 
+            # options_list for MC
+            self.options_list = [
                 ('a', data.get('option_a', '')),
                 ('b', data.get('option_b', '')),
                 ('c', data.get('option_c', '')),
                 ('d', data.get('option_d', '')),
             ]
-
+ 
+        # ── FIX: template calls question.get_matching_data ────────────────
+        def get_matching_data(self):
+            """Mirror of ExtractedQuestion.get_matching_data for session fakes."""
+            if self.question_type.name != 'matching':
+                return None
+ 
+            opt_a = self._data.get('option_a', '')
+            opt_b = self._data.get('option_b', '')
+            opt_c = self._data.get('option_c', '')
+ 
+            if not opt_a or not opt_b:
+                return None
+ 
+            try:
+                column_a = _json.loads(opt_a)
+                column_b = _json.loads(opt_b)
+                pairs    = _json.loads(opt_c) if opt_c else []
+ 
+                if not column_a or not column_b:
+                    return None
+ 
+                pairs_by_item = {
+                    p['item']: p['match']
+                    for p in pairs
+                    if isinstance(p, dict) and 'item' in p and 'match' in p
+                }
+ 
+                return {
+                    'column_a':      column_a,
+                    'column_b':      column_b,
+                    'pairs':         pairs,
+                    'pairs_by_item': pairs_by_item,
+                }
+            except (ValueError, TypeError, KeyError):
+                return None
+ 
     class _FakeQuestionnaire:
         def __init__(self, meta):
             self.title       = meta['title']
             self.description = meta.get('description', '')
-
+ 
     # ── POST ──────────────────────────────────────────────────────────────────
     if request.method == 'POST':
         action = request.POST.get('action')
-
-        # ── Delete a single question from the session list ────────────────────
+ 
         if action == 'delete_question':
             idx_str = request.POST.get('question_id')
             try:
@@ -413,12 +421,9 @@ def review_extracted_questions(request):
                 return JsonResponse({'ok': True})
             except (ValueError, IndexError):
                 return JsonResponse({'error': 'Invalid index'}, status=400)
-
-        # ── Save selected questions to DB ─────────────────────────────────────
+ 
         if action == 'save_selected':
-            selected_indices = request.POST.getlist('selected_questions')
-
-            # ── Collect manually-added questions from the form ────────────────
+            selected_indices    = request.POST.getlist('selected_questions')
             manual_uids         = request.POST.getlist('manual_selected_uid[]')
             manual_texts        = request.POST.getlist('manual_question_text[]')
             manual_types        = request.POST.getlist('manual_question_type[]')
@@ -430,7 +435,7 @@ def review_extracted_questions(request):
             manual_opts_b       = request.POST.getlist('manual_option_B[]')
             manual_opts_c       = request.POST.getlist('manual_option_C[]')
             manual_opts_d       = request.POST.getlist('manual_option_D[]')
-
+ 
             type_name_map = {
                 'fill_in_the_blank': 'fill_blank',
                 'multiple_choice':   'multiple_choice',
@@ -440,31 +445,29 @@ def review_extracted_questions(request):
                 'fill_blank':        'fill_blank',
                 'matching':          'matching',
             }
-
-            has_ai      = len(selected_indices) > 0
-            has_manual  = len(manual_uids) > 0
-
+ 
+            has_ai     = len(selected_indices) > 0
+            has_manual = len(manual_uids) > 0
+ 
             if not has_ai and not has_manual:
                 if source == 'generate':
                     return JsonResponse({'success': False, 'error': 'Please select at least one question.'})
                 messages.error(request, 'Please select at least one question.')
-                # Re-render review page (session still intact)
                 fake_questions = [_FakeQuestion(i, q) for i, q in enumerate(pending_qs)]
-                used_types = {q['question_type'] for q in pending_qs}
-                fake_types = [_FakeQuestionType(t) for t in used_types]
+                used_types     = {q['question_type'] for q in pending_qs}
+                fake_types     = [_FakeQuestionType(t) for t in used_types]
                 return render(request, 'teacher_dashboard/review_extracted.html', {
                     'questionnaire':  _FakeQuestionnaire(pending_meta),
                     'questions':      fake_questions,
                     'question_types': fake_types,
                     'source':         source,
                 })
-
-            # ── NOW create the Questionnaire in the DB ────────────────────────
-            teacher  = get_object_or_404(TeacherProfile, user=request.user)
-            subject  = get_object_or_404(Subject, pk=pending_meta['subject_id'])
-
+ 
+            teacher = get_object_or_404(TeacherProfile, user=request.user)
+            subject = get_object_or_404(Subject, pk=pending_meta['subject_id'])
+ 
             final_title = request.POST.get('final_title', '').strip() or pending_meta['title']
-
+ 
             questionnaire = Questionnaire(
                 title             = final_title,
                 description       = pending_meta.get('description', ''),
@@ -474,26 +477,21 @@ def review_extracted_questions(request):
                 uploader          = teacher,
                 extraction_status = 'completed',
                 is_extracted      = True,
-                # file is blank — generate mode never stores a file,
-                # and extract mode cleaned up the temp file already.
                 file_size         = 0,
                 file_type         = 'txt',
             )
-            # file field is required by the model's save() — bypass size/type calc
             questionnaire.file = ''
-            # Use update_fields to skip the save() override that reads file.size
             questionnaire.save()
-
-            # ── Save AI-extracted questions that were selected ─────────────────
+ 
             newly_created_ids = []
-
+ 
             for idx_str in selected_indices:
                 try:
                     idx = int(idx_str)
                     q   = pending_qs[idx]
                 except (ValueError, IndexError):
                     continue
-
+ 
                 resolved_type = type_name_map.get(q['question_type'], q['question_type'])
                 try:
                     q_type_obj = QuestionType.objects.get(name=resolved_type)
@@ -501,7 +499,7 @@ def review_extracted_questions(request):
                     q_type_obj = QuestionType.objects.filter(is_active=True).first()
                     if not q_type_obj:
                         continue
-
+ 
                 new_q = ExtractedQuestion.objects.create(
                     questionnaire  = questionnaire,
                     question_type  = q_type_obj,
@@ -517,10 +515,9 @@ def review_extracted_questions(request):
                     option_d       = q.get('option_d') or None,
                 )
                 newly_created_ids.append(new_q.id)
-
-            # ── Save manually-added questions ─────────────────────────────────
+ 
             manual_created_ids = []
-
+ 
             for i, uid in enumerate(manual_uids):
                 q_text = manual_texts[i].strip()        if i < len(manual_texts)        else ''
                 q_type = manual_types[i].strip()        if i < len(manual_types)        else ''
@@ -528,15 +525,15 @@ def review_extracted_questions(request):
                 q_pts  = manual_points_list[i]          if i < len(manual_points_list)  else '1'
                 q_ans  = manual_answers[i].strip()      if i < len(manual_answers)      else ''
                 q_expl = manual_explanations[i].strip() if i < len(manual_explanations) else ''
-
+ 
                 if not q_text or not q_type:
                     continue
-
+ 
                 try:
                     q_pts = int(q_pts)
                 except (ValueError, TypeError):
                     q_pts = 1
-
+ 
                 resolved_type = type_name_map.get(q_type, q_type)
                 try:
                     q_type_obj = QuestionType.objects.get(name=resolved_type)
@@ -544,7 +541,7 @@ def review_extracted_questions(request):
                     q_type_obj = QuestionType.objects.filter(is_active=True).first()
                     if not q_type_obj:
                         continue
-
+ 
                 new_q = ExtractedQuestion.objects.create(
                     questionnaire  = questionnaire,
                     question_type  = q_type_obj,
@@ -560,11 +557,10 @@ def review_extracted_questions(request):
                     option_d       = manual_opts_d[i] if i < len(manual_opts_d) else None,
                 )
                 manual_created_ids.append(new_q.id)
-
+ 
             all_saved_ids = newly_created_ids + manual_created_ids
             total_saved   = len(all_saved_ids)
-
-            # ── Activity logs ─────────────────────────────────────────────────
+ 
             ActivityLog.objects.create(
                 activity_type='questionnaire_uploaded',
                 user=request.user,
@@ -581,23 +577,20 @@ def review_extracted_questions(request):
                     f'({len(manual_created_ids)} manual) for "{questionnaire.title}"'
                 ),
             )
-
-            # ── Clear session — work is done ──────────────────────────────────
+ 
             _clear_pending_session(request)
-
-            # ── GENERATE MODE: also save to workspace folder ──────────────────
+ 
             if source == 'generate':
                 folder_id = request.POST.get('workspace_folder_id', '').strip()
-
+ 
                 if not folder_id:
-                    # Still saved to DB — just no folder attached yet
                     return JsonResponse({'success': False, 'error': 'No workspace folder selected.'})
-
+ 
                 try:
                     folder = WorkspaceFolder.objects.get(pk=folder_id, teacher=teacher)
                 except WorkspaceFolder.DoesNotExist:
                     return JsonResponse({'success': False, 'error': 'Workspace folder not found.'})
-
+ 
                 added   = 0
                 already = 0
                 for qid in all_saved_ids:
@@ -612,7 +605,7 @@ def review_extracted_questions(request):
                         added += 1
                     else:
                         already += 1
-
+ 
                 ActivityLog.objects.create(
                     activity_type='questions_approved',
                     user=request.user,
@@ -621,7 +614,7 @@ def review_extracted_questions(request):
                         f'"{folder.name}" from "{questionnaire.title}"'
                     ),
                 )
-
+ 
                 return JsonResponse({
                     'success':     True,
                     'added':       added,
@@ -629,26 +622,26 @@ def review_extracted_questions(request):
                     'folder_name': folder.name,
                     'total_saved': total_saved,
                 })
-
+ 
             # ── EXTRACT MODE: download or redirect ────────────────────────────
             download_format = request.POST.get('download_format', 'none')
             if download_format != 'none':
                 from django.urls import reverse
                 download_url = reverse('questionnaires:download_questionnaire', args=[questionnaire.pk])
                 return redirect(f"{download_url}?type=generated&format={download_format}")
-
+ 
             messages.success(request, f'Saved {total_saved} question(s) successfully!')
             return redirect('questionnaires:my_uploads')
-
-    # ── GET  ──────────────────────────────────────────────────────────────────
+ 
+    # ── GET ───────────────────────────────────────────────────────────────────
     fake_questions = [_FakeQuestion(i, q) for i, q in enumerate(pending_qs)]
     used_types     = {q['question_type'] for q in pending_qs}
-
+ 
     class _FakeQuestionTypeWithCount(_FakeQuestionType):
         pass
-
+ 
     fake_types = [_FakeQuestionTypeWithCount(t) for t in used_types]
-
+ 
     context = {
         'questionnaire':  _FakeQuestionnaire(pending_meta),
         'questions':      fake_questions,
@@ -657,69 +650,69 @@ def review_extracted_questions(request):
         'source':         source,
     }
     return render(request, 'teacher_dashboard/review_extracted.html', context)
-
-
+ 
+ 
 # ============================================================================
-# RETRY EXTRACTION  (unchanged — only relevant after a questionnaire is saved)
+# RETRY EXTRACTION
 # ============================================================================
-
+ 
 @login_required
 def retry_extraction(request, pk):
     questionnaire = get_object_or_404(Questionnaire, pk=pk)
-
+ 
     if request.user.is_staff:
         can_retry = True
     elif hasattr(request.user, 'teacher_profile'):
         can_retry = questionnaire.uploader == request.user.teacher_profile
     else:
         can_retry = False
-
+ 
     if not can_retry:
         messages.error(request, 'You do not have permission to retry extraction.')
         return redirect('questionnaires:browse_questionnaires')
-
+ 
     if request.method == 'POST':
         question_type_ids = request.POST.getlist('question_types')
-
+ 
         if not question_type_ids:
             messages.error(request, 'Please select at least one question type.')
             return redirect('questionnaires:retry_extraction', pk=pk)
-
+ 
         try:
             questionnaire.extracted_questions.all().delete()
             questionnaire.extraction_status = 'processing'
             questionnaire.save()
-
+ 
             question_types = QuestionType.objects.filter(id__in=question_type_ids)
             type_names = [qt.name for qt in question_types]
-
+ 
             extractor = get_extractor()
             created_questions = extractor.process_questionnaire(questionnaire, type_names)
-
+ 
             questionnaire.extraction_status = 'completed'
             questionnaire.is_extracted = True
             questionnaire.extraction_error = None
             questionnaire.save()
-
+ 
             ActivityLog.objects.create(
                 activity_type='questions_extracted',
                 user=request.user,
                 description=f'Re-extracted {len(created_questions)} questions from "{questionnaire.title}"'
             )
-
+ 
             messages.success(request, f'Successfully extracted {len(created_questions)} questions!')
             return redirect('questionnaires:review_extracted_pk', pk=questionnaire.pk)
-
+ 
         except Exception as e:
             questionnaire.extraction_status = 'failed'
             questionnaire.extraction_error = str(e)
             questionnaire.save()
-
+ 
             messages.error(request, f'Extraction failed: {str(e)}')
             return redirect('questionnaires:retry_extraction', pk=pk)
-
+ 
     question_types = QuestionType.objects.filter(is_active=True)
-
+ 
     return render(request, 'teacher_dashboard/retry_extraction.html', {
         'questionnaire': questionnaire,
         'question_types': question_types,
@@ -732,30 +725,26 @@ def retry_extraction(request, pk):
 
 @login_required
 def review_extracted_questions_pk(request, pk):
-    """
-    Legacy review view used only by retry_extraction (already saved to DB).
-    The main upload/generate flow now uses review_extracted_questions (session-based).
-    """
     questionnaire = get_object_or_404(Questionnaire, pk=pk)
-
+ 
     if request.user.is_staff:
         can_view = True
     elif hasattr(request.user, 'teacher_profile'):
         can_view = questionnaire.uploader == request.user.teacher_profile
     else:
         can_view = False
-
+ 
     if not can_view:
         messages.error(request, 'You do not have permission to view this.')
         return redirect('questionnaires:browse_questionnaires')
-
+ 
     extracted_questions = questionnaire.extracted_questions.select_related('question_type').all()
     source = request.GET.get('source', request.POST.get('source', 'extract'))
-
+ 
     if request.method == 'POST':
         action = request.POST.get('action')
         source = request.POST.get('source', 'extract')
-
+ 
         if action == 'save_selected':
             selected_ids        = request.POST.getlist('selected_questions')
             manual_uids         = request.POST.getlist('manual_selected_uid[]')
@@ -769,7 +758,7 @@ def review_extracted_questions_pk(request, pk):
             manual_opts_b       = request.POST.getlist('manual_option_B[]')
             manual_opts_c       = request.POST.getlist('manual_option_C[]')
             manual_opts_d       = request.POST.getlist('manual_option_D[]')
-
+ 
             type_name_map = {
                 'fill_in_the_blank': 'fill_blank',
                 'multiple_choice':   'multiple_choice',
@@ -779,7 +768,7 @@ def review_extracted_questions_pk(request, pk):
                 'fill_blank':        'fill_blank',
                 'matching':          'matching',
             }
-
+ 
             newly_created_ids = []
             for i, uid in enumerate(manual_uids):
                 q_text = manual_texts[i].strip()        if i < len(manual_texts)        else ''
@@ -812,40 +801,40 @@ def review_extracted_questions_pk(request, pk):
                     option_d=manual_opts_d[i] if i < len(manual_opts_d) else None,
                 )
                 newly_created_ids.append(new_q.id)
-
+ 
             all_approved_ids = list(selected_ids) + [str(i) for i in newly_created_ids]
             if not all_approved_ids:
                 messages.error(request, 'Please select at least one question.')
                 return redirect('questionnaires:review_extracted_pk', pk=pk)
-
+ 
             extracted_questions.filter(id__in=selected_ids).update(is_approved=True)
             extracted_questions.exclude(id__in=all_approved_ids).update(is_approved=False)
-
+ 
             final_title = request.POST.get('final_title', '').strip()
             if final_title:
                 questionnaire.title = final_title
                 questionnaire.save()
-
+ 
             total_saved = len(all_approved_ids)
             ActivityLog.objects.create(
                 activity_type='questions_approved', user=request.user,
                 description=f'Saved {total_saved} question(s) for "{questionnaire.title}"'
             )
-
+ 
             download_format = request.POST.get('download_format', 'none')
             if download_format != 'none':
                 from django.urls import reverse
                 download_url = reverse('questionnaires:download_questionnaire', args=[questionnaire.pk])
                 return redirect(f"{download_url}?type=generated&format={download_format}")
-
+ 
             messages.success(request, f'Saved {total_saved} question(s) successfully!')
             return redirect('questionnaires:my_uploads')
-
+ 
         elif action == 'delete_question':
             question_id = request.POST.get('question_id')
             ExtractedQuestion.objects.filter(id=question_id, questionnaire=questionnaire).delete()
             return JsonResponse({'ok': True})
-
+ 
     question_types = QuestionType.objects.filter(
         id__in=extracted_questions.values_list('question_type', flat=True).distinct()
     )
@@ -859,24 +848,21 @@ def review_extracted_questions_pk(request, pk):
     return render(request, 'teacher_dashboard/review_extracted.html', context)
 
 
-# ============================================================================
-# REST OF VIEWS  (unchanged)
-# ============================================================================
-
 @login_required
 def my_uploads(request):
     if request.user.is_staff:
         return redirect('accounts:admin_dashboard')
-
+ 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
-
+ 
+    # FIX: removed .exclude(file='') — session-saved questionnaires have file=''
+    # and were therefore invisible in My Uploads.
     questionnaires = (
         Questionnaire.objects
         .filter(uploader=teacher)
-        .exclude(file='')
         .select_related('department', 'subject')
     )
-
+ 
     search_query = request.GET.get('search', '')
     if search_query:
         questionnaires = questionnaires.filter(
@@ -884,11 +870,11 @@ def my_uploads(request):
             Q(description__icontains=search_query) |
             Q(subject__name__icontains=search_query)
         )
-
+ 
     paginator   = Paginator(questionnaires, 10)
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)
-
+ 
     return render(request, 'teacher_dashboard/my_uploads.html', {
         'page_obj':     page_obj,
         'search_query': search_query,
