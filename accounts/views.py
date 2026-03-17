@@ -19,6 +19,8 @@ from .forms import (
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db import OperationalError
+from django.core.mail import send_mail
+from django.conf import settings
 
 import logging
 logger = logging.getLogger(__name__)
@@ -67,6 +69,152 @@ def log_activity(activity_type, description, user=None, metadata=None):
         description=description,
         metadata=metadata or {}
     )
+
+
+# ============================================================================
+# EMAIL HELPER
+# Centralised so both superadmin and sub-admin views can call it.
+# ============================================================================
+
+def send_teacher_invite_email(teacher, plain_password):
+    """
+    Sends a welcome / credentials email to a newly created teacher.
+    `plain_password` is the raw password string (before hashing) captured
+    at creation time — it is never stored, only sent once here.
+    """
+    full_name  = teacher.user.get_full_name()
+    username   = teacher.user.username
+    email      = teacher.user.email
+    site_url   = getattr(settings, 'SITE_URL', 'http://localhost:2000')
+    login_url  = f"{site_url}/accounts/login/"
+
+    subject = "Your Teacher Account Has Been Created"
+
+    message = f"""Hello {full_name},
+
+An account has been created for you on our system.
+
+Your login credentials
+──────────────────────
+Username : {username}
+Password : {plain_password}
+
+Please log in and change your password as soon as possible.
+
+Login here: {login_url}
+
+If you did not expect this email, please contact your administrator immediately.
+
+— System Administration
+"""
+
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+        )
+        return True
+    except Exception as e:
+        print(f"EMAIL ERROR: {e}")  # ← add this temporarily
+        logger.error(f"Failed to send invite email to {email}: {e}")
+        return False
+    
+    
+
+
+def send_credentials_updated_email(user, new_username=None, new_password=None):
+    """
+    Notifies a teacher that their login credentials were changed by an admin.
+    Only mentions the fields that actually changed.
+    """
+    site_url  = getattr(settings, 'SITE_URL', 'http://localhost:2000')
+    login_url = f"{site_url}/accounts/login/"
+    changes   = []
+
+    if new_username:
+        changes.append(f"  New username : {new_username}")
+    if new_password:
+        changes.append(f"  New password : {new_password}")
+
+    if not changes:
+        return  # Nothing credential-related changed — no email needed
+
+    message = f"""Hello {user.get_full_name()},
+
+An administrator has updated your login credentials.
+
+Updated details
+───────────────
+{chr(10).join(changes)}
+
+Please log in with your new credentials as soon as possible.
+
+Login here: {login_url}
+
+If you did not authorise this change, contact your administrator immediately.
+
+— System Administration
+"""
+
+    try:
+        send_mail(
+            subject="Your Login Credentials Have Been Updated",
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=True,  # Don't break the save if email fails
+        )
+    except Exception as e:
+        logger.error(f"Failed to send credential-update email to {user.email}: {e}")
+        
+def send_subadmin_invite_email(subadmin, plain_password):
+    """
+    Sends a welcome / credentials email to a newly created sub-admin.
+    """
+    full_name  = subadmin.user.get_full_name()
+    username   = subadmin.user.username
+    email      = subadmin.user.email
+    department = subadmin.department.name
+    site_url   = getattr(settings, 'SITE_URL', 'http://localhost:2000')
+    login_url  = f"{site_url}/accounts/login/"
+
+    subject = "Your Sub-Admin Account Has Been Created"
+
+    message = f"""Hello {full_name},
+
+A sub-admin account has been created for you on our system.
+
+Department  : {department}
+
+Your login credentials
+──────────────────────
+Username : {username}
+Password : {plain_password}
+
+Please log in and change your password as soon as possible.
+
+Login here: {login_url}
+
+If you did not expect this email, please contact your administrator immediately.
+
+— System Administration
+"""
+
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send sub-admin invite email to {email}: {e}")
+        return False
 
 
 # ============================================================================
@@ -132,11 +280,11 @@ def admin_dashboard(request):
     from questionnaires.models import Questionnaire, Download
     import json
 
-    total_teachers = TeacherProfile.objects.count()
+    total_teachers  = TeacherProfile.objects.count()
     active_teachers = TeacherProfile.objects.filter(is_active=True).count()
     total_departments = Department.objects.count()
-    total_subjects = Subject.objects.count()
-    total_subadmins = SubAdminProfile.objects.filter(is_active=True).count()  # NEW
+    total_subjects  = Subject.objects.count()
+    total_subadmins = SubAdminProfile.objects.filter(is_active=True).count()
 
     selected_department = request.GET.get('department', 'all')
 
@@ -144,31 +292,30 @@ def admin_dashboard(request):
     if selected_department != 'all':
         questionnaires_qs = questionnaires_qs.filter(department_id=selected_department)
 
-    total_uploads = questionnaires_qs.count()
+    total_uploads   = questionnaires_qs.count()
     total_downloads = Download.objects.filter(
         questionnaire__in=questionnaires_qs
     ).count() if selected_department != 'all' else Download.objects.count()
     total_questionnaires = questionnaires_qs.count()
 
-    departments = Department.objects.all().order_by('name')
-
+    departments     = Department.objects.all().order_by('name')
     department_stats = []
-    max_downloads = 1
+    max_downloads   = 1
 
     for dept in departments:
         dept_questionnaires = Questionnaire.objects.filter(department=dept)
-        upload_count = dept_questionnaires.count()
+        upload_count   = dept_questionnaires.count()
         download_count = Download.objects.filter(questionnaire__in=dept_questionnaires).count()
 
         if download_count > max_downloads:
             max_downloads = download_count
 
         department_stats.append({
-            'department_name': dept.name,
+            'department_name':    dept.name,
             'questionnaire_count': upload_count,
-            'upload_count': upload_count,
-            'download_count': download_count,
-            'popularity_percent': 0
+            'upload_count':       upload_count,
+            'download_count':     download_count,
+            'popularity_percent': 0,
         })
 
     for stat in department_stats:
@@ -177,29 +324,29 @@ def admin_dashboard(request):
 
     department_stats.sort(key=lambda x: x['questionnaire_count'], reverse=True)
 
-    activity_chart_data = get_activity_chart_data(selected_department)
+    activity_chart_data   = get_activity_chart_data(selected_department)
     department_chart_data = get_department_chart_data()
 
     context = {
-        'total_teachers': total_teachers,
-        'active_teachers': active_teachers,
-        'total_departments': total_departments,
-        'total_subjects': total_subjects,
-        'total_subadmins': total_subadmins,
-        'total_uploads': total_uploads,
-        'total_downloads': total_downloads,
+        'total_teachers':       total_teachers,
+        'active_teachers':      active_teachers,
+        'total_departments':    total_departments,
+        'total_subjects':       total_subjects,
+        'total_subadmins':      total_subadmins,
+        'total_uploads':        total_uploads,
+        'total_downloads':      total_downloads,
         'total_questionnaires': total_questionnaires,
-        'departments': departments,
-        'department_stats': department_stats,
-        'activity_chart_data': json.dumps(activity_chart_data),
+        'departments':          departments,
+        'department_stats':     department_stats,
+        'activity_chart_data':  json.dumps(activity_chart_data),
         'department_chart_data': json.dumps(department_chart_data),
-        'selected_department': selected_department,
+        'selected_department':  selected_department,
     }
     return render(request, 'admin_dashboard/dashboard.html', context)
 
 
 # ============================================================================
-# SUPERADMIN — TEACHER MANAGEMENT (unchanged, scoped to all departments)
+# SUPERADMIN — TEACHER MANAGEMENT
 # ============================================================================
 
 @login_required
@@ -215,20 +362,16 @@ def manage_teachers(request):
             Q(employee_id__icontains=search_query)
         )
 
-    # Pass all departments so the edit-modal dropdown can populate them
     departments = Department.objects.all().order_by('name')
-
-    # Pass form so add-modal can redisplay validation errors on POST redirect
     form = TeacherCreationForm()
 
     context = {
-        'teachers': teachers,
+        'teachers':     teachers,
         'search_query': search_query,
-        'departments': departments,
-        'form': form,
+        'departments':  departments,
+        'form':         form,
     }
     return render(request, 'admin_dashboard/manage_teachers.html', context)
-
 
 
 @login_required
@@ -237,43 +380,146 @@ def add_teacher(request):
     if request.method == 'POST':
         form = TeacherCreationForm(request.POST)
         if form.is_valid():
+            plain_password = form.cleaned_data['password']
+
+            # Test email BEFORE saving the account
+            test_email = form.cleaned_data['email']
+            try:
+                from django.core.mail import get_connection
+                connection = get_connection()
+                connection.open()
+                connection.close()
+            except Exception as e:
+                logger.error(f"Email connection failed: {e}")
+                messages.error(
+                    request,
+                    "Cannot add teacher: the email server is unreachable or credentials are invalid. "
+                    "Please check your email settings before adding a teacher."
+                )
+                teachers    = TeacherProfile.objects.select_related('user', 'department').all()
+                departments = Department.objects.all().order_by('name')
+                return render(request, 'admin_dashboard/manage_teachers.html', {
+                    'teachers':     teachers,
+                    'search_query': '',
+                    'departments':  departments,
+                    'form':         form,
+                })
+
+            # Only save if email connection works
             teacher = form.save()
+
             ActivityLog.objects.create(
                 activity_type='teacher_created',
                 user=request.user,
                 description=f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) was created"
             )
-            messages.success(request, 'Teacher added successfully')
+
+            email_sent = send_teacher_invite_email(teacher, plain_password)
+
+            if not email_sent:
+                # Rollback — delete the teacher and user that were just created
+                user = teacher.user
+                teacher.delete()
+                user.delete()
+                messages.error(
+                    request,
+                    f"Teacher was NOT added. The welcome email to {test_email} could not be sent. "
+                    f"Please verify your email server settings."
+                )
+                teachers    = TeacherProfile.objects.select_related('user', 'department').all()
+                departments = Department.objects.all().order_by('name')
+                return render(request, 'admin_dashboard/manage_teachers.html', {
+                    'teachers':     teachers,
+                    'search_query': '',
+                    'departments':  departments,
+                    'form':         form,
+                })
+
+            messages.success(
+                request,
+                f"Teacher added successfully. A welcome email with login credentials "
+                f"has been sent to {teacher.user.email}."
+            )
             return redirect('accounts:manage_teachers')
-    else:
-        form = TeacherCreationForm()
-    return render(request, 'admin_dashboard/add_teacher.html', {'form': form})
+        else:
+            teachers    = TeacherProfile.objects.select_related('user', 'department').all()
+            departments = Department.objects.all().order_by('name')
+            return render(request, 'admin_dashboard/manage_teachers.html', {
+                'teachers':     teachers,
+                'search_query': '',
+                'departments':  departments,
+                'form':         form,
+            })
+
+    return redirect('accounts:manage_teachers')
 
 
 @login_required
 @user_passes_test(is_admin)
 def edit_teacher(request, pk):
+    """
+    Updates teacher profile AND optionally updates username / password.
+    Sends a notification email if login credentials were changed.
+    """
     teacher = get_object_or_404(TeacherProfile, pk=pk)
 
     if request.method == 'POST':
         form = TeacherEditForm(request.POST, instance=teacher)
         if form.is_valid():
+            # ── Detect credential changes before saving ───────────────────
+            old_username = teacher.user.username
+            new_username = form.cleaned_data['username']
+            plain_new_password = form.cleaned_data.get('new_password', '').strip()
+
+            username_changed = new_username != old_username
+            password_changed = bool(plain_new_password)
+
+            # ── Save profile fields ───────────────────────────────────────
             teacher = form.save()
+
+            # ── Save User fields ──────────────────────────────────────────
             teacher.user.first_name = form.cleaned_data['first_name']
-            teacher.user.last_name = form.cleaned_data['last_name']
-            teacher.user.email = form.cleaned_data['email']
+            teacher.user.last_name  = form.cleaned_data['last_name']
+            teacher.user.email      = form.cleaned_data['email']
+            teacher.user.username   = new_username
+
+            if password_changed:
+                teacher.user.set_password(plain_new_password)
+
             teacher.user.save()
+
+            # ── Notify teacher of credential changes ──────────────────────
+            send_credentials_updated_email(
+                user         = teacher.user,
+                new_username = new_username if username_changed else None,
+                new_password = plain_new_password if password_changed else None,
+            )
 
             ActivityLog.objects.create(
                 activity_type='teacher_updated',
                 user=request.user,
-                description=f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) profile was updated"
+                description=(
+                    f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) "
+                    f"profile was updated"
+                    + (" [username changed]" if username_changed else "")
+                    + (" [password changed]" if password_changed else "")
+                )
             )
-            messages.success(request, 'Teacher updated successfully')
+            messages.success(request, 'Teacher updated successfully.')
             return redirect('accounts:manage_teachers')
+
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+            return render(request, 'admin_dashboard/edit_teacher.html', {
+                'form': form, 'teacher': teacher
+            })
+
     else:
         form = TeacherEditForm(instance=teacher)
-    return render(request, 'admin_dashboard/edit_teacher.html', {'form': form, 'teacher': teacher})
+
+    return render(request, 'admin_dashboard/edit_teacher.html', {
+        'form': form, 'teacher': teacher
+    })
 
 
 @login_required
@@ -400,17 +646,16 @@ def delete_department(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def manage_subjects(request):
-    subjects = Subject.objects.prefetch_related('departments').all()
+    subjects        = Subject.objects.prefetch_related('departments').all()
     all_departments = Department.objects.all().order_by('name')
-    form = SubjectForm()  # blank form — errors passed back on add POST redirect
+    form            = SubjectForm()
 
     context = {
-        'subjects': subjects,
-        'all_departments': all_departments,
-        'form': form,
+        'subjects':         subjects,
+        'all_departments':  all_departments,
+        'form':             form,
     }
     return render(request, 'admin_dashboard/manage_subjects.html', context)
-
 
 
 @login_required
@@ -437,7 +682,7 @@ def add_subject(request):
 @login_required
 @user_passes_test(is_admin)
 def edit_subject(request, pk):
-    subject = get_object_or_404(Subject, pk=pk)
+    subject  = get_object_or_404(Subject, pk=pk)
     old_name = subject.name
     old_code = subject.code
 
@@ -482,24 +727,20 @@ def delete_subject(request, pk):
 
 
 # ============================================================================
-# SUPERADMIN — SUB-ADMIN MANAGEMENT  (NEW)
+# SUPERADMIN — SUB-ADMIN MANAGEMENT
 # ============================================================================
 
 @login_required
 @user_passes_test(is_admin)
 def manage_subadmins(request):
-    subadmins = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
-
-    # All departments for the edit modal dropdown (unrestricted)
+    subadmins       = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
     all_departments = Department.objects.all().order_by('name')
-
-    # Blank form for the add modal (errors re-rendered on POST redirect)
-    form = SubAdminCreationForm()
+    form            = SubAdminCreationForm()
 
     context = {
-        'subadmins': subadmins,
-        'all_departments': all_departments,
-        'form': form,
+        'subadmins':        subadmins,
+        'all_departments':  all_departments,
+        'form':             form,
     }
     return render(request, 'admin_dashboard/manage_subadmins.html', context)
 
@@ -510,30 +751,82 @@ def add_subadmin(request):
     if request.method == 'POST':
         form = SubAdminCreationForm(request.POST)
         if form.is_valid():
-            # --- your existing save logic here (unchanged) ---
-            user = User.objects.create_user(
-                username=form.cleaned_data['username'],
-                password=form.cleaned_data['password'],
-                email=form.cleaned_data['email'],
-                first_name=form.cleaned_data['first_name'],
-                last_name=form.cleaned_data['last_name'],
+            plain_password = form.cleaned_data['password']
+            test_email = form.cleaned_data['email']
+
+            # ── Test email connection BEFORE creating anything ────────────
+            try:
+                from django.core.mail import get_connection
+                connection = get_connection()
+                connection.open()
+                connection.close()
+                logger.info(f"Email connection test successful for {test_email}")
+            except Exception as e:
+                logger.error(f"Email connection failed: {e}")
+                messages.error(
+                    request,
+                    "Cannot add sub-admin: the email server is unreachable or credentials are invalid. "
+                    "Please check your email settings before adding a sub-admin."
+                )
+                subadmins = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
+                all_departments = Department.objects.all().order_by('name')
+                return render(request, 'admin_dashboard/manage_subadmins.html', {
+                    'subadmins': subadmins,
+                    'all_departments': all_departments,
+                    'form': form,
+                })
+
+            # ── Email connection OK — create the account ──────────────────
+            subadmin = form.save(assigned_by=request.user)
+
+            ActivityLog.objects.create(
+                activity_type='subadmin_created',
+                user=request.user,
+                description=(
+                    f"Sub-Admin {subadmin.user.get_full_name()} was created "
+                    f"for department {subadmin.department.name}"
+                )
             )
-            SubAdminProfile.objects.create(
-                user=user,
-                department=form.cleaned_data['department'],
-                assigned_by=request.user,
+
+            # ── Send welcome email ────────────────────────────────────────
+            email_sent = send_subadmin_invite_email(subadmin, plain_password)
+
+            if not email_sent:
+                # Rollback — delete the subadmin and user that were just created
+                user = subadmin.user
+                subadmin.delete()
+                user.delete()
+                
+                messages.error(
+                    request,
+                    f"Sub-Admin was NOT added. The welcome email to {test_email} could not be sent. "
+                    f"Please verify your email server settings."
+                )
+                
+                subadmins = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
+                all_departments = Department.objects.all().order_by('name')
+                return render(request, 'admin_dashboard/manage_subadmins.html', {
+                    'subadmins': subadmins,
+                    'all_departments': all_departments,
+                    'form': form,
+                })
+
+            messages.success(
+                request,
+                f"Sub-Admin added successfully. A welcome email with login credentials "
+                f"has been sent to {subadmin.user.email}."
             )
-            messages.success(request, 'Sub-admin created successfully.')
             return redirect('accounts:manage_subadmins')
+
         else:
-            # ✅ FIX: render manage_subadmins.html with the errored form
             subadmins = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
             all_departments = Department.objects.all().order_by('name')
             return render(request, 'admin_dashboard/manage_subadmins.html', {
                 'subadmins': subadmins,
                 'all_departments': all_departments,
-                'form': form,   # the template checks `form.errors` to auto-open the add modal
+                'form': form,
             })
+
     return redirect('accounts:manage_subadmins')
 
 
@@ -549,7 +842,6 @@ def edit_subadmin(request, pk):
         dept_pk    = request.POST.get('department', '').strip()
         is_active  = request.POST.get('is_active') == 'on'
 
-        # ── Validation ───────────────────────────────────────────────────────
         errors = []
 
         if not first_name:
@@ -563,8 +855,8 @@ def edit_subadmin(request, pk):
         if not dept_pk:
             errors.append('Please select a department.')
 
-        # Check email uniqueness (exclude current user)
-        if email and User.objects.filter(email=email).exclude(pk=subadmin.user.pk).exists():
+        from django.contrib.auth.models import User as _User
+        if email and _User.objects.filter(email=email).exclude(pk=subadmin.user.pk).exists():
             errors.append('That email address is already in use by another account.')
 
         if errors:
@@ -572,7 +864,6 @@ def edit_subadmin(request, pk):
                 messages.error(request, error)
             return redirect('accounts:manage_subadmins')
 
-        # ── Save ─────────────────────────────────────────────────────────────
         user = subadmin.user
         user.first_name = first_name
         user.last_name  = last_name
@@ -598,54 +889,45 @@ def edit_subadmin(request, pk):
 def delete_subadmin(request, pk):
     subadmin = get_object_or_404(SubAdminProfile, pk=pk)
     if request.method == 'POST':
-        subadmin.user.delete()   # cascades to SubAdminProfile
+        subadmin.user.delete()
         messages.success(request, 'Sub-admin removed successfully.')
     return redirect('accounts:manage_subadmins')
 
 
 # ============================================================================
-# SUB-ADMIN DASHBOARD  (NEW)
+# SUB-ADMIN DASHBOARD
 # ============================================================================
 
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_dashboard(request):
-    """
-    Sub-admin's home page. Shows only their department's data.
-    """
-    subadmin = request.user.subadmin_profile
+    subadmin   = request.user.subadmin_profile
     department = subadmin.department
 
-    # Teachers in this department only
-    total_teachers = TeacherProfile.objects.filter(department=department).count()
+    total_teachers  = TeacherProfile.objects.filter(department=department).count()
     active_teachers = TeacherProfile.objects.filter(department=department, is_active=True).count()
 
-    # Recent activities — only teacher actions performed by this sub-admin
     recent_activities = ActivityLog.objects.filter(
         user=request.user
-    ).exclude(
-        activity_type='user_login'
-    ).order_by('-created_at')[:15]
+    ).exclude(activity_type='user_login').order_by('-created_at')[:15]
 
     context = {
-        'subadmin': subadmin,
-        'department': department,
-        'total_teachers': total_teachers,
-        'active_teachers': active_teachers,
+        'subadmin':         subadmin,
+        'department':       department,
+        'total_teachers':   total_teachers,
+        'active_teachers':  active_teachers,
         'recent_activities': recent_activities,
     }
     return render(request, 'subadmin_dashboard/dashboard.html', context)
 
 
 # ============================================================================
-# SUB-ADMIN — TEACHER MANAGEMENT  (NEW)
-# All views are scoped to the sub-admin's department only.
+# SUB-ADMIN — TEACHER MANAGEMENT
 # ============================================================================
 
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_manage_teachers(request):
-    """List teachers in the sub-admin's department only."""
     department = request.user.subadmin_profile.department
 
     teachers = TeacherProfile.objects.select_related('user', 'department').filter(
@@ -661,9 +943,9 @@ def subadmin_manage_teachers(request):
         )
 
     context = {
-        'teachers': teachers,
+        'teachers':     teachers,
         'search_query': search_query,
-        'department': department,
+        'department':   department,
     }
     return render(request, 'subadmin_dashboard/manage_teachers.html', context)
 
@@ -671,13 +953,38 @@ def subadmin_manage_teachers(request):
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_add_teacher(request):
-    """Sub-admin adds a teacher — department is automatically their own."""
+    """Sub-admin adds a teacher — blocks creation if email server is unreachable."""
     department = request.user.subadmin_profile.department
 
     if request.method == 'POST':
         form = SubAdminTeacherCreationForm(request.POST, department=department)
         if form.is_valid():
+            plain_password = form.cleaned_data['password']
+            test_email     = form.cleaned_data['email']
+
+            # ── Test email connection BEFORE creating anything ────────────
+            try:
+                from django.core.mail import get_connection
+                connection = get_connection()
+                connection.open()
+                connection.close()
+                logger.info(f"Email connection test successful for {test_email}")
+            except Exception as e:
+                logger.error(f"Email connection failed: {e}")
+                messages.error(
+                    request,
+                    "Cannot add teacher: the email server is unreachable or credentials are invalid. "
+                    "Please check your email settings before adding a teacher."
+                )
+                # Re-render the form with the submitted data
+                return render(request, 'subadmin_dashboard/add_teacher.html', {
+                    'form': form, 
+                    'department': department
+                })
+
+            # ── Email connection OK — create the teacher ──────────────────
             teacher = form.save()
+
             ActivityLog.objects.create(
                 activity_type='teacher_created',
                 user=request.user,
@@ -686,37 +993,84 @@ def subadmin_add_teacher(request):
                     f"was added to {department.name} by Sub-Admin {request.user.get_full_name()}"
                 )
             )
-            messages.success(request, 'Teacher added successfully.')
+
+            # ── Send welcome email ────────────────────────────────────────
+            email_sent = send_teacher_invite_email(teacher, plain_password)
+
+            if email_sent:
+                messages.success(
+                    request,
+                    f"Teacher added successfully. A welcome email has been sent to {teacher.user.email}."
+                )
+            else:
+                # Rollback if email fails - delete the created teacher
+                user = teacher.user
+                teacher.delete()
+                user.delete()
+                
+                messages.error(
+                    request,
+                    f"Teacher was NOT added. The welcome email to {test_email} could not be sent. "
+                    f"Please verify your email server settings."
+                )
+                
+                # Re-render the form with the submitted data
+                return render(request, 'subadmin_dashboard/add_teacher.html', {
+                    'form': form,
+                    'department': department
+                })
+
             return redirect('accounts:subadmin_manage_teachers')
+
         else:
             messages.error(request, 'Please correct the errors in the form.')
+            return render(request, 'subadmin_dashboard/add_teacher.html', {
+                'form': form, 
+                'department': department
+            })
+
     else:
         form = SubAdminTeacherCreationForm(department=department)
 
-    context = {
-        'form': form,
-        'department': department,
-    }
-    return render(request, 'subadmin_dashboard/add_teacher.html', context)
+    return render(request, 'subadmin_dashboard/add_teacher.html', {
+        'form': form, 'department': department
+    })
 
 
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_edit_teacher(request, pk):
-    """Sub-admin edits a teacher — only if the teacher belongs to their department."""
+    """Sub-admin edits a teacher — supports credential updates with email notification."""
     department = request.user.subadmin_profile.department
-
-    # 404 if the teacher doesn't belong to this sub-admin's department
-    teacher = get_object_or_404(TeacherProfile, pk=pk, department=department)
+    teacher    = get_object_or_404(TeacherProfile, pk=pk, department=department)
 
     if request.method == 'POST':
         form = SubAdminTeacherEditForm(request.POST, instance=teacher)
         if form.is_valid():
+            old_username       = teacher.user.username
+            new_username       = form.cleaned_data['username']
+            plain_new_password = form.cleaned_data.get('new_password', '').strip()
+
+            username_changed = new_username != old_username
+            password_changed = bool(plain_new_password)
+
             teacher = form.save()
+
             teacher.user.first_name = form.cleaned_data['first_name']
-            teacher.user.last_name = form.cleaned_data['last_name']
-            teacher.user.email = form.cleaned_data['email']
+            teacher.user.last_name  = form.cleaned_data['last_name']
+            teacher.user.email      = form.cleaned_data['email']
+            teacher.user.username   = new_username
+
+            if password_changed:
+                teacher.user.set_password(plain_new_password)
+
             teacher.user.save()
+
+            send_credentials_updated_email(
+                user         = teacher.user,
+                new_username = new_username if username_changed else None,
+                new_password = plain_new_password if password_changed else None,
+            )
 
             ActivityLog.objects.create(
                 activity_type='teacher_updated',
@@ -724,6 +1078,8 @@ def subadmin_edit_teacher(request, pk):
                 description=(
                     f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) "
                     f"was updated by Sub-Admin {request.user.get_full_name()}"
+                    + (" [username changed]" if username_changed else "")
+                    + (" [password changed]" if password_changed else "")
                 )
             )
             messages.success(request, 'Teacher updated successfully.')
@@ -733,22 +1089,16 @@ def subadmin_edit_teacher(request, pk):
     else:
         form = SubAdminTeacherEditForm(instance=teacher)
 
-    context = {
-        'form': form,
-        'teacher': teacher,
-        'department': department,
-    }
-    return render(request, 'subadmin_dashboard/edit_teacher.html', context)
+    return render(request, 'subadmin_dashboard/edit_teacher.html', {
+        'form': form, 'teacher': teacher, 'department': department
+    })
 
 
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_delete_teacher(request, pk):
-    """Sub-admin deletes a teacher — only if the teacher belongs to their department."""
     department = request.user.subadmin_profile.department
-
-    # 404 if the teacher doesn't belong to this sub-admin's department
-    teacher = get_object_or_404(TeacherProfile, pk=pk, department=department)
+    teacher    = get_object_or_404(TeacherProfile, pk=pk, department=department)
 
     if request.method == 'POST':
         teacher_name = f"{teacher.user.get_full_name()} ({teacher.employee_id})"
@@ -767,11 +1117,9 @@ def subadmin_delete_teacher(request, pk):
         messages.success(request, 'Teacher deleted successfully.')
         return redirect('accounts:subadmin_manage_teachers')
 
-    context = {
-        'teacher': teacher,
-        'department': department,
-    }
-    return render(request, 'subadmin_dashboard/delete_teacher.html', context)
+    return render(request, 'subadmin_dashboard/delete_teacher.html', {
+        'teacher': teacher, 'department': department
+    })
 
 
 # ============================================================================
@@ -789,31 +1137,29 @@ def teacher_dashboard(request):
 
     from questionnaires.models import Questionnaire, Download
 
-    my_uploads = teacher.questionnaires.count()
+    my_uploads     = teacher.questionnaires.count()
     total_downloads = Download.objects.filter(questionnaire__uploader=teacher).count()
 
     current_month = timezone.now().month
-    current_year = timezone.now().year
+    current_year  = timezone.now().year
     uploads_this_month = teacher.questionnaires.filter(
         uploaded_at__month=current_month,
         uploaded_at__year=current_year
     ).count()
 
-    upload_stats = get_teacher_upload_stats(teacher)
-
-    top_downloads = Questionnaire.objects.filter(
+    upload_stats      = get_teacher_upload_stats(teacher)
+    top_downloads     = Questionnaire.objects.filter(
         uploader=teacher
     ).annotate(download_count=Count('downloads')).order_by('-download_count')[:3]
-
     recent_activities = get_teacher_recent_activities(teacher)[:15]
 
     context = {
-        'teacher': teacher,
-        'my_uploads': my_uploads,
-        'total_downloads': total_downloads,
+        'teacher':           teacher,
+        'my_uploads':        my_uploads,
+        'total_downloads':   total_downloads,
         'uploads_this_month': uploads_this_month,
-        'upload_stats': upload_stats,
-        'top_downloads': top_downloads,
+        'upload_stats':      upload_stats,
+        'top_downloads':     top_downloads,
         'recent_activities': recent_activities,
     }
     return render(request, 'teacher_dashboard/dashboard.html', context)
@@ -854,7 +1200,11 @@ def get_teacher_recent_activities(teacher):
 
     recent_uploads = Questionnaire.objects.filter(uploader=teacher).order_by('-uploaded_at')[:5]
     for quest in recent_uploads:
-        activities.append({'type': 'upload', 'message': f'You uploaded "{quest.title}"', 'timestamp': quest.uploaded_at})
+        activities.append({
+            'type': 'upload',
+            'message': f'You uploaded "{quest.title}"',
+            'timestamp': quest.uploaded_at,
+        })
 
     recent_downloads = Download.objects.filter(
         questionnaire__uploader=teacher
@@ -862,10 +1212,9 @@ def get_teacher_recent_activities(teacher):
 
     for download in recent_downloads:
         if download.user and download.user != teacher.user:
-            downloader_name = download.user.get_full_name()
             activities.append({
                 'type': 'download',
-                'message': f'{downloader_name} downloaded your "{download.questionnaire.title}"',
+                'message': f'{download.user.get_full_name()} downloaded your "{download.questionnaire.title}"',
                 'timestamp': download.downloaded_at,
             })
 
@@ -874,7 +1223,11 @@ def get_teacher_recent_activities(teacher):
     ).exclude(activity_type='user_login').order_by('-created_at')[:5]
 
     for log in activity_logs:
-        activities.append({'type': 'system', 'message': log.description, 'timestamp': log.created_at})
+        activities.append({
+            'type': 'system',
+            'message': log.description,
+            'timestamp': log.created_at,
+        })
 
     activities.sort(key=lambda x: x['timestamp'], reverse=True)
     return activities
@@ -907,11 +1260,11 @@ def mark_all_notifications_read(request):
 def get_activity_chart_data(department_filter='all'):
     from questionnaires.models import Questionnaire, Download
 
-    today = timezone.now().date()
+    today      = timezone.now().date()
     date_range = [today - timedelta(days=i) for i in range(6, -1, -1)]
-    labels = [d.strftime('%b %d') for d in date_range]
-    uploads = []
-    downloads = []
+    labels     = [d.strftime('%b %d') for d in date_range]
+    uploads    = []
+    downloads  = []
 
     for date in date_range:
         upload_qs = Questionnaire.objects.filter(uploaded_at__date=date)
@@ -950,29 +1303,32 @@ def test_activity(request):
     )
     return redirect('accounts:admin_dashboard')
 
+
+# ============================================================================
+# SUB-ADMIN — SUBJECT MANAGEMENT
+# ============================================================================
+
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_manage_subjects(request):
-    """List subjects that belong to the sub-admin's department."""
-    department = request.user.subadmin_profile.department
-    subjects = Subject.objects.filter(departments=department).order_by('code')
-
+    department   = request.user.subadmin_profile.department
+    subjects     = Subject.objects.filter(departments=department).order_by('code')
     search_query = request.GET.get('search', '')
+
     if search_query:
         subjects = subjects.filter(
             Q(name__icontains=search_query) |
             Q(code__icontains=search_query)
         )
 
-    # Pass an empty form so the modal can display it (and show errors on POST redirect)
     from .forms import SubjectForm
     form = SubjectForm()
 
     context = {
-        'subjects': subjects,
+        'subjects':     subjects,
         'search_query': search_query,
-        'department': department,
-        'form': form,
+        'department':   department,
+        'form':         form,
     }
     return render(request, 'subadmin_dashboard/manage_subjects.html', context)
 
@@ -980,24 +1336,17 @@ def subadmin_manage_subjects(request):
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_add_subject(request):
-    """
-    Sub-admin adds a new subject and auto-assigns it to their department.
-    The department field is NOT shown to the user — it's forced server-side.
-    """
     department = request.user.subadmin_profile.department
 
     if request.method == 'POST':
-        # We use a lightweight inline form instead of SubjectForm which exposes
-        # the full department multi-select. Build the subject manually so the
-        # department is always locked to the sub-admin's own department.
-        code = request.POST.get('code', '').strip().upper()
-        name = request.POST.get('name', '').strip()
+        code        = request.POST.get('code', '').strip().upper()
+        name        = request.POST.get('name', '').strip()
         description = request.POST.get('description', '').strip()
 
         errors = {}
         if not code:
             errors['code'] = 'Subject code is required.'
-        elif Subject.objects.filter(code=code).exclude(pk=0).exists():
+        elif Subject.objects.filter(code=code).exists():
             errors['code'] = f'A subject with code "{code}" already exists.'
         if not name:
             errors['name'] = 'Subject name is required.'
@@ -1016,7 +1365,6 @@ def subadmin_add_subject(request):
             messages.success(request, f'Subject "{subject.name}" ({subject.code}) added successfully.')
             return redirect('accounts:subadmin_manage_subjects')
         else:
-            # Re-render the manage page with errors surfaced via messages
             for field, error in errors.items():
                 messages.error(request, error)
             return redirect('accounts:subadmin_manage_subjects')
@@ -1027,17 +1375,12 @@ def subadmin_add_subject(request):
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_edit_subject(request, pk):
-    """
-    Sub-admin edits a subject — only if it belongs to their department.
-    Department assignment is never changed here.
-    """
     department = request.user.subadmin_profile.department
-    # 404 if the subject doesn't belong to this sub-admin's department
-    subject = get_object_or_404(Subject, pk=pk, departments=department)
+    subject    = get_object_or_404(Subject, pk=pk, departments=department)
 
     if request.method == 'POST':
-        code = request.POST.get('code', '').strip().upper()
-        name = request.POST.get('name', '').strip()
+        code        = request.POST.get('code', '').strip().upper()
+        name        = request.POST.get('name', '').strip()
         description = request.POST.get('description', '').strip()
 
         errors = {}
@@ -1050,8 +1393,8 @@ def subadmin_edit_subject(request, pk):
 
         if not errors:
             old_code = subject.code
-            subject.code = code
-            subject.name = name
+            subject.code        = code
+            subject.name        = name
             subject.description = description
             subject.save()
             ActivityLog.objects.create(
@@ -1073,13 +1416,8 @@ def subadmin_edit_subject(request, pk):
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_delete_subject(request, pk):
-    """
-    Sub-admin deletes a subject — only if it belongs to their department.
-    If the subject is shared with other departments, it's only unlinked;
-    if it belongs solely to this department, the record is fully deleted.
-    """
     department = request.user.subadmin_profile.department
-    subject = get_object_or_404(Subject, pk=pk, departments=department)
+    subject    = get_object_or_404(Subject, pk=pk, departments=department)
 
     if request.method == 'POST':
         subject_name = subject.name
@@ -1087,11 +1425,9 @@ def subadmin_delete_subject(request, pk):
 
         other_departments = subject.departments.exclude(pk=department.pk)
         if other_departments.exists():
-            # Shared subject — just unlink from this department
             subject.departments.remove(department)
             action = f"unlinked from {department.name}"
         else:
-            # Belongs only to this department — delete it entirely
             subject.delete()
             action = "deleted"
 
@@ -1110,35 +1446,25 @@ def subadmin_delete_subject(request, pk):
 
 # ============================================================================
 # SUB-ADMIN — BROWSE QUESTIONNAIRES
-# Scoped to questionnaires uploaded by teachers in the sub-admin's department.
 # ============================================================================
 
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_browse_questionnaires(request):
-    """
-    Browse questionnaires from teachers in the sub-admin's department only.
-    Filters: subject (department-scoped), teacher (department-scoped), exam_type, search.
-    """
     from questionnaires.models import Questionnaire
     from django.core.paginator import Paginator
 
     department = request.user.subadmin_profile.department
 
-    # Base queryset — only questionnaires whose uploader is in this department
     questionnaires = Questionnaire.objects.filter(
         uploader__department=department
     ).select_related('subject', 'uploader__user', 'department')
 
-    # Subjects scoped to this department (for filter dropdown)
     subjects = Subject.objects.filter(departments=department).order_by('code')
-
-    # Teachers scoped to this department (for filter dropdown)
     teachers = TeacherProfile.objects.filter(
         department=department, is_active=True
     ).select_related('user').order_by('user__last_name')
 
-    # ── Apply filters ────────────────────────────────────────────────────────
     selected_subject = request.GET.get('subject', '')
     selected_teacher = request.GET.get('teacher', '')
     exam_type        = request.GET.get('exam_type', '')
@@ -1146,13 +1472,10 @@ def subadmin_browse_questionnaires(request):
 
     if selected_subject:
         questionnaires = questionnaires.filter(subject_id=selected_subject)
-
     if selected_teacher:
         questionnaires = questionnaires.filter(uploader_id=selected_teacher)
-
     if exam_type:
         questionnaires = questionnaires.filter(exam_type=exam_type)
-
     if search_query:
         questionnaires = questionnaires.filter(
             Q(title__icontains=search_query) |
@@ -1161,21 +1484,20 @@ def subadmin_browse_questionnaires(request):
             Q(subject__code__icontains=search_query)
         )
 
-    # ── Paginate ─────────────────────────────────────────────────────────────
-    paginator  = Paginator(questionnaires, 9)
+    paginator   = Paginator(questionnaires, 9)
     page_number = request.GET.get('page', 1)
-    page_obj   = paginator.get_page(page_number)
+    page_obj    = paginator.get_page(page_number)
 
     context = {
-        'page_obj':         page_obj,
-        'department':       department,
-        'subjects':         subjects,
-        'teachers':         teachers,
-        'selected_subject': selected_subject,
-        'selected_teacher': selected_teacher,
-        'exam_type':        exam_type,
-        'search_query':     search_query,
+        'page_obj':          page_obj,
+        'department':        department,
+        'subjects':          subjects,
+        'teachers':          teachers,
+        'selected_subject':  selected_subject,
+        'selected_teacher':  selected_teacher,
+        'exam_type':         exam_type,
+        'search_query':      search_query,
         'exam_type_choices': Questionnaire.EXAM_TYPE_CHOICES,
     }
     return render(request, 'subadmin_dashboard/browse_questionnaires.html', context)
-    
+
