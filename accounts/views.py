@@ -1541,7 +1541,7 @@ def subadmin_browse_questionnaires(request):
     return render(request, 'subadmin_dashboard/browse_questionnaires.html', context)
 
 from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth.models import User
 
 @login_required
 def update_profile(request):
@@ -1576,7 +1576,7 @@ def update_profile(request):
         user.email = email
         user.save()
         
-        # Update teacher-specific fields if user is a teacher
+        # Update role-specific fields
         if hasattr(user, 'teacher_profile'):
             phone = request.POST.get('phone', '').strip()
             if phone:
@@ -1597,7 +1597,7 @@ def update_profile(request):
 
 
 @login_required
-def change_password(request):
+def change_credentials(request):
     """Allow users to change their own username and/or password"""
     if request.method == 'POST':
         user = request.user
@@ -1616,7 +1616,6 @@ def change_password(request):
         # Handle username change
         username_changed = False
         if new_username and new_username != user.username:
-            from django.contrib.auth.models import User
             if User.objects.filter(username=new_username).exclude(pk=user.pk).exists():
                 errors.append('This username is already taken.')
             else:
@@ -1631,8 +1630,16 @@ def change_password(request):
             elif new_password != confirm_password:
                 errors.append('New passwords do not match.')
             else:
-                password_changed = True
-                changes.append("password changed")
+                # Additional password strength checks
+                if not any(char.isupper() for char in new_password):
+                    errors.append('Password must contain at least one uppercase letter.')
+                if not any(char.isdigit() for char in new_password):
+                    errors.append('Password must contain at least one number.')
+                if not any(char in '!@#$%^&*()_+-=[]{}|;:,.<>?' for char in new_password):
+                    errors.append('Password must contain at least one special character.')
+                else:
+                    password_changed = True
+                    changes.append("password changed")
         
         if errors:
             for error in errors:
@@ -1653,11 +1660,16 @@ def change_password(request):
             if password_changed:
                 update_session_auth_hash(request, user)
             
+            # Determine user role for logging
+            user_role = "Administrator" if user.is_staff else "Teacher"
+            if hasattr(user, 'subadmin_profile'):
+                user_role = "Sub-Admin"
+            
             # Log activity
             ActivityLog.objects.create(
                 activity_type='credentials_updated',
                 user=user,
-                description=f"{user.get_full_name()} updated their login credentials: {', '.join(changes)}"
+                description=f"{user_role} {user.get_full_name()} updated their login credentials: {', '.join(changes)}"
             )
             
             # Send email notification

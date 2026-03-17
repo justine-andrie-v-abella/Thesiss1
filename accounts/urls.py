@@ -67,5 +67,5 @@ urlpatterns = [
     path('subadmin/questionnaires/',                    views.subadmin_browse_questionnaires, name='subadmin_browse_questionnaires'),
 
     path('profile/update/', views.update_profile, name='update_profile'),
-    path('profile/change-password/', views.change_password, name='change_password'),
+    path('profile/change-password/', views.change_credentials, name='change_credentials'),
 ]
