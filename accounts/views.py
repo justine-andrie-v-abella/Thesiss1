@@ -839,6 +839,8 @@ def edit_subadmin(request, pk):
         first_name = request.POST.get('first_name', '').strip()
         last_name  = request.POST.get('last_name', '').strip()
         email      = request.POST.get('email', '').strip()
+        username   = request.POST.get('username', '').strip()  # NEW
+        new_password = request.POST.get('new_password', '').strip()  # NEW
         dept_pk    = request.POST.get('department', '').strip()
         is_active  = request.POST.get('is_active') == 'on'
 
@@ -852,10 +854,18 @@ def edit_subadmin(request, pk):
             errors.append('Email address is required.')
         elif '@' not in email:
             errors.append('Enter a valid email address.')
+        if not username:  # NEW: Validate username
+            errors.append('Username is required.')
         if not dept_pk:
             errors.append('Please select a department.')
 
         from django.contrib.auth.models import User as _User
+        
+        # NEW: Check if username is already taken
+        if username and _User.objects.filter(username=username).exclude(pk=subadmin.user.pk).exists():
+            errors.append('That username is already in use by another account.')
+            
+        # Check if email is already taken
         if email and _User.objects.filter(email=email).exclude(pk=subadmin.user.pk).exists():
             errors.append('That email address is already in use by another account.')
 
@@ -865,11 +875,22 @@ def edit_subadmin(request, pk):
             return redirect('accounts:manage_subadmins')
 
         user = subadmin.user
+        old_username = user.username
+        username_changed = username != old_username
+        password_changed = bool(new_password)
+
+        # Update user fields
         user.first_name = first_name
         user.last_name  = last_name
         user.email      = email
+        user.username   = username
+
+        if password_changed:
+            user.set_password(new_password)
+
         user.save()
 
+        # Update department
         try:
             subadmin.department = Department.objects.get(pk=dept_pk)
         except Department.DoesNotExist:
@@ -878,6 +899,24 @@ def edit_subadmin(request, pk):
 
         subadmin.is_active = is_active
         subadmin.save()
+
+        # NEW: Send email notification if credentials changed
+        if username_changed or password_changed:
+            send_credentials_updated_email(
+                user         = user,
+                new_username = username if username_changed else None,
+                new_password = new_password if password_changed else None,
+            )
+
+        ActivityLog.objects.create(
+            activity_type='subadmin_updated',
+            user=request.user,
+            description=(
+                f"Sub-Admin {user.get_full_name()} was updated"
+                + (" [username changed]" if username_changed else "")
+                + (" [password changed]" if password_changed else "")
+            )
+        )
 
         messages.success(request, f'{user.get_full_name()} has been updated successfully.')
 
