@@ -1540,3 +1540,151 @@ def subadmin_browse_questionnaires(request):
     }
     return render(request, 'subadmin_dashboard/browse_questionnaires.html', context)
 
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.forms import PasswordChangeForm
+
+@login_required
+def update_profile(request):
+    """Allow users to update their own profile information"""
+    if request.method == 'POST':
+        user = request.user
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        email = request.POST.get('email', '').strip()
+        
+        errors = []
+        
+        if not first_name:
+            errors.append('First name is required.')
+        if not last_name:
+            errors.append('Last name is required.')
+        if not email:
+            errors.append('Email address is required.')
+        elif '@' not in email:
+            errors.append('Enter a valid email address.')
+        elif User.objects.filter(email=email).exclude(pk=user.pk).exists():
+            errors.append('This email is already in use by another account.')
+        
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+            return redirect(request.META.get('HTTP_REFERER', 'home'))
+        
+        # Update user fields
+        user.first_name = first_name
+        user.last_name = last_name
+        user.email = email
+        user.save()
+        
+        # Update teacher-specific fields if user is a teacher
+        if hasattr(user, 'teacher_profile'):
+            phone = request.POST.get('phone', '').strip()
+            if phone:
+                user.teacher_profile.phone = phone
+                user.teacher_profile.save()
+        
+        # Log activity
+        ActivityLog.objects.create(
+            activity_type='profile_updated',
+            user=user,
+            description=f"{user.get_full_name()} updated their profile information"
+        )
+        
+        messages.success(request, 'Your profile has been updated successfully.')
+        return redirect(request.META.get('HTTP_REFERER', 'home'))
+    
+    return redirect('home')
+
+
+@login_required
+def change_password(request):
+    """Allow users to change their own username and/or password"""
+    if request.method == 'POST':
+        user = request.user
+        new_username = request.POST.get('username', '').strip()
+        current_password = request.POST.get('current_password', '')
+        new_password = request.POST.get('new_password', '').strip()
+        confirm_password = request.POST.get('confirm_password', '').strip()
+        
+        errors = []
+        changes = []
+        
+        # Check current password
+        if not user.check_password(current_password):
+            errors.append('Current password is incorrect.')
+        
+        # Handle username change
+        username_changed = False
+        if new_username and new_username != user.username:
+            from django.contrib.auth.models import User
+            if User.objects.filter(username=new_username).exclude(pk=user.pk).exists():
+                errors.append('This username is already taken.')
+            else:
+                username_changed = True
+                changes.append(f"username changed to '{new_username}'")
+        
+        # Handle password change
+        password_changed = False
+        if new_password:
+            if len(new_password) < 8:
+                errors.append('Password must be at least 8 characters long.')
+            elif new_password != confirm_password:
+                errors.append('New passwords do not match.')
+            else:
+                password_changed = True
+                changes.append("password changed")
+        
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+            return redirect(request.META.get('HTTP_REFERER', 'home'))
+        
+        # Apply changes
+        if username_changed:
+            user.username = new_username
+        
+        if password_changed:
+            user.set_password(new_password)
+        
+        if username_changed or password_changed:
+            user.save()
+            
+            # Keep user logged in if password changed
+            if password_changed:
+                update_session_auth_hash(request, user)
+            
+            # Log activity
+            ActivityLog.objects.create(
+                activity_type='credentials_updated',
+                user=user,
+                description=f"{user.get_full_name()} updated their login credentials: {', '.join(changes)}"
+            )
+            
+            # Send email notification
+            try:
+                changes_list = "\n".join([f"  • {change}" for change in changes])
+                send_mail(
+                    subject="Your Login Credentials Have Been Updated",
+                    message=f"""Hello {user.get_full_name()},
+
+Your login credentials were successfully updated with the following changes:
+
+{changes_list}
+
+If you did not make these changes, please contact your administrator immediately.
+
+— System Administration""",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=True,
+                )
+            except Exception as e:
+                logger.error(f"Failed to send credential update email to {user.email}: {e}")
+            
+            messages.success(request, f'Your login credentials have been updated successfully: {", ".join(changes)}.')
+        else:
+            messages.info(request, 'No changes were made to your credentials.')
+        
+        return redirect(request.META.get('HTTP_REFERER', 'home'))
+    
+    return redirect('home')

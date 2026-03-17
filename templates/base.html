@@ -173,17 +173,34 @@
 
         <!-- User Info -->
         <div class="p-4 border-t border-blue-700 flex-shrink-0">
-            <div class="bg-blue-700 rounded-lg p-4 mb-3">
-                <div class="flex items-center space-x-3 mb-2">
-                    <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center">
+            <!-- Clickable Profile Section -->
+            <button onclick="openProfileModal()" 
+                    class="w-full bg-blue-700 hover:bg-blue-600 rounded-lg p-4 mb-3 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
                         <i class="bi bi-person-fill text-blue-900 text-xl"></i>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="font-semibold text-sm truncate">{{ user.get_full_name }}</p>
-                        <p class="text-xs text-blue-200 truncate">{{ user.email }}</p>
+                        <div class="flex items-center justify-between">
+                            <p class="font-semibold text-sm truncate">{{ user.get_full_name }}</p>
+                            <i class="bi bi-pencil-square text-blue-200 text-xs ml-2 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                        </div>
+                        <p class="text-xs text-blue-200 truncate flex items-center">
+                            <i class="bi bi-envelope mr-1"></i>
+                            {{ user.email }}
+                        </p>
+                        <p class="text-xs text-blue-300 mt-1 flex items-center">
+                            <i class="bi bi-gear mr-1"></i>
+                            {% if user.is_staff %}Administrator
+                            {% elif user_is_subadmin %}Sub-Admin
+                            {% else %}Teacher{% endif %}
+                            <span class="mx-1">·</span>
+                            <i class="bi bi-pencil"></i> Click to edit
+                        </p>
                     </div>
                 </div>
-            </div>
+            </button>
+
             <a href="{% url 'accounts:logout' %}"
                 class="flex items-center justify-center space-x-2 w-full bg-white text-blue-900 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium">
                 <i class="bi bi-box-arrow-right"></i>
@@ -353,6 +370,184 @@
     {% else %}
     <div class="container mx-auto px-4 mt-5"></div>
     {% endif %}
+
+<!-- Profile Edit Modal -->
+<div id="profileModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeProfileModal();">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform transition-all duration-200 scale-95 opacity-0"
+             id="profileModalContent">
+
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-8 py-6 rounded-t-2xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                            <i class="bi bi-person-gear text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Edit Profile</h2>
+                            <p class="text-blue-200 text-sm">Update your personal information</p>
+                        </div>
+                    </div>
+                    <button onclick="closeProfileModal()" class="text-white text-opacity-70 hover:text-opacity-100 transition-opacity">
+                        <i class="bi bi-x-lg text-xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-200 bg-gray-50">
+                <button id="profileInfoTab" class="flex-1 px-4 py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600 transition-colors">
+                    <i class="bi bi-person mr-1"></i> Personal Info
+                </button>
+                <button id="profileSecurityTab" class="flex-1 px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors">
+                    <i class="bi bi-shield-lock mr-1"></i> Security
+                </button>
+            </div>
+
+            <!-- Personal Info Form -->
+            <div id="profileInfoContent" class="p-6">
+                <form id="profileInfoForm" method="post" action="{% url 'accounts:update_profile' %}" class="space-y-4">
+                    {% csrf_token %}
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">First Name</label>
+                        <input type="text" name="first_name" value="{{ user.first_name }}"
+                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Last Name</label>
+                        <input type="text" name="last_name" value="{{ user.last_name }}"
+                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Email Address</label>
+                        <input type="email" name="email" value="{{ user.email }}"
+                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                        <p class="text-xs text-gray-500 mt-1">Changing email will affect your login credentials</p>
+                    </div>
+
+                    {% if not user.is_staff and not user_is_subadmin %}
+                    <!-- Teacher-specific fields -->
+                    <hr class="border-gray-200">
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Employee ID</label>
+                        <div class="flex items-center space-x-3 px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-xl">
+                            <i class="bi bi-lock-fill text-gray-400"></i>
+                            <span class="text-gray-600 font-medium">{{ user.teacher_profile.employee_id }}</span>
+                            <span class="text-xs text-gray-400 ml-auto">(cannot be changed)</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Phone Number</label>
+                        <input type="text" name="phone" value="{{ user.teacher_profile.phone|default:'' }}"
+                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors"
+                               placeholder="Enter phone number">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Department</label>
+                        <div class="flex items-center space-x-3 px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-xl">
+                            <i class="bi bi-building text-gray-400"></i>
+                            <span class="text-gray-600 font-medium">{{ user.teacher_profile.department.name }}</span>
+                            <span class="text-xs text-gray-400 ml-auto">(assigned by admin)</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
+                        <button type="button" onclick="closeProfileModal()"
+                                class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                                class="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-2.5 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-md font-medium">
+                            <i class="bi bi-check-lg"></i>
+                            <span>Save Changes</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Security Form -->
+            <div id="profileSecurityContent" class="p-6 hidden">
+                <form id="profileSecurityForm" method="post" action="{% url 'accounts:change_password' %}" class="space-y-4">
+                    {% csrf_token %}
+                    
+                    <!-- NEW: Username Field -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Username</label>
+                        <div class="relative">
+                            <input type="text" name="username" id="edit_username" value="{{ user.username }}"
+                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-mono"
+                                placeholder="Your username">
+                            <i class="bi bi-person absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Changing username will affect your login credentials</p>
+                    </div>
+
+                    <hr class="border-gray-200">
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Current Password</label>
+                        <div class="relative">
+                            <input type="password" name="current_password" id="current_password" required
+                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors"
+                                placeholder="Enter current password">
+                            <button type="button" onclick="togglePassword('current_password')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">New Password</label>
+                        <div class="relative">
+                            <input type="password" name="new_password" id="new_password"
+                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors"
+                                placeholder="Enter new password (leave blank to keep current)">
+                            <button type="button" onclick="togglePassword('new_password')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Minimum 8 characters. Leave blank to keep current password.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Confirm New Password</label>
+                        <div class="relative">
+                            <input type="password" name="confirm_password" id="confirm_password"
+                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors"
+                                placeholder="Confirm new password">
+                            <button type="button" onclick="togglePassword('confirm_password')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
+                        <button type="button" onclick="closeProfileModal()"
+                                class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                                class="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-2.5 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-md font-medium">
+                            <i class="bi bi-shield-lock"></i>
+                            <span>Update Credentials</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Backdrop -->
+<div id="profileModalBackdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
 
 <script>
     // Toast Notification Function
@@ -524,6 +719,141 @@
             {% endfor %}
         {% endif %}
     });
+
+// Profile Modal Functions
+const profileModal = document.getElementById('profileModal');
+const profileModalBackdrop = document.getElementById('profileModalBackdrop');
+const profileModalContent = document.getElementById('profileModalContent');
+const profileInfoTab = document.getElementById('profileInfoTab');
+const profileSecurityTab = document.getElementById('profileSecurityTab');
+const profileInfoContent = document.getElementById('profileInfoContent');
+const profileSecurityContent = document.getElementById('profileSecurityContent');
+
+function openProfileModal() {
+    profileModalBackdrop.classList.remove('hidden');
+    profileModal.classList.remove('hidden');
+    
+    // Reset to Personal Info tab
+    showProfileInfoTab();
+    
+    setTimeout(() => {
+        profileModalContent.classList.remove('scale-95', 'opacity-0');
+        profileModalContent.classList.add('scale-100', 'opacity-100');
+    }, 10);
+}
+
+function closeProfileModal() {
+    profileModalContent.classList.remove('scale-100', 'opacity-100');
+    profileModalContent.classList.add('scale-95', 'opacity-0');
+    
+    setTimeout(() => {
+        profileModal.classList.add('hidden');
+        profileModalBackdrop.classList.add('hidden');
+    }, 200);
+}
+
+function showProfileInfoTab() {
+    profileInfoTab.classList.add('text-blue-600', 'border-blue-600');
+    profileInfoTab.classList.remove('text-gray-500', 'border-transparent');
+    profileSecurityTab.classList.remove('text-blue-600', 'border-blue-600');
+    profileSecurityTab.classList.add('text-gray-500', 'border-transparent');
+    profileInfoContent.classList.remove('hidden');
+    profileSecurityContent.classList.add('hidden');
+}
+
+function showProfileSecurityTab() {
+    profileSecurityTab.classList.add('text-blue-600', 'border-blue-600');
+    profileSecurityTab.classList.remove('text-gray-500', 'border-transparent');
+    profileInfoTab.classList.remove('text-blue-600', 'border-blue-600');
+    profileInfoTab.classList.add('text-gray-500', 'border-transparent');
+    profileSecurityContent.classList.remove('hidden');
+    profileInfoContent.classList.add('hidden');
+}
+
+// Tab click handlers
+if (profileInfoTab) {
+    profileInfoTab.addEventListener('click', showProfileInfoTab);
+}
+if (profileSecurityTab) {
+    profileSecurityTab.addEventListener('click', showProfileSecurityTab);
+}
+
+// Close modal when clicking backdrop
+if (profileModalBackdrop) {
+    profileModalBackdrop.addEventListener('click', closeProfileModal);
+}
+
+// Close on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !profileModal.classList.contains('hidden')) {
+        closeProfileModal();
+    }
+});
+
+// Password visibility toggle
+function togglePassword(fieldId) {
+    const field = document.getElementById(fieldId);
+    const button = field.nextElementSibling;
+    const icon = button.querySelector('i');
+    
+    if (field.type === 'password') {
+        field.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        field.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+    }
+}
+
+// Password strength checker
+document.getElementById('new_password')?.addEventListener('input', function() {
+    const password = this.value;
+    const strengthIndicator = document.getElementById('password-strength');
+    
+    if (!strengthIndicator) {
+        const indicator = document.createElement('div');
+        indicator.id = 'password-strength';
+        indicator.className = 'mt-2 text-xs';
+        this.parentElement.appendChild(indicator);
+    }
+    
+    const strength = calculatePasswordStrength(password);
+    const indicator = document.getElementById('password-strength');
+    
+    if (password.length === 0) {
+        indicator.innerHTML = '';
+        return;
+    }
+    
+    let strengthText = '';
+    let strengthColor = '';
+    
+    if (strength < 2) {
+        strengthText = 'Weak';
+        strengthColor = 'text-red-500';
+    } else if (strength < 3) {
+        strengthText = 'Medium';
+        strengthColor = 'text-yellow-500';
+    } else {
+        strengthText = 'Strong';
+        strengthColor = 'text-green-500';
+    }
+    
+    indicator.innerHTML = `Password strength: <span class="${strengthColor} font-semibold">${strengthText}</span>`;
+});
+
+function calculatePasswordStrength(password) {
+    let strength = 0;
+    
+    if (password.length >= 8) strength++;
+    if (password.match(/[A-Z]/)) strength++;
+    if (password.match(/[0-9]/)) strength++;
+    if (password.match(/[^A-Za-z0-9]/)) strength++;
+    
+    return strength;
+}
 </script>
 {% block modals %}{% endblock %}   {# ← ADD THIS LINE #}
 {% block extra_js %}{% endblock %}

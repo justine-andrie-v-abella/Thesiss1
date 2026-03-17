@@ -66,4 +66,6 @@ urlpatterns = [
     # Browse Questionnaires (sub-admin — department-scoped)
     path('subadmin/questionnaires/',                    views.subadmin_browse_questionnaires, name='subadmin_browse_questionnaires'),
 
+    path('profile/update/', views.update_profile, name='update_profile'),
+    path('profile/change-password/', views.change_password, name='change_password'),
 ]
