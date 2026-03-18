@@ -372,15 +372,32 @@ class SubjectForm(forms.ModelForm):
 
     def clean_code(self):
         code = self.cleaned_data.get('code', '').upper().strip()
+        return code  # dept-level validation done in clean()
 
-        # Check uniqueness after uppercasing to catch case-insensitive duplicates
-        qs = Subject.objects.filter(code=code)
-        if self.instance.pk:
-            qs = qs.exclude(pk=self.instance.pk)  # allow editing without self-conflict
-        if qs.exists():
-            raise forms.ValidationError(f'A subject with code "{code}" already exists.')
+    def clean(self):
+        cleaned_data = super().clean()
+        code = cleaned_data.get('code', '').upper().strip()
+        departments = cleaned_data.get('departments')
 
-        return code
+        if not code or not departments:
+            return cleaned_data
+
+        # Check if any selected department already has a subject with this code
+        conflicting_depts = []
+        for dept in departments:
+            qs = Subject.objects.filter(code=code, departments=dept)
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                conflicting_depts.append(dept.code)
+
+        if conflicting_depts:
+            raise forms.ValidationError(
+                f'A subject with code "{code}" already exists in: '
+                f'{", ".join(conflicting_depts)}.'
+            )
+
+        return cleaned_data
 
 
 # ============================================================================

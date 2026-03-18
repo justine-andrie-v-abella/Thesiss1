@@ -1393,8 +1393,8 @@ def subadmin_add_subject(request):
         errors = {}
         if not code:
             errors['code'] = 'Subject code is required.'
-        elif Subject.objects.filter(code=code).exists():
-            errors['code'] = f'A subject with code "{code}" already exists.'
+        elif Subject.objects.filter(code=code, departments=department).exists():
+            errors['code'] = f'A subject with code "{code}" already exists in {department.code}.'
         if not name:
             errors['name'] = 'Subject name is required.'
 
@@ -1433,8 +1433,8 @@ def subadmin_edit_subject(request, pk):
         errors = {}
         if not code:
             errors['code'] = 'Subject code is required.'
-        elif Subject.objects.filter(code=code).exclude(pk=pk).exists():
-            errors['code'] = f'A subject with code "{code}" already exists.'
+        elif Subject.objects.filter(code=code, departments=department).exclude(pk=pk).exists():
+            errors['code'] = f'A subject with code "{code}" already exists in {department.code}.'
         if not name:
             errors['name'] = 'Subject name is required.'
 

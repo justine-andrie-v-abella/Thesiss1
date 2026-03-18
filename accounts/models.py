@@ -23,7 +23,7 @@ class Department(models.Model):
 class Subject(models.Model):
     departments = models.ManyToManyField(Department, related_name='subjects')
     name = models.CharField(max_length=200)
-    code = models.CharField(max_length=20, unique=True)
+    code = models.CharField(max_length=20)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
