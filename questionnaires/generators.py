@@ -173,23 +173,24 @@ class BISUQuestionnaireGenerator:
             return
 
         # All other types: print the numbered question stem first.
-        p = self.doc.add_paragraph()
-        r = p.add_run(f"{number}. {question.question_text}")
-        r.font.size = Pt(12)
-        r.font.name = 'Arial'
+        # True/False gets a blank prepended before the number (like identification).
+        if qtype == 'true_false':
+            p = self.doc.add_paragraph()
+            r = p.add_run(f"________ {number}. {question.question_text}")
+            r.font.size = Pt(12)
+            r.font.name = 'Arial'
+        else:
+            p = self.doc.add_paragraph()
+            r = p.add_run(f"{number}. {question.question_text}")
+            r.font.size = Pt(12)
+            r.font.name = 'Arial'
 
         if qtype == 'multiple_choice':
             self._add_multiple_choice(question)
 
-        elif qtype == 'true_false':
-            p = self.doc.add_paragraph()
-            r = p.add_run("   A. True          B. False")
-            r.font.size = Pt(12)
-            r.font.name = 'Arial'
-
         elif qtype in ('identification', 'fill_blank', 'fill_in_the_blank'):
             p = self.doc.add_paragraph()
-            r = p.add_run("Answer: _______________________________")
+            r = p.add_run("Answer: ________________________")
             r.font.size = Pt(12)
             r.font.name = 'Arial'
 
