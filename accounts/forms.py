@@ -370,6 +370,18 @@ class SubjectForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
         }
 
+    def clean_code(self):
+        code = self.cleaned_data.get('code', '').upper().strip()
+
+        # Check uniqueness after uppercasing to catch case-insensitive duplicates
+        qs = Subject.objects.filter(code=code)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)  # allow editing without self-conflict
+        if qs.exists():
+            raise forms.ValidationError(f'A subject with code "{code}" already exists.')
+
+        return code
+
 
 # ============================================================================
 # SUB-ADMIN CREATION FORM  (used by superadmin)

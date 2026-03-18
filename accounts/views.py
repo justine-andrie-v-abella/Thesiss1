@@ -647,8 +647,9 @@ def delete_department(request, pk):
 @user_passes_test(is_admin)
 def manage_subjects(request):
     subjects        = Subject.objects.prefetch_related('departments').all()
-    all_departments = Department.objects.all().order_by('name')
+    all_departments = list(Department.objects.all().order_by('name'))  # force eval
     form            = SubjectForm()
+    form.fields['departments'].queryset = Department.objects.all().order_by('name')
 
     context = {
         'subjects':         subjects,
@@ -673,10 +674,17 @@ def add_subject(request):
             messages.success(request, f'Subject "{subject.name}" ({subject.code}) has been added successfully!')
             return redirect('accounts:manage_subjects')
         else:
+            # Re-render manage_subjects so the modal auto-opens with errors
             messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = SubjectForm()
-    return render(request, 'admin_dashboard/add_subject.html', {'form': form})
+            subjects        = Subject.objects.prefetch_related('departments').all()
+            all_departments = list(Department.objects.all().order_by('name'))  # force eval
+            form.fields['departments'].queryset = Department.objects.all().order_by('name')
+            return render(request, 'admin_dashboard/manage_subjects.html', {
+                'subjects':        subjects,
+                'all_departments': all_departments,
+                'form':            form,
+            })
+    return redirect('accounts:manage_subjects')
 
 
 @login_required

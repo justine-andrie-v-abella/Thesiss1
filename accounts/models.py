@@ -33,6 +33,10 @@ class Subject(models.Model):
     def __str__(self):
         return f"{self.code} - {self.name}"
 
+    def save(self, *args, **kwargs):
+        self.code = self.code.upper()  # always uppercase at DB level
+        super().save(*args, **kwargs)
+
     def get_departments_display(self):
         return ", ".join([dept.code for dept in self.departments.all()])
 
