@@ -62,11 +62,18 @@ DATABASES = {
     )
 }
 
-DATABASES["default"]["CONN_MAX_AGE"] = 0
+DATABASES["default"]["CONN_MAX_AGE"] = 60
 DATABASES["default"]["OPTIONS"] = {
     "sslmode": "require",
 }
 DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-snowflake",
+    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

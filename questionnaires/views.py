@@ -1343,6 +1343,7 @@ def workspace_create_folder(request):
     if request.user.is_staff:
         return JsonResponse({'error': 'Not allowed'}, status=403)
 
+    from django.core.cache import cache
     teacher = get_object_or_404(TeacherProfile, user=request.user)
 
     try:
@@ -1355,12 +1356,14 @@ def workspace_create_folder(request):
         return JsonResponse({'error': 'Folder name is required.'}, status=400)
 
     folder = WorkspaceFolder.objects.create(teacher=teacher, name=name)
+    cache.delete(f'workspace_folders_{teacher.id}')  # ✅ bust cache after creating folder
     return JsonResponse({'id': folder.pk, 'name': folder.name})
 
 
 @login_required
 @require_POST
 def workspace_rename_folder(request, folder_id):
+    from django.core.cache import cache
     teacher = get_object_or_404(TeacherProfile, user=request.user)
     folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher)
 
@@ -1375,16 +1378,19 @@ def workspace_rename_folder(request, folder_id):
 
     folder.name = name
     folder.save()
+    cache.delete(f'workspace_folders_{teacher.id}')  # ✅ bust cache after renaming folder
     return JsonResponse({'id': folder.pk, 'name': folder.name})
 
 
 @login_required
 @require_POST
 def workspace_delete_folder(request, folder_id):
+    from django.core.cache import cache
     teacher = get_object_or_404(TeacherProfile, user=request.user)
     folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher)
     name    = folder.name
     folder.delete()
+    cache.delete(f'workspace_folders_{teacher.id}')  # ✅ bust cache after deleting folder
     return JsonResponse({'deleted': True, 'name': name})
 
 
@@ -1394,6 +1400,7 @@ def workspace_add_questions(request, folder_id):
     if request.user.is_staff:
         return JsonResponse({'error': 'Not allowed'}, status=403)
 
+    from django.core.cache import cache
     teacher = get_object_or_404(TeacherProfile, user=request.user)
     folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher)
 
@@ -1416,17 +1423,20 @@ def workspace_add_questions(request, folder_id):
         else:
             already += 1
 
+    cache.delete(f'workspace_folders_{teacher.id}')  # ✅ bust cache after adding questions
     return JsonResponse({'added': added, 'already_existed': already})
 
 
 @login_required
 @require_POST
 def workspace_remove_question(request, folder_id, question_id):
+    from django.core.cache import cache
     teacher = get_object_or_404(TeacherProfile, user=request.user)
     folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher)
     WorkspaceFolderQuestion.objects.filter(
         folder=folder, question_id=question_id
     ).delete()
+    cache.delete(f'workspace_folders_{teacher.id}')  # ✅ bust cache after removing question
     return JsonResponse({'removed': True})
 
 
@@ -1540,7 +1550,15 @@ def workspace_list_folders(request):
     if request.user.is_staff:
         return JsonResponse({'folders': [], 'question_ids_in_workspace': []})
 
-    teacher = get_object_or_404(TeacherProfile, user=request.user)
+    from django.core.cache import cache
+
+    teacher   = get_object_or_404(TeacherProfile, user=request.user)
+    cache_key = f'workspace_folders_{teacher.id}'
+    cached    = cache.get(cache_key)
+
+    if cached:
+        return JsonResponse(cached)
+
     folders = (
         WorkspaceFolder.objects
         .filter(teacher=teacher)
@@ -1559,7 +1577,10 @@ def workspace_list_folders(request):
             'question_count': len(qids),
         })
 
-    return JsonResponse({
+    data = {
         'folders':                   folders_data,
         'question_ids_in_workspace': list(set(all_question_ids)),
-    })
+    }
+
+    cache.set(cache_key, data, timeout=60)
+    return JsonResponse(data)
