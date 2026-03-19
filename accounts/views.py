@@ -995,7 +995,6 @@ def subadmin_manage_teachers(request):
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_add_teacher(request):
-    """Sub-admin adds a teacher — blocks creation if email server is unreachable."""
     department = request.user.subadmin_profile.department
 
     if request.method == 'POST':
@@ -1009,17 +1008,16 @@ def subadmin_add_teacher(request):
                 connection = get_connection()
                 connection.open()
                 connection.close()
-                logger.info(f"Email connection test successful for {test_email}")
             except Exception as e:
                 logger.error(f"Email connection failed: {e}")
-                messages.error(
-                    request,
-                    "Cannot add teacher: the email server is unreachable or credentials are invalid. "
-                    "Please check your email settings before adding a teacher."
-                )
-                return render(request, 'subadmin_dashboard/add_teacher.html', {
-                    'form': form,
-                    'department': department
+                return JsonResponse({
+                    'success': False,
+                    'errors': {
+                        '__all__': [
+                            "Cannot add teacher: the email server is unreachable. "
+                            "Please check your email settings."
+                        ]
+                    }
                 })
 
             teacher = form.save()
@@ -1035,47 +1033,35 @@ def subadmin_add_teacher(request):
 
             email_sent = send_teacher_invite_email(teacher, plain_password)
 
-            if email_sent:
-                bust_dashboard_cache()  # ✅ only after successful save + email
-                messages.success(
-                    request,
-                    f"Teacher added successfully. A welcome email has been sent to {teacher.user.email}."
-                )
-            else:
+            if not email_sent:
                 user = teacher.user
                 teacher.delete()
                 user.delete()
-                messages.error(
-                    request,
-                    f"Teacher was NOT added. The welcome email to {test_email} could not be sent. "
-                    f"Please verify your email server settings."
-                )
-                return render(request, 'subadmin_dashboard/add_teacher.html', {
-                    'form': form,
-                    'department': department
+                return JsonResponse({
+                    'success': False,
+                    'errors': {
+                        '__all__': [
+                            f"Teacher was NOT added. The welcome email to {test_email} "
+                            f"could not be sent. Please verify your email server settings."
+                        ]
+                    }
                 })
 
-            return redirect('accounts:subadmin_manage_teachers')
-
-        else:
-            messages.error(request, 'Please correct the errors in the form.')
-            return render(request, 'subadmin_dashboard/add_teacher.html', {
-                'form': form,
-                'department': department
+            bust_dashboard_cache()
+            return JsonResponse({
+                'success': True,
+                'message': f"Teacher added successfully. A welcome email has been sent to {teacher.user.email}."
             })
 
-    else:
-        form = SubAdminTeacherCreationForm(department=department)
+        else:
+            return JsonResponse({'success': False, 'errors': form.errors})
 
-    return render(request, 'subadmin_dashboard/add_teacher.html', {
-        'form': form, 'department': department
-    })
+    return redirect('accounts:subadmin_manage_teachers')
 
 
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_edit_teacher(request, pk):
-    """Sub-admin edits a teacher — supports credential updates with email notification."""
     department = request.user.subadmin_profile.department
     teacher    = get_object_or_404(TeacherProfile, pk=pk, department=department)
 
@@ -1090,7 +1076,6 @@ def subadmin_edit_teacher(request, pk):
             password_changed = bool(plain_new_password)
 
             teacher = form.save()
-
             teacher.user.first_name = form.cleaned_data['first_name']
             teacher.user.last_name  = form.cleaned_data['last_name']
             teacher.user.email      = form.cleaned_data['email']
@@ -1117,16 +1102,12 @@ def subadmin_edit_teacher(request, pk):
                     + (" [password changed]" if password_changed else "")
                 )
             )
-            messages.success(request, 'Teacher updated successfully.')
-            return redirect('accounts:subadmin_manage_teachers')
-        else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = SubAdminTeacherEditForm(instance=teacher)
+            return JsonResponse({'success': True, 'message': 'Teacher updated successfully.'})
 
-    return render(request, 'subadmin_dashboard/edit_teacher.html', {
-        'form': form, 'teacher': teacher, 'department': department
-    })
+        else:
+            return JsonResponse({'success': False, 'errors': form.errors})
+
+    return redirect('accounts:subadmin_manage_teachers')
 
 
 @login_required
@@ -1385,30 +1366,27 @@ def subadmin_add_subject(request):
 
         errors = {}
         if not code:
-            errors['code'] = 'Subject code is required.'
+            errors['code'] = ['Subject code is required.']
         elif Subject.objects.filter(code=code, departments=department).exists():
-            errors['code'] = f'A subject with code "{code}" already exists in {department.code}.'
+            errors['code'] = [f'A subject with code "{code}" already exists in {department.code}.']
         if not name:
-            errors['name'] = 'Subject name is required.'
+            errors['name'] = ['Subject name is required.']
 
-        if not errors:
-            subject = Subject.objects.create(code=code, name=name, description=description)
-            subject.departments.add(department)
-            ActivityLog.objects.create(
-                activity_type='subject_created',
-                user=request.user,
-                description=(
-                    f"Subject {subject.name} ({subject.code}) was created "
-                    f"and added to {department.name} by Sub-Admin {request.user.get_full_name()}"
-                )
+        if errors:
+            return JsonResponse({'success': False, 'errors': errors})
+
+        subject = Subject.objects.create(code=code, name=name, description=description)
+        subject.departments.add(department)
+        ActivityLog.objects.create(
+            activity_type='subject_created',
+            user=request.user,
+            description=(
+                f"Subject {subject.name} ({subject.code}) was created "
+                f"and added to {department.name} by Sub-Admin {request.user.get_full_name()}"
             )
-            bust_dashboard_cache()  # ✅
-            messages.success(request, f'Subject "{subject.name}" ({subject.code}) added successfully.')
-            return redirect('accounts:subadmin_manage_subjects')
-        else:
-            for field, error in errors.items():
-                messages.error(request, error)
-            return redirect('accounts:subadmin_manage_subjects')
+        )
+        bust_dashboard_cache()
+        return JsonResponse({'success': True, 'message': f'Subject "{subject.name}" ({subject.code}) added successfully.'})
 
     return redirect('accounts:subadmin_manage_subjects')
 
@@ -1426,31 +1404,30 @@ def subadmin_edit_subject(request, pk):
 
         errors = {}
         if not code:
-            errors['code'] = 'Subject code is required.'
+            errors['code'] = ['Subject code is required.']
         elif Subject.objects.filter(code=code, departments=department).exclude(pk=pk).exists():
-            errors['code'] = f'A subject with code "{code}" already exists in {department.code}.'
+            errors['code'] = [f'A subject with code "{code}" already exists in {department.code}.']
         if not name:
-            errors['name'] = 'Subject name is required.'
+            errors['name'] = ['Subject name is required.']
 
-        if not errors:
-            old_code = subject.code
-            subject.code        = code
-            subject.name        = name
-            subject.description = description
-            subject.save()
-            ActivityLog.objects.create(
-                activity_type='subject_updated',
-                user=request.user,
-                description=(
-                    f"Subject {old_code} updated to {subject.name} ({subject.code}) "
-                    f"in {department.name} by Sub-Admin {request.user.get_full_name()}"
-                )
+        if errors:
+            return JsonResponse({'success': False, 'errors': errors})
+
+        old_code = subject.code
+        subject.code        = code
+        subject.name        = name
+        subject.description = description
+        subject.save()
+        ActivityLog.objects.create(
+            activity_type='subject_updated',
+            user=request.user,
+            description=(
+                f"Subject {old_code} updated to {subject.name} ({subject.code}) "
+                f"in {department.name} by Sub-Admin {request.user.get_full_name()}"
             )
-            bust_dashboard_cache()  # ✅
-            messages.success(request, f'Subject "{subject.name}" updated successfully.')
-        else:
-            for field, error in errors.items():
-                messages.error(request, error)
+        )
+        bust_dashboard_cache()
+        return JsonResponse({'success': True, 'message': f'Subject "{subject.name}" updated successfully.'})
 
     return redirect('accounts:subadmin_manage_subjects')
 

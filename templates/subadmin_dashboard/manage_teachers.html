@@ -1,11 +1,22 @@
 {% extends 'base.html' %}
 
 {% block title %}Manage Teachers - {{ department.name }}{% endblock %}
-
 {% block header_title %}Manage Teachers{% endblock %}
 {% block header_subtitle %}{{ department.name }} ({{ department.code }}) — Teachers under your department{% endblock %}
 
 {% block content %}
+
+<!-- Flash message from AJAX -->
+<div id="ajaxFlash" class="hidden mb-4 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded-xl flex items-center justify-between">
+    <div class="flex items-center">
+        <i class="bi bi-check-circle-fill text-green-500 text-lg mr-2"></i>
+        <span id="ajaxFlashMessage"></span>
+    </div>
+    <button onclick="document.getElementById('ajaxFlash').classList.add('hidden')" class="text-green-600 hover:text-green-800">
+        <i class="bi bi-x-lg"></i>
+    </button>
+</div>
+
 <!-- Header Actions -->
 <div class="flex items-center justify-between mb-6">
     <div class="flex items-center space-x-3">
@@ -171,13 +182,11 @@
 
 
 <!-- ===================== ADD TEACHER MODAL ===================== -->
-<div id="addModal"
-     class="fixed inset-0 z-50 overflow-y-auto hidden">
+<div id="addModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
     <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeAllModals();">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl transform transition-all duration-200 scale-95 opacity-0"
          id="addModalContent">
 
-        <!-- Header -->
         <div class="bg-gradient-to-r from-green-500 to-green-600 px-8 py-6 rounded-t-2xl">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
@@ -189,13 +198,12 @@
                         <p class="text-green-200 text-sm">Will be added to <strong>{{ department.name }}</strong></p>
                     </div>
                 </div>
-                <button onclick="closeAllModals()" class="text-white text-opacity-70 hover:text-opacity-100 transition-opacity">
+                <button onclick="closeAllModals()" class="text-white hover:text-green-200 transition-colors">
                     <i class="bi bi-x-lg text-xl"></i>
                 </button>
             </div>
         </div>
 
-        <!-- Department locked notice -->
         <div class="mx-6 mt-5 flex items-center space-x-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
             <i class="bi bi-lock-fill text-blue-500"></i>
             <p class="text-sm text-blue-700">
@@ -203,9 +211,14 @@
             </p>
         </div>
 
-        <!-- Form -->
-        <form method="post" action="{% url 'accounts:subadmin_add_teacher' %}" class="p-6 space-y-5">
+        <form id="addForm" method="post" action="{% url 'accounts:subadmin_add_teacher' %}" class="p-6 space-y-5">
             {% csrf_token %}
+
+            <!-- General error banner -->
+            <div id="add_general_error" class="hidden bg-red-50 border border-red-300 text-red-700 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill text-red-500 flex-shrink-0"></i>
+                <span id="add_general_error_text"></span>
+            </div>
 
             <!-- Personal Info -->
             <div>
@@ -215,25 +228,25 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">First Name <span class="text-red-500">*</span></label>
-                        <input type="text" name="first_name" value="{{ form.first_name.value|default:'' }}"
+                        <input type="text" name="first_name" id="add_first_name"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 transition-colors"
                                placeholder="Juan">
-                        {% if form.first_name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.first_name.errors.0 }}</p>{% endif %}
+                        <p class="text-red-500 text-xs mt-1 hidden" id="add_first_name_error"></p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Last Name <span class="text-red-500">*</span></label>
-                        <input type="text" name="last_name" value="{{ form.last_name.value|default:'' }}"
+                        <input type="text" name="last_name" id="add_last_name"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 transition-colors"
                                placeholder="Dela Cruz">
-                        {% if form.last_name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.last_name.errors.0 }}</p>{% endif %}
+                        <p class="text-red-500 text-xs mt-1 hidden" id="add_last_name_error"></p>
                     </div>
                 </div>
                 <div class="mt-3">
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">Email Address <span class="text-red-500">*</span></label>
-                    <input type="email" name="email" value="{{ form.email.value|default:'' }}"
+                    <input type="email" name="email" id="add_email"
                            class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 transition-colors"
                            placeholder="juan.delacruz@bisu.edu.ph">
-                    {% if form.email.errors %}<p class="text-red-500 text-xs mt-1">{{ form.email.errors.0 }}</p>{% endif %}
+                    <p class="text-red-500 text-xs mt-1 hidden" id="add_email_error"></p>
                 </div>
             </div>
 
@@ -247,17 +260,17 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Username <span class="text-red-500">*</span></label>
-                        <input type="text" name="username" value="{{ form.username.value|default:'' }}"
+                        <input type="text" name="username" id="add_username"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 transition-colors font-mono"
                                placeholder="jdelacruz">
-                        {% if form.username.errors %}<p class="text-red-500 text-xs mt-1">{{ form.username.errors.0 }}</p>{% endif %}
+                        <p class="text-red-500 text-xs mt-1 hidden" id="add_username_error"></p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Password <span class="text-red-500">*</span></label>
-                        <input type="password" name="password"
+                        <input type="password" name="password" id="add_password"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 transition-colors"
                                placeholder="••••••••">
-                        {% if form.password.errors %}<p class="text-red-500 text-xs mt-1">{{ form.password.errors.0 }}</p>{% endif %}
+                        <p class="text-red-500 text-xs mt-1 hidden" id="add_password_error"></p>
                     </div>
                 </div>
             </div>
@@ -272,28 +285,27 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Employee ID <span class="text-red-500">*</span></label>
-                        <input type="text" name="employee_id" value="{{ form.employee_id.value|default:'' }}"
+                        <input type="text" name="employee_id" id="add_employee_id"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 transition-colors font-mono"
                                placeholder="EMP-00001">
-                        {% if form.employee_id.errors %}<p class="text-red-500 text-xs mt-1">{{ form.employee_id.errors.0 }}</p>{% endif %}
+                        <p class="text-red-500 text-xs mt-1 hidden" id="add_employee_id_error"></p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Phone Number</label>
-                        <input type="text" name="phone" value="{{ form.phone.value|default:'' }}"
+                        <input type="text" name="phone" id="add_phone"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 transition-colors"
                                placeholder="09XX-XXX-XXXX">
-                        {% if form.phone.errors %}<p class="text-red-500 text-xs mt-1">{{ form.phone.errors.0 }}</p>{% endif %}
+                        <p class="text-red-500 text-xs mt-1 hidden" id="add_phone_error"></p>
                     </div>
                 </div>
             </div>
 
-            <!-- Actions -->
             <div class="flex items-center justify-end space-x-4 pt-2 border-t border-gray-200">
                 <button type="button" onclick="closeAllModals()"
                         class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
                     Cancel
                 </button>
-                <button type="submit"
+                <button type="button" onclick="submitFormAjax('addForm', 'add')"
                         class="flex items-center space-x-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-2.5 rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-md font-medium">
                     <i class="bi bi-person-plus"></i>
                     <span>Add Teacher</span>
@@ -306,13 +318,11 @@
 
 
 <!-- ===================== EDIT TEACHER MODAL ===================== -->
-<div id="editModal"
-     class="fixed inset-0 z-50 overflow-y-auto hidden">
+<div id="editModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
     <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeAllModals();">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl transform transition-all duration-200 scale-95 opacity-0"
          id="editModalContent">
 
-        <!-- Header -->
         <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-8 py-6 rounded-t-2xl">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
@@ -325,15 +335,20 @@
                         <p id="editTeacherMeta" class="text-blue-200 text-sm">— {{ department.name }}</p>
                     </div>
                 </div>
-                <button onclick="closeAllModals()" class="text-white text-opacity-70 hover:text-opacity-100 transition-opacity">
+                <button onclick="closeAllModals()" class="text-white hover:text-blue-200 transition-colors">
                     <i class="bi bi-x-lg text-xl"></i>
                 </button>
             </div>
         </div>
 
-        <!-- Form (action set dynamically) -->
         <form id="editForm" method="post" action="" class="p-6 space-y-5">
             {% csrf_token %}
+
+            <!-- General error banner -->
+            <div id="edit_general_error" class="hidden bg-red-50 border border-red-300 text-red-700 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill text-red-500 flex-shrink-0"></i>
+                <span id="edit_general_error_text"></span>
+            </div>
 
             <!-- Personal Info -->
             <div>
@@ -345,23 +360,26 @@
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">First Name <span class="text-red-500">*</span></label>
                         <input type="text" name="first_name" id="edit_first_name"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                        <p class="text-red-500 text-xs mt-1 hidden" id="edit_first_name_error"></p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Last Name <span class="text-red-500">*</span></label>
                         <input type="text" name="last_name" id="edit_last_name"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                        <p class="text-red-500 text-xs mt-1 hidden" id="edit_last_name_error"></p>
                     </div>
                 </div>
                 <div class="mt-3">
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">Email Address <span class="text-red-500">*</span></label>
                     <input type="email" name="email" id="edit_email"
                            class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                    <p class="text-red-500 text-xs mt-1 hidden" id="edit_email_error"></p>
                 </div>
             </div>
 
             <hr class="border-gray-200">
 
-            <!-- ========== NEW: LOGIN CREDENTIALS SECTION ========== -->
+            <!-- Login Credentials -->
             <div>
                 <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
                     <i class="bi bi-shield-lock mr-2 text-blue-500"></i>Login Credentials
@@ -373,6 +391,7 @@
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-mono"
                                placeholder="Username for login">
                         <p class="text-xs text-gray-500 mt-1">Leave unchanged if you don't want to modify</p>
+                        <p class="text-red-500 text-xs mt-1 hidden" id="edit_username_error"></p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">New Password</label>
@@ -380,6 +399,7 @@
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors"
                                placeholder="Leave blank to keep current">
                         <p class="text-xs text-gray-500 mt-1">Only fill if you want to change password</p>
+                        <p class="text-red-500 text-xs mt-1 hidden" id="edit_new_password_error"></p>
                     </div>
                 </div>
                 <div class="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -402,15 +422,16 @@
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Employee ID <span class="text-red-500">*</span></label>
                         <input type="text" name="employee_id" id="edit_employee_id"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-mono">
+                        <p class="text-red-500 text-xs mt-1 hidden" id="edit_employee_id_error"></p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Phone Number</label>
                         <input type="text" name="phone" id="edit_phone"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                        <p class="text-red-500 text-xs mt-1 hidden" id="edit_phone_error"></p>
                     </div>
                 </div>
 
-                <!-- Department locked -->
                 <div class="mt-3">
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">Department</label>
                     <div class="flex items-center space-x-3 px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-xl">
@@ -420,7 +441,6 @@
                     </div>
                 </div>
 
-                <!-- Status -->
                 <div class="mt-3">
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">Account Status</label>
                     <div class="flex items-center h-11 px-4 border-2 border-gray-200 rounded-xl">
@@ -433,13 +453,12 @@
                 </div>
             </div>
 
-            <!-- Actions -->
             <div class="flex items-center justify-end space-x-4 pt-2 border-t border-gray-200">
                 <button type="button" onclick="closeAllModals()"
                         class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
                     Cancel
                 </button>
-                <button type="submit"
+                <button type="button" onclick="submitFormAjax('editForm', 'edit')"
                         class="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-2.5 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-md font-medium">
                     <i class="bi bi-check-lg"></i>
                     <span>Save Changes</span>
@@ -451,17 +470,62 @@
 </div>
 
 
+<!-- ===================== DELETE TEACHER MODAL ===================== -->
+<div id="deleteModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeAllModals();">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0"
+         id="deleteModalContent">
+
+        <div class="bg-gradient-to-r from-red-500 to-red-600 px-8 py-6 rounded-t-2xl text-center relative">
+            <button onclick="closeAllModals()" class="absolute top-4 right-4 text-white hover:text-red-200 transition-colors">
+                <i class="bi bi-x-lg text-xl"></i>
+            </button>
+            <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-3 text-white text-2xl font-bold" id="deleteAvatar">--</div>
+            <h2 class="text-2xl font-bold text-white">Delete Teacher?</h2>
+            <p class="text-red-200 text-sm mt-1">This action cannot be undone</p>
+        </div>
+
+        <div class="p-6">
+            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-5 mb-5">
+                <p id="deleteTeacherName" class="font-bold text-gray-800 text-lg"></p>
+                <p id="deleteTeacherEmail" class="text-sm text-gray-500 mt-1"></p>
+                <span id="deleteEmployeeId" class="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600 inline-block mt-1"></span>
+            </div>
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-5">
+                <div class="flex items-start space-x-3">
+                    <i class="bi bi-exclamation-triangle-fill text-red-500 text-lg flex-shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-red-700">Deleting this teacher will permanently remove their account and all associated data.</p>
+                </div>
+            </div>
+            <form id="deleteForm" method="post" action="">
+                {% csrf_token %}
+                <div class="flex items-center space-x-4">
+                    <button type="button" onclick="closeAllModals()"
+                            class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium text-center">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-md font-medium">
+                        <i class="bi bi-trash3"></i>
+                        <span>Yes, Delete</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    </div>
+</div>
+
+
 <!-- ===================== JAVASCRIPT ===================== -->
 <script>
-    // ── URL templates rendered by Django — no hardcoded paths ────────────────
     const EDIT_URL_TEMPLATE   = "{% url 'accounts:subadmin_edit_teacher' pk=0 %}";
     const DELETE_URL_TEMPLATE = "{% url 'accounts:subadmin_delete_teacher' pk=0 %}";
+    const MODAL_IDS = ['addModal', 'editModal', 'deleteModal'];
 
     function makeUrl(template, pk) {
         return template.replace('/0/', '/' + pk + '/');
     }
-
-    const MODAL_IDS = ['addModal', 'editModal', 'deleteModal'];
 
     function openModal(modalId) {
         document.getElementById('modalBackdrop').classList.remove('hidden');
@@ -481,10 +545,14 @@
     }
 
     function closeAllModals() {
+        clearFormErrors('add');
+        clearFormErrors('edit');
         MODAL_IDS.forEach(id => {
             const card = document.getElementById(id + 'Content');
-            card.classList.remove('scale-100', 'opacity-100');
-            card.classList.add('scale-95', 'opacity-0');
+            if (card) {
+                card.classList.remove('scale-100', 'opacity-100');
+                card.classList.add('scale-95', 'opacity-0');
+            }
         });
         setTimeout(() => {
             MODAL_IDS.forEach(id => document.getElementById(id).classList.add('hidden'));
@@ -492,24 +560,99 @@
         }, 200);
     }
 
-    function openAddModal() { openModal('addModal'); }
+    const ADD_FIELDS  = ['first_name', 'last_name', 'email', 'username', 'password', 'employee_id', 'phone'];
+    const EDIT_FIELDS = ['first_name', 'last_name', 'email', 'username', 'new_password', 'employee_id', 'phone'];
+
+    function clearFormErrors(prefix) {
+        const fields = prefix === 'add' ? ADD_FIELDS : EDIT_FIELDS;
+        fields.forEach(field => {
+            const el = document.getElementById(`${prefix}_${field}_error`);
+            if (el) { el.textContent = ''; el.classList.add('hidden'); }
+            const input = document.getElementById(`${prefix}_${field}`);
+            if (input) input.classList.remove('border-red-500');
+        });
+        const gen = document.getElementById(`${prefix}_general_error`);
+        if (gen) gen.classList.add('hidden');
+    }
+
+    function showFormErrors(prefix, errors) {
+        clearFormErrors(prefix);
+        Object.entries(errors).forEach(([field, msgs]) => {
+            if (field === '__all__') {
+                const gen     = document.getElementById(`${prefix}_general_error`);
+                const genText = document.getElementById(`${prefix}_general_error_text`);
+                if (gen && genText) {
+                    genText.textContent = msgs[0];
+                    gen.classList.remove('hidden');
+                }
+                return;
+            }
+            const el = document.getElementById(`${prefix}_${field}_error`);
+            if (el) { el.textContent = msgs[0]; el.classList.remove('hidden'); }
+            const input = document.getElementById(`${prefix}_${field}`);
+            if (input) input.classList.add('border-red-500');
+        });
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            document.cookie.split(';').forEach(cookie => {
+                cookie = cookie.trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                }
+            });
+        }
+        return cookieValue;
+    }
+
+    function submitFormAjax(formId, prefix) {
+        const form = document.getElementById(formId);
+        const url  = form.action;
+        const data = new FormData(form);
+
+        fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            body: data,
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                sessionStorage.setItem('flashMessage', result.message);
+                window.location.reload();
+            } else {
+                showFormErrors(prefix, result.errors);
+            }
+        })
+        .catch(() => {
+            alert('An unexpected error occurred. Please try again.');
+        });
+    }
+
+    function openAddModal() {
+        clearFormErrors('add');
+        document.getElementById('addForm').reset();
+        openModal('addModal');
+    }
 
     function openEditModal(pk, firstName, lastName, email, username, employeeId, phone, isActive) {
-        document.getElementById('edit_first_name').value  = firstName;
-        document.getElementById('edit_last_name').value   = lastName;
-        document.getElementById('edit_email').value       = email;
-        document.getElementById('edit_username').value    = username;  // NEW: Set username
-        document.getElementById('edit_employee_id').value = employeeId;
-        document.getElementById('edit_phone').value       = phone;
-        document.getElementById('edit_is_active').checked = isActive;
-        document.getElementById('edit_new_password').value = '';  // Clear password field
+        clearFormErrors('edit');
+        document.getElementById('edit_first_name').value   = firstName;
+        document.getElementById('edit_last_name').value    = lastName;
+        document.getElementById('edit_email').value        = email;
+        document.getElementById('edit_username').value     = username;
+        document.getElementById('edit_employee_id').value  = employeeId;
+        document.getElementById('edit_phone').value        = phone;
+        document.getElementById('edit_is_active').checked  = isActive;
+        document.getElementById('edit_new_password').value = '';
 
         const initials = (firstName[0] || '').toUpperCase() + (lastName[0] || '').toUpperCase();
         document.getElementById('editAvatar').textContent      = initials;
         document.getElementById('editTeacherName').textContent = firstName + ' ' + lastName;
         document.getElementById('editTeacherMeta').textContent = employeeId + ' — {{ department.name }}';
         document.getElementById('editForm').action             = makeUrl(EDIT_URL_TEMPLATE, pk);
-
         openModal('editModal');
     }
 
@@ -519,14 +662,24 @@
         document.getElementById('deleteTeacherEmail').textContent = email;
         document.getElementById('deleteEmployeeId').textContent   = employeeId;
         document.getElementById('deleteForm').action              = makeUrl(DELETE_URL_TEMPLATE, pk);
-
         openModal('deleteModal');
     }
 
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
+    // Flash message on reload
+    window.addEventListener('load', function () {
+        const msg = sessionStorage.getItem('flashMessage');
+        if (msg) {
+            const flash    = document.getElementById('ajaxFlash');
+            const flashMsg = document.getElementById('ajaxFlashMessage');
+            if (flash && flashMsg) {
+                flashMsg.textContent = msg;
+                flash.classList.remove('hidden');
+                sessionStorage.removeItem('flashMessage');
+                setTimeout(() => flash.classList.add('hidden'), 4000);
+            }
+        }
+    });
 
-    {% if form and form.errors %}
-    window.addEventListener('DOMContentLoaded', () => openAddModal());
-    {% endif %}
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
 </script>
 {% endblock %}

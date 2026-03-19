@@ -5,6 +5,18 @@
 {% block header_subtitle %}{{ department.name }} ({{ department.code }}) — Subjects in your department{% endblock %}
 
 {% block content %}
+
+<!-- Flash message from AJAX -->
+<div id="ajaxFlash" class="hidden mb-4 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded-xl flex items-center justify-between">
+    <div class="flex items-center">
+        <i class="bi bi-check-circle-fill text-green-500 text-lg mr-2"></i>
+        <span id="ajaxFlashMessage"></span>
+    </div>
+    <button onclick="document.getElementById('ajaxFlash').classList.add('hidden')" class="text-green-600 hover:text-green-800">
+        <i class="bi bi-x-lg"></i>
+    </button>
+</div>
+
 <!-- Header Actions -->
 <div class="flex items-center justify-between mb-6">
     <div class="flex items-center space-x-3">
@@ -142,9 +154,7 @@
 
 
 <!-- ===================== MODAL BACKDROP ===================== -->
-<div id="modalBackdrop"
-     class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden">
-</div>
+<div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
 
 
 <!-- ===================== ADD SUBJECT MODAL ===================== -->
@@ -170,7 +180,6 @@
             </div>
         </div>
 
-        <!-- Department locked notice -->
         <div class="mx-6 mt-5 flex items-center space-x-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
             <i class="bi bi-lock-fill text-blue-500"></i>
             <p class="text-sm text-blue-700">
@@ -178,32 +187,32 @@
             </p>
         </div>
 
-        <form method="post" action="{% url 'accounts:subadmin_add_subject' %}" class="p-6 space-y-4">
+        <form id="addForm" method="post" action="{% url 'accounts:subadmin_add_subject' %}" class="p-6 space-y-4">
             {% csrf_token %}
 
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">Subject Code <span class="text-red-500">*</span></label>
-                <input type="text" name="code" value="{{ form.code.value|default:'' }}"
+                <input type="text" name="code" id="add_code"
                        class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 transition-colors font-mono uppercase"
                        placeholder="e.g., CS101">
                 <p class="text-xs text-gray-400 mt-1">Will be converted to uppercase automatically</p>
-                {% if form.code.errors %}<p class="text-red-500 text-xs mt-1">{{ form.code.errors.0 }}</p>{% endif %}
+                <p class="text-red-500 text-xs mt-1 hidden" id="add_code_error"></p>
             </div>
 
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">Subject Name <span class="text-red-500">*</span></label>
-                <input type="text" name="name" value="{{ form.name.value|default:'' }}"
+                <input type="text" name="name" id="add_name"
                        class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 transition-colors"
                        placeholder="e.g., Introduction to Programming">
-                {% if form.name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.name.errors.0 }}</p>{% endif %}
+                <p class="text-red-500 text-xs mt-1 hidden" id="add_name_error"></p>
             </div>
 
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
-                <textarea name="description" rows="3"
+                <textarea name="description" id="add_description" rows="3"
                           class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 transition-colors resize-none"
-                          placeholder="Brief description of the subject...">{{ form.description.value|default:'' }}</textarea>
-                {% if form.description.errors %}<p class="text-red-500 text-xs mt-1">{{ form.description.errors.0 }}</p>{% endif %}
+                          placeholder="Brief description of the subject..."></textarea>
+                <p class="text-red-500 text-xs mt-1 hidden" id="add_description_error"></p>
             </div>
 
             <div class="flex items-center justify-end space-x-4 pt-2 border-t border-gray-200">
@@ -211,7 +220,7 @@
                         class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
                     Cancel
                 </button>
-                <button type="submit"
+                <button type="button" onclick="submitFormAjax('addForm', 'add')"
                         class="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white px-8 py-2.5 rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all shadow-md font-medium">
                     <i class="bi bi-journal-plus"></i>
                     <span>Add Subject</span>
@@ -253,21 +262,23 @@
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">Subject Code <span class="text-red-500">*</span></label>
                 <input type="text" name="code" id="edit_code"
                        class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-mono uppercase">
+                <p class="text-red-500 text-xs mt-1 hidden" id="edit_code_error"></p>
             </div>
 
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">Subject Name <span class="text-red-500">*</span></label>
                 <input type="text" name="name" id="edit_name"
                        class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                <p class="text-red-500 text-xs mt-1 hidden" id="edit_name_error"></p>
             </div>
 
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
                 <textarea name="description" id="edit_description" rows="3"
                           class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors resize-none"></textarea>
+                <p class="text-red-500 text-xs mt-1 hidden" id="edit_description_error"></p>
             </div>
 
-            <!-- Department locked -->
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">Department</label>
                 <div class="flex items-center space-x-3 px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-xl">
@@ -282,7 +293,7 @@
                         class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
                     Cancel
                 </button>
-                <button type="submit"
+                <button type="button" onclick="submitFormAjax('editForm', 'edit')"
                         class="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-2.5 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-md font-medium">
                     <i class="bi bi-check-lg"></i>
                     <span>Save Changes</span>
@@ -318,8 +329,8 @@
                         <i class="bi bi-book text-2xl"></i>
                     </div>
                     <div>
-                        <p id="deleteSubjectName" class="font-bold text-gray-800 text-lg">Subject Name</p>
-                        <p id="deleteSubjectCode" class="font-mono text-sm bg-gray-100 px-2 py-0.5 rounded inline-block text-gray-600 mt-1">CODE</p>
+                        <p id="deleteSubjectName" class="font-bold text-gray-800 text-lg"></p>
+                        <p id="deleteSubjectCode" class="font-mono text-sm bg-gray-100 px-2 py-0.5 rounded inline-block text-gray-600 mt-1"></p>
                     </div>
                 </div>
             </div>
@@ -359,8 +370,6 @@
 
 <script>
     const MODAL_IDS = ['addModal', 'editModal', 'deleteModal'];
-
-    // ── URL templates rendered by Django — no hardcoded paths ────────────────
     const EDIT_URL_TEMPLATE   = "{% url 'accounts:subadmin_edit_subject' pk=0 %}";
     const DELETE_URL_TEMPLATE = "{% url 'accounts:subadmin_delete_subject' pk=0 %}";
 
@@ -386,10 +395,14 @@
     }
 
     function closeAllModals() {
+        clearFormErrors('add');
+        clearFormErrors('edit');
         MODAL_IDS.forEach(id => {
             const card = document.getElementById(id + 'Content');
-            card.classList.remove('scale-100', 'opacity-100');
-            card.classList.add('scale-95', 'opacity-0');
+            if (card) {
+                card.classList.remove('scale-100', 'opacity-100');
+                card.classList.add('scale-95', 'opacity-0');
+            }
         });
         setTimeout(() => {
             MODAL_IDS.forEach(id => document.getElementById(id).classList.add('hidden'));
@@ -397,9 +410,72 @@
         }, 200);
     }
 
-    function openAddModal() { openModal('addModal'); }
+    const SUBJECT_FIELDS = ['code', 'name', 'description'];
+
+    function clearFormErrors(prefix) {
+        SUBJECT_FIELDS.forEach(field => {
+            const el = document.getElementById(`${prefix}_${field}_error`);
+            if (el) { el.textContent = ''; el.classList.add('hidden'); }
+            const input = document.getElementById(`${prefix}_${field}`);
+            if (input) input.classList.remove('border-red-500');
+        });
+    }
+
+    function showFormErrors(prefix, errors) {
+        clearFormErrors(prefix);
+        Object.entries(errors).forEach(([field, msgs]) => {
+            const el = document.getElementById(`${prefix}_${field}_error`);
+            if (el) { el.textContent = msgs[0]; el.classList.remove('hidden'); }
+            const input = document.getElementById(`${prefix}_${field}`);
+            if (input) input.classList.add('border-red-500');
+        });
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            document.cookie.split(';').forEach(cookie => {
+                cookie = cookie.trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                }
+            });
+        }
+        return cookieValue;
+    }
+
+    function submitFormAjax(formId, prefix) {
+        const form = document.getElementById(formId);
+        const url  = form.action;
+        const data = new FormData(form);
+
+        fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            body: data,
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                sessionStorage.setItem('flashMessage', result.message);
+                window.location.reload();
+            } else {
+                showFormErrors(prefix, result.errors);
+            }
+        })
+        .catch(() => {
+            alert('An unexpected error occurred. Please try again.');
+        });
+    }
+
+    function openAddModal() {
+        clearFormErrors('add');
+        document.getElementById('addForm').reset();
+        openModal('addModal');
+    }
 
     function openEditModal(pk, name, code, description) {
+        clearFormErrors('edit');
         document.getElementById('edit_code').value        = code;
         document.getElementById('edit_name').value        = name;
         document.getElementById('edit_description').value = description;
@@ -415,10 +491,21 @@
         openModal('deleteModal');
     }
 
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
+    // Flash message on reload
+    window.addEventListener('load', function () {
+        const msg = sessionStorage.getItem('flashMessage');
+        if (msg) {
+            const flash    = document.getElementById('ajaxFlash');
+            const flashMsg = document.getElementById('ajaxFlashMessage');
+            if (flash && flashMsg) {
+                flashMsg.textContent = msg;
+                flash.classList.remove('hidden');
+                sessionStorage.removeItem('flashMessage');
+                setTimeout(() => flash.classList.add('hidden'), 4000);
+            }
+        }
+    });
 
-    {% if form and form.errors %}
-    window.addEventListener('DOMContentLoaded', () => openAddModal());
-    {% endif %}
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
 </script>
 {% endblock %}
