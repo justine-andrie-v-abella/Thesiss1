@@ -583,19 +583,16 @@ def add_department(request):
         form = DepartmentForm(request.POST)
         if form.is_valid():
             department = form.save()
-            bust_dashboard_cache()  # ✅
+            bust_dashboard_cache()
             ActivityLog.objects.create(
                 activity_type='department_created',
                 user=request.user,
                 description=f"Department {department.name} ({department.code}) was created"
             )
-            messages.success(request, f'Department "{department.name}" has been added successfully!')
-            return redirect('accounts:manage_departments')
+            return JsonResponse({'success': True, 'message': f'Department "{department.name}" has been added successfully!'})
         else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = DepartmentForm()
-    return render(request, 'admin_dashboard/add_department.html', {'form': form})
+            return JsonResponse({'success': False, 'errors': form.errors})
+    return redirect('accounts:manage_departments')
 
 
 @login_required
@@ -609,20 +606,17 @@ def edit_department(request, pk):
         form = DepartmentForm(request.POST, instance=department)
         if form.is_valid():
             updated_department = form.save()
-            bust_dashboard_cache()  # ✅
+            bust_dashboard_cache()
             ActivityLog.objects.create(
                 activity_type='department_updated',
                 user=request.user,
                 description=f"Department {old_name} ({old_code}) was updated to {updated_department.name} ({updated_department.code})"
             )
-            messages.success(request, f'Department "{updated_department.name}" has been updated successfully!')
-            return redirect('accounts:manage_departments')
+            return JsonResponse({'success': True, 'message': f'Department "{updated_department.name}" has been updated successfully!'})
         else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = DepartmentForm(instance=department)
+            return JsonResponse({'success': False, 'errors': form.errors})
 
-    return render(request, 'admin_dashboard/edit_department.html', {'form': form, 'department': department})
+    return redirect('accounts:manage_departments')
 
 
 @login_required
