@@ -107,7 +107,7 @@
         <!-- Card Footer -->
         <div class="bg-gray-50 px-5 py-4 rounded-b-xl">
 
-            <!-- Download Button — uses fixed-position dropdown via JS -->
+            <!-- Download Button -->
             <div class="mb-2">
                 <button
                     type="button"
@@ -132,14 +132,44 @@
                     <i class="bi bi-list-check mr-1"></i> Review
                 </a>
                 {% endif %}
-                <a href="{% url 'questionnaires:edit_questionnaire' quest.pk %}"
-                    class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-lg transition-all" title="Edit">
+
+                <!-- Edit — opens modal -->
+                {% with uploaded=quest.uploaded_at|date:"M d, Y" desc=quest.description|default:""|escapejs %}
+                <button type="button"
+                    class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-lg transition-all"
+                    title="Edit"
+                    onclick="openEditModal(
+                        '{{ quest.pk }}',
+                        '{{ quest.title|escapejs }}',
+                        '{{ desc }}',
+                        '{{ quest.subject.code }}',
+                        '{{ quest.department.name|escapejs }}',
+                        '{{ quest.file_type|upper }}',
+                        '{{ quest.get_file_size_display }}',
+                        '{{ uploaded }}',
+                        '{{ quest.exam_type }}'
+                    )">
                     <i class="bi bi-pencil-square"></i>
-                </a>
-                <a href="{% url 'questionnaires:delete_questionnaire' quest.pk %}"
-                    class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-3 rounded-lg transition-all" title="Delete">
+                </button>
+                {% endwith %}
+
+                <!-- Delete — opens modal -->
+                {% with uploaded=quest.uploaded_at|date:"M d, Y" %}
+                <button type="button"
+                    class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-3 rounded-lg transition-all"
+                    title="Delete"
+                    onclick="openDeleteModal(
+                        '{{ quest.pk }}',
+                        '{{ quest.title|escapejs }}',
+                        '{{ quest.department.name|escapejs }}',
+                        '{{ quest.subject.code }} - {{ quest.subject.name|escapejs }}',
+                        '{{ quest.file_type|upper }} ({{ quest.get_file_size_display }})',
+                        '{{ uploaded }}',
+                        '{{ quest.exam_type }}'
+                    )">
                     <i class="bi bi-trash3"></i>
-                </a>
+                </button>
+                {% endwith %}
             </div>
         </div>
     </div>
@@ -191,18 +221,249 @@
 </div>
 {% endif %}
 
-<!-- =====================================================================
-     FIXED-POSITION DROPDOWN PORTAL
-     Renders outside the card grid so it's NEVER covered by other cards
-     ===================================================================== -->
+<!-- Download Dropdown Portal -->
 <div id="download-dropdown-portal"
     style="display:none; position:fixed; z-index:99999; min-width:220px;"
     class="bg-white rounded-lg shadow-2xl border-2 border-gray-200">
 </div>
 
-<!-- =====================================================================
-     {% comment %} STYLES + SCRIPT — inside {% block content %} so it always renders {% endcomment %}
-     ===================================================================== -->
+
+<!-- ═══════════════════════════════════════════════════════════════
+     EDIT MODAL
+════════════════════════════════════════════════════════════════ -->
+<div id="editModal" style="display:none;"
+    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto animate-modal">
+
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-yellow-500 to-orange-600 px-6 py-4 flex items-center justify-between rounded-t-xl sticky top-0 z-10">
+            <h3 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-pencil-square text-2xl mr-3"></i> Edit Questionnaire
+            </h3>
+            <button type="button" onclick="closeEditModal()"
+                class="w-9 h-9 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors">
+                <i class="bi bi-x-lg text-xl"></i>
+            </button>
+        </div>
+
+        <div class="p-6 grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+            <!-- Form — left 3 cols -->
+            <div class="lg:col-span-3">
+                <form id="editForm" method="post" action="" class="space-y-5">
+                    {% csrf_token %}
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-card-heading text-yellow-500 mr-1"></i> Title *
+                        </label>
+                        <input type="text" id="editTitle" name="title" required
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-yellow-500 transition-colors">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-card-text text-yellow-500 mr-1"></i> Description
+                        </label>
+                        <textarea id="editDescription" name="description" rows="4"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-yellow-500 transition-colors resize-none"></textarea>
+                    </div>
+
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-tag-fill text-orange-500 mr-1"></i> Exam Type *
+                        </label>
+                        <select id="editExamType" name="exam_type" required
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-yellow-500 transition-colors">
+                            <option value="">-- Select Exam Type --</option>
+                            <option value="short_quiz">Short Quiz</option>
+                            <option value="long_quiz">Long Quiz</option>
+                            <option value="prelim">Prelim Exam</option>
+                            <option value="midterm">Midterm Exam</option>
+                            <option value="prefinal">Pre-Final Exam</option>
+                            <option value="final">Final Exam</option>
+                            <option value="activity">Activity / Seatwork</option>
+                            <option value="others">Others</option>
+                        </select>
+                    </div>
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+                        <div class="flex items-start">
+                            <i class="bi bi-info-circle-fill text-blue-600 text-xl mr-3 mt-0.5 flex-shrink-0"></i>
+                            <div>
+                                <p class="font-bold text-blue-800 mb-1 text-sm">Note</p>
+                                <p class="text-sm text-blue-700">Department, subject, and file cannot be changed. Delete and re-upload to change these.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex space-x-3 pt-2">
+                        <button type="submit"
+                            class="flex-1 bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-bold py-3 px-6 rounded-lg hover:from-yellow-600 hover:to-orange-700 transition-all shadow-lg flex items-center justify-center gap-2">
+                            <i class="bi bi-check-circle"></i> Save Changes
+                        </button>
+                        <button type="button" onclick="closeEditModal()"
+                            class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Sidebar — right 2 cols -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-5 py-3 border-b border-gray-200">
+                        <h4 class="text-sm font-bold text-gray-700 flex items-center gap-2">
+                            <i class="bi bi-info-circle text-blue-500"></i> Current Information
+                        </h4>
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                            <div class="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                                <i class="bi bi-building text-blue-600"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs text-gray-500">Department</p>
+                                <p id="editInfoDept" class="font-semibold text-gray-800 text-sm truncate"></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                            <div class="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                                <i class="bi bi-book text-purple-600"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs text-gray-500">Subject</p>
+                                <p id="editInfoSubject" class="font-semibold text-gray-800 text-sm truncate"></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                            <div class="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                                <i class="bi bi-file-earmark text-orange-600"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs text-gray-500">File Type</p>
+                                <p id="editInfoFileType" class="font-semibold text-gray-800 text-sm"></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                            <div class="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                                <i class="bi bi-hdd text-green-600"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs text-gray-500">File Size</p>
+                                <p id="editInfoFileSize" class="font-semibold text-gray-800 text-sm"></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                            <div class="w-9 h-9 bg-pink-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                                <i class="bi bi-calendar text-pink-600"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs text-gray-500">Uploaded</p>
+                                <p id="editInfoDate" class="font-semibold text-gray-800 text-sm"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     DELETE MODAL
+════════════════════════════════════════════════════════════════ -->
+<div id="deleteModal" style="display:none;"
+    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg animate-modal border-2 border-red-200">
+
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 flex items-center justify-between rounded-t-xl">
+            <h3 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-exclamation-triangle text-2xl mr-3"></i> Confirm Deletion
+            </h3>
+            <button type="button" onclick="closeDeleteModal()"
+                class="w-9 h-9 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors">
+                <i class="bi bi-x-lg text-xl"></i>
+            </button>
+        </div>
+
+        <div class="p-8">
+            <p class="text-lg text-gray-700 mb-6 font-semibold">Are you sure you want to delete this questionnaire?</p>
+
+            <!-- Details -->
+            <div class="bg-gray-50 rounded-xl p-6 mb-6 border-l-4 border-red-500 space-y-3">
+                <div class="flex items-center">
+                    <i class="bi bi-card-heading text-red-500 text-xl mr-3 flex-shrink-0"></i>
+                    <div>
+                        <p class="text-xs text-gray-500">Title</p>
+                        <p id="deleteTitle" class="font-bold text-gray-800"></p>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <i class="bi bi-building text-red-500 text-xl mr-3 flex-shrink-0"></i>
+                    <div>
+                        <p class="text-xs text-gray-500">Department</p>
+                        <p id="deleteDept" class="text-gray-700"></p>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <i class="bi bi-book text-red-500 text-xl mr-3 flex-shrink-0"></i>
+                    <div>
+                        <p class="text-xs text-gray-500">Subject</p>
+                        <p id="deleteSubject" class="text-gray-700"></p>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <i class="bi bi-file-earmark text-red-500 text-xl mr-3 flex-shrink-0"></i>
+                    <div>
+                        <p class="text-xs text-gray-500">File</p>
+                        <p id="deleteFile" class="text-gray-700"></p>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <i class="bi bi-calendar text-red-500 text-xl mr-3 flex-shrink-0"></i>
+                    <div>
+                        <p class="text-xs text-gray-500">Uploaded</p>
+                        <p id="deleteDate" class="text-gray-700"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Warning -->
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-lg">
+                <div class="flex items-start">
+                    <i class="bi bi-exclamation-triangle-fill text-red-600 text-2xl mr-3 mt-1 flex-shrink-0"></i>
+                    <div>
+                        <p class="font-bold text-red-800 mb-1">Warning: This action cannot be undone!</p>
+                        <p class="text-sm text-red-700">The file will be permanently removed from the system.</p>
+                    </div>
+                </div>
+            </div>
+
+            <form id="deleteForm" method="post" action="">
+                {% csrf_token %}
+                <div class="flex space-x-3">
+                    <button type="submit"
+                        class="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 px-6 rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-lg flex items-center justify-center gap-2">
+                        <i class="bi bi-trash3"></i> Yes, Delete Questionnaire
+                    </button>
+                    <button type="button" onclick="closeDeleteModal()"
+                        class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
 <style>
 .line-clamp-2 {
     display: -webkit-box;
@@ -216,15 +477,87 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+@keyframes modalIn {
+    from { opacity: 0; transform: scale(0.96) translateY(-10px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+.animate-modal {
+    animation: modalIn 0.2s ease forwards;
+}
 </style>
 
 <script>
 (function () {
-    var portal = document.getElementById('download-dropdown-portal');
+
+    /* ── URL helpers: adjust these to match your urls.py ── */
+    function editUrl(pk)   { return '/questionnaires/edit/' + pk + '/'; }
+    function deleteUrl(pk) { return '/questionnaires/delete/' + pk + '/'; }
+
+    /* ══════════════════════════════════════════
+       EDIT MODAL
+    ══════════════════════════════════════════ */
+    window.openEditModal = function (pk, title, description, subject, dept, fileType, fileSize, date, examType) {
+        document.getElementById('editForm').action           = editUrl(pk);
+        document.getElementById('editTitle').value           = title;
+        document.getElementById('editDescription').value     = description;
+        document.getElementById('editInfoDept').textContent     = dept;
+        document.getElementById('editInfoSubject').textContent  = subject;
+        document.getElementById('editInfoFileType').textContent = fileType;
+        document.getElementById('editInfoFileSize').textContent = fileSize;
+        document.getElementById('editInfoDate').textContent     = date;
+        document.getElementById('editExamType').value            = examType;
+
+        document.getElementById('editModal').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        setTimeout(function () { document.getElementById('editTitle').focus(); }, 60);
+    };
+
+    window.closeEditModal = function () {
+        document.getElementById('editModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    };
+
+    /* ══════════════════════════════════════════
+       DELETE MODAL
+    ══════════════════════════════════════════ */
+    window.openDeleteModal = function (pk, title, dept, subject, file, date) {
+        document.getElementById('deleteForm').action           = deleteUrl(pk);
+        document.getElementById('deleteTitle').textContent     = title;
+        document.getElementById('deleteDept').textContent      = dept;
+        document.getElementById('deleteSubject').textContent   = subject;
+        document.getElementById('deleteFile').textContent      = file;
+        document.getElementById('deleteDate').textContent      = date;
+
+        document.getElementById('deleteModal').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    };
+
+    window.closeDeleteModal = function () {
+        document.getElementById('deleteModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    };
+
+    /* ── Close on backdrop click ── */
+    document.getElementById('editModal').addEventListener('click', function (e) {
+        if (e.target === this) closeEditModal();
+    });
+    document.getElementById('deleteModal').addEventListener('click', function (e) {
+        if (e.target === this) closeDeleteModal();
+    });
+
+    /* ── Close on Escape ── */
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { closeEditModal(); closeDeleteModal(); }
+    });
+
+    /* ══════════════════════════════════════════
+       DOWNLOAD DROPDOWN — unchanged from original
+    ══════════════════════════════════════════ */
+    var portal    = document.getElementById('download-dropdown-portal');
     var activeBtn = null;
 
     function buildMenuHTML(btn) {
-        var fileType   = btn.getAttribute('data-file-type');
+        var fileType    = btn.getAttribute('data-file-type');
         var isExtracted = btn.getAttribute('data-is-extracted') === 'true';
         var urlOriginal = btn.getAttribute('data-url-original');
         var urlDocx     = btn.getAttribute('data-url-docx');
@@ -255,77 +588,62 @@
                 '<span class="text-xs text-gray-500">Ready-to-print BISU format (PDF)</span></div>' +
                 '</div></a>';
         }
-
         return html;
     }
 
     function openDropdown(btn) {
         var rect = btn.getBoundingClientRect();
-
-        // Build content first so we can measure its height
-        portal.innerHTML = buildMenuHTML(btn);
-        portal.style.display = 'block';
-        portal.style.left = rect.left + 'px';
-        portal.style.width = rect.width + 'px';
-        portal.style.top = '-9999px'; // render off-screen to measure
-        portal.style.bottom = '';
+        portal.innerHTML      = buildMenuHTML(btn);
+        portal.style.display  = 'block';
+        portal.style.left     = rect.left + 'px';
+        portal.style.width    = rect.width + 'px';
+        portal.style.top      = '-9999px';
+        portal.style.bottom   = '';
 
         var menuHeight = portal.offsetHeight;
         var spaceBelow = window.innerHeight - rect.bottom;
         var spaceAbove = rect.top;
 
         if (spaceBelow >= menuHeight + 8) {
-            // Enough space below — open downward
             portal.style.top = (rect.bottom + 4) + 'px';
         } else if (spaceAbove >= menuHeight + 8) {
-            // Not enough space below but enough above — open upward
             portal.style.top = (rect.top - menuHeight - 4) + 'px';
         } else {
-            // Not enough space either way — pick the bigger side and scroll within
             if (spaceBelow >= spaceAbove) {
-                portal.style.top = (rect.bottom + 4) + 'px';
+                portal.style.top       = (rect.bottom + 4) + 'px';
                 portal.style.maxHeight = (spaceBelow - 8) + 'px';
                 portal.style.overflowY = 'auto';
             } else {
-                portal.style.top = '8px';
+                portal.style.top       = '8px';
                 portal.style.maxHeight = (spaceAbove - 8) + 'px';
                 portal.style.overflowY = 'auto';
             }
         }
-
         activeBtn = btn;
     }
 
     function closeDropdown() {
-        portal.style.display = 'none';
+        portal.style.display   = 'none';
         portal.style.maxHeight = '';
         portal.style.overflowY = '';
-        portal.innerHTML = '';
+        portal.innerHTML       = '';
         activeBtn = null;
     }
 
-    // Attach click to all download buttons
     document.querySelectorAll('.download-btn').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
-            if (activeBtn === btn) {
-                closeDropdown();
-            } else {
-                openDropdown(btn);
-            }
+            if (activeBtn === btn) { closeDropdown(); } else { openDropdown(btn); }
         });
     });
 
-    // Close when clicking outside
     document.addEventListener('click', function (e) {
-        if (!portal.contains(e.target)) {
-            closeDropdown();
-        }
+        if (!portal.contains(e.target)) closeDropdown();
     });
 
-    // Reposition on scroll/resize
     window.addEventListener('scroll', closeDropdown, true);
     window.addEventListener('resize', closeDropdown);
+
 })();
 </script>
 

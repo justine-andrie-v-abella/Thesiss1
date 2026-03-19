@@ -647,6 +647,35 @@ function removeGroupFromFolder(fid, subCode) {
     }).catch(function(){ showToast('Failed to remove group.','error'); });
 }
 
+/* ── Toast (workspace-local) ── */
+function showToast(message, type) {
+    var colors = {
+        success: 'bg-green-500',
+        info:    'bg-blue-500',
+        warning: 'bg-amber-500',
+        error:   'bg-red-500',
+    };
+    var icons = {
+        success: 'bi-check-circle-fill',
+        info:    'bi-info-circle-fill',
+        warning: 'bi-exclamation-triangle-fill',
+        error:   'bi-x-circle-fill',
+    };
+    var toast = document.createElement('div');
+    toast.className = 'fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl text-white font-semibold text-sm transition-all duration-300 opacity-0 translate-y-4 ' + (colors[type] || colors.info);
+    toast.innerHTML = '<i class="bi ' + (icons[type] || icons.info) + ' text-lg"></i><span>' + message + '</span>';
+    document.body.appendChild(toast);
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            toast.classList.remove('opacity-0', 'translate-y-4');
+        });
+    });
+    setTimeout(function() {
+        toast.classList.add('opacity-0', 'translate-y-4');
+        setTimeout(function() { toast.remove(); }, 300);
+    }, 3500);
+}
+
 /* ── Stats + download bar ── */
 function updateFolderStats() {
     var checked = fvContainer.querySelectorAll('.fv-checkbox:checked');
@@ -658,6 +687,7 @@ function updateFolderStats() {
     setText('fv-stat-selected', checked.length);
     setText('fv-stat-points', pts);
 }
+
 function updateFolderDownloadBar() {
     var ids = Array.from(fvContainer.querySelectorAll('.fv-checkbox:checked'))
                   .map(function(cb){ return cb.dataset.questionId; });
@@ -665,14 +695,32 @@ function updateFolderDownloadBar() {
     var docx = document.getElementById('fv-download-docx');
     var pdf  = document.getElementById('fv-download-pdf');
     if (ids.length > 0) {
-        docx.onclick = function(){ window.location.href = API.download(ids,'docx'); };
-        pdf.onclick  = function(){ window.location.href = API.download(ids,'pdf'); };
-        docx.classList.remove('opacity-50','cursor-not-allowed');
-        pdf.classList.remove('opacity-50','cursor-not-allowed');
+        docx.classList.remove('opacity-50', 'cursor-not-allowed');
+        pdf.classList.remove('opacity-50', 'cursor-not-allowed');
+        docx.onclick = function(){
+            showToast('Preparing your BISU DOCX...', 'info');
+            setTimeout(function(){
+                window.location.href = API.download(ids, 'docx');
+                setTimeout(function(){
+                    showToast('✓ downloaded successfully!', 'success');
+                }, 1500);
+            }, 400);
+        };
+        pdf.onclick = function(){
+            showToast('Preparing your BISU PDF...', 'info');
+            setTimeout(function(){
+                window.location.href = API.download(ids, 'pdf');
+                setTimeout(function(){
+                    showToast('✓ downloaded successfully!', 'success');
+                }, 1500);
+            }, 400);
+        };
     } else {
-        docx.onclick = pdf.onclick = function(){ showToast('Select at least one question.','warning'); };
-        docx.classList.add('opacity-50','cursor-not-allowed');
-        pdf.classList.add('opacity-50','cursor-not-allowed');
+        docx.classList.add('opacity-50', 'cursor-not-allowed');
+        pdf.classList.add('opacity-50', 'cursor-not-allowed');
+        docx.onclick = pdf.onclick = function(){
+            showToast('Select at least one question first.', 'warning');
+        };
     }
 }
 

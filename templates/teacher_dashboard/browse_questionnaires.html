@@ -944,6 +944,72 @@ function esc(s) {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/* ══════════════════════════════════════════════════
+   TOAST (browse-local)
+════════════════════════════════════════════════ */
+function showToast(message, type) {
+    var colors = { success:'bg-green-500', info:'bg-blue-500', warning:'bg-amber-500', error:'bg-red-500' };
+    var icons  = { success:'bi-check-circle-fill', info:'bi-info-circle-fill', warning:'bi-exclamation-triangle-fill', error:'bi-x-circle-fill' };
+    var toast  = document.createElement('div');
+    toast.className = 'fixed bottom-6 right-6 z-[99999] flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl text-white font-semibold text-sm transition-all duration-300 opacity-0 translate-y-4 ' + (colors[type] || colors.info);
+    toast.innerHTML = '<i class="bi ' + (icons[type] || icons.info) + ' text-lg"></i><span>' + message + '</span>';
+    document.body.appendChild(toast);
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        toast.classList.remove('opacity-0','translate-y-4');
+    }); });
+    setTimeout(function(){
+        toast.classList.add('opacity-0','translate-y-4');
+        setTimeout(function(){ toast.remove(); }, 300);
+    }, 3500);
+}
+
+/* ══════════════════════════════════════════════════
+   DOWNLOAD TOAST HELPERS
+════════════════════════════════════════════════ */
+function triggerDownloadWithToast(url, label) {
+    showToast('Preparing your ' + label + '...', 'info');
+    setTimeout(function(){
+        window.location.href = url;
+        setTimeout(function(){
+            showToast('✓ ' + label + ' downloaded successfully!', 'success');
+        }, 1500);
+    }, 400);
+}
+
+/* Intercept dropdown portal clicks */
+document.getElementById('download-dropdown-portal').addEventListener('click', function(e) {
+    var link = e.target.closest('a');
+    if (!link) return;
+    var href = link.getAttribute('href');
+    if (!href || href === '#') return;
+    e.preventDefault();
+    var label = 'Original File';
+    if (href.includes('format=docx')) label = 'BISU DOCX';
+    else if (href.includes('format=pdf')) label = 'BISU PDF';
+    closeDropdown();
+    triggerDownloadWithToast(href, label);
+});
+
+/* Intercept modal download links */
+document.getElementById('modalDownloadDocx').addEventListener('click', function(e) {
+    var href = this.getAttribute('href');
+    if (!href || href === '#') return;
+    e.preventDefault();
+    triggerDownloadWithToast(href, 'BISU DOCX');
+});
+document.getElementById('modalDownloadPdf').addEventListener('click', function(e) {
+    var href = this.getAttribute('href');
+    if (!href || href === '#') return;
+    e.preventDefault();
+    triggerDownloadWithToast(href, 'BISU PDF');
+});
+document.getElementById('modalDownloadOriginal').addEventListener('click', function(e) {
+    var href = this.getAttribute('href');
+    if (!href || href === '#') return;
+    e.preventDefault();
+    triggerDownloadWithToast(href, 'Original File');
+});
+
 })();
 </script>
 

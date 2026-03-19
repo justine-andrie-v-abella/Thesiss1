@@ -967,13 +967,9 @@ def edit_questionnaire(request, pk):
             if request.user.is_staff:
                 return redirect('questionnaires:all_questionnaires')
             return redirect('questionnaires:my_uploads')
-    else:
-        form = QuestionnaireEditForm(instance=questionnaire)
-
-    return render(request, 'teacher_dashboard/edit_questionnaire.html', {
-        'form': form,
-        'questionnaire': questionnaire,
-    })
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    return redirect('questionnaires:my_uploads')
 
 
 @login_required
@@ -1005,9 +1001,7 @@ def delete_questionnaire(request, pk):
             return redirect('questionnaires:all_questionnaires')
         return redirect('questionnaires:my_uploads')
 
-    return render(request, 'teacher_dashboard/delete_questionnaire.html', {
-        'questionnaire': questionnaire,
-    })
+    return redirect('questionnaires:my_uploads')
 
 
 # ============================================================================
