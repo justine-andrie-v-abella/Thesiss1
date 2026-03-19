@@ -224,19 +224,32 @@
 
     <!-- Empty folder state -->
     <div id="fv-empty-state" class="hidden bg-white rounded-2xl shadow p-14 text-center">
-        <div class="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-5">
-            <i class="bi bi-inbox text-5xl text-indigo-300"></i>
+        <div class="w-24 h-24 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-5">
+            <i class="bi bi-exclamation-circle text-5xl text-amber-400"></i>
         </div>
-        <h3 class="text-xl font-bold text-gray-700 mb-2">This folder is empty</h3>
-        <p class="text-gray-500 mb-6 max-w-xs mx-auto">
-            Browse questionnaires and select questions to save them into this folder.
+        <h3 class="text-xl font-bold text-gray-700 mb-2">No Questions Available</h3>
+        <p class="text-gray-600 font-medium mb-2 max-w-sm mx-auto">
+            No questions available for this subject. Please upload a test file first.
         </p>
-        <a href="{% url 'questionnaires:browse_questionnaires' %}"
-            class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-500
-                   to-purple-600 text-white font-bold rounded-xl shadow-lg
-                   hover:from-indigo-600 hover:to-purple-700 transition-all">
-            <i class="bi bi-search"></i> Browse Questionnaires
-        </a>
+        <p class="text-gray-400 text-sm mb-8 max-w-sm mx-auto">
+            This workspace requires at least one uploaded and processed file in the
+            selected subject before question items become available for selection and
+            compilation into a test paper.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            <a href="{% url 'questionnaires:browse_questionnaires' %}"
+                class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r
+                    from-indigo-500 to-purple-600 text-white font-bold rounded-xl shadow-lg
+                    hover:from-indigo-600 hover:to-purple-700 transition-all">
+                <i class="bi bi-search"></i> Browse Questionnaires
+            </a>
+            <a href="{% url 'questionnaires:upload_questionnaire' %}"
+                class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r
+                    from-amber-500 to-orange-500 text-white font-bold rounded-xl shadow-lg
+                    hover:from-amber-600 hover:to-orange-600 transition-all">
+                <i class="bi bi-upload"></i> Upload a File
+            </a>
+        </div>
     </div>
 
     <!-- Questions list -->
