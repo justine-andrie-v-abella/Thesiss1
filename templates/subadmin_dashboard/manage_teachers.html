@@ -28,11 +28,21 @@
             <p class="text-sm text-gray-500">{{ teachers.count }} teacher{{ teachers.count|pluralize }} in this department</p>
         </div>
     </div>
-    <button onclick="openAddModal()"
-       class="flex items-center space-x-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-5 py-3 rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-md font-medium">
-        <i class="bi bi-person-plus text-lg"></i>
-        <span>Add Teacher</span>
-    </button>
+    <div class="flex items-center space-x-3">
+        {% if archived_teachers.count %}
+        <button onclick="openModal('archivedModal')"
+           class="relative flex items-center space-x-2 bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-3 rounded-xl transition-all font-medium border border-gray-300">
+            <i class="bi bi-archive text-lg"></i>
+            <span>Archived</span>
+            <span class="absolute -top-2 -right-2 w-5 h-5 bg-gray-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{{ archived_teachers.count }}</span>
+        </button>
+        {% endif %}
+        <button onclick="openAddModal()"
+           class="flex items-center space-x-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-5 py-3 rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-md font-medium">
+            <i class="bi bi-person-plus text-lg"></i>
+            <span>Add Teacher</span>
+        </button>
+    </div>
 </div>
 
 <!-- Search -->
@@ -130,16 +140,16 @@
                                 <i class="bi bi-pencil"></i>
                                 <span>Edit</span>
                             </button>
-                            <button onclick="openDeleteModal(
+                            <button onclick="openArchiveModal(
                                         '{{ teacher.pk }}',
                                         '{{ teacher.user.get_full_name|escapejs }}',
                                         '{{ teacher.user.email|escapejs }}',
                                         '{{ teacher.employee_id|escapejs }}',
                                         '{{ teacher.user.first_name.0|upper }}{{ teacher.user.last_name.0|upper }}'
                                     )"
-                               class="flex items-center space-x-1 bg-red-100 text-red-700 hover:bg-red-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
-                                <i class="bi bi-trash"></i>
-                                <span>Delete</span>
+                               class="flex items-center space-x-1 bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
+                                <i class="bi bi-archive"></i>
+                                <span>Archive</span>
                             </button>
                         </div>
                     </td>
@@ -470,47 +480,151 @@
 </div>
 
 
-<!-- ===================== DELETE TEACHER MODAL ===================== -->
-<div id="deleteModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+<!-- ===================== ARCHIVE TEACHER MODAL ===================== -->
+<div id="archiveModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
     <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeAllModals();">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0"
-         id="deleteModalContent">
+         id="archiveModalContent">
 
-        <div class="bg-gradient-to-r from-red-500 to-red-600 px-8 py-6 rounded-t-2xl text-center relative">
-            <button onclick="closeAllModals()" class="absolute top-4 right-4 text-white hover:text-red-200 transition-colors">
+        <div class="bg-gradient-to-r from-gray-500 to-gray-600 px-8 py-6 rounded-t-2xl text-center relative">
+            <button onclick="closeAllModals()" class="absolute top-4 right-4 text-white hover:text-gray-200 transition-colors">
                 <i class="bi bi-x-lg text-xl"></i>
             </button>
-            <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-3 text-white text-2xl font-bold" id="deleteAvatar">--</div>
-            <h2 class="text-2xl font-bold text-white">Delete Teacher?</h2>
-            <p class="text-red-200 text-sm mt-1">This action cannot be undone</p>
+            <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-3 text-white text-2xl font-bold" id="archiveAvatar">--</div>
+            <h2 class="text-2xl font-bold text-white">Archive Teacher?</h2>
+            <p class="text-gray-200 text-sm mt-1">The teacher will be hidden but not deleted</p>
         </div>
 
         <div class="p-6">
-            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-5 mb-5">
-                <p id="deleteTeacherName" class="font-bold text-gray-800 text-lg"></p>
-                <p id="deleteTeacherEmail" class="text-sm text-gray-500 mt-1"></p>
-                <span id="deleteEmployeeId" class="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600 inline-block mt-1"></span>
+            <div class="bg-gray-50 border-2 border-gray-200 rounded-xl p-5 mb-5">
+                <p id="archiveTeacherName" class="font-bold text-gray-800 text-lg"></p>
+                <p id="archiveTeacherEmail" class="text-sm text-gray-500 mt-1"></p>
+                <span id="archiveEmployeeId" class="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600 inline-block mt-1"></span>
+            </div>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-5">
+                <div class="flex items-start space-x-3">
+                    <i class="bi bi-info-circle-fill text-yellow-500 text-lg flex-shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-yellow-700">Archiving will deactivate the teacher's account. You can restore them later from the Archived list.</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button type="button" onclick="closeAllModals()"
+                        class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium text-center">
+                    Cancel
+                </button>
+                <button type="button" onclick="confirmArchiveTeacher()"
+                        class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-gray-500 to-gray-600 text-white px-6 py-3 rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all shadow-md font-medium">
+                    <i class="bi bi-archive"></i>
+                    <span>Yes, Archive</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+
+<!-- ===================== ARCHIVED TEACHERS MODAL ===================== -->
+<div id="archivedModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeAllModals();">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform transition-all duration-200 scale-95 opacity-0"
+         id="archivedModalContent">
+
+        <div class="bg-gradient-to-r from-gray-600 to-gray-700 px-8 py-6 rounded-t-2xl">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                        <i class="bi bi-archive text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Archived Teachers</h2>
+                        <p class="text-gray-200 text-sm">{{ department.name }}</p>
+                    </div>
+                </div>
+                <button onclick="closeAllModals()" class="text-white hover:text-gray-200 transition-colors">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="p-6">
+            {% if archived_teachers %}
+            <div class="space-y-3 max-h-80 overflow-y-auto">
+                {% for t in archived_teachers %}
+                <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-bold text-sm flex-shrink-0">
+                            {{ t.user.first_name.0|upper }}{{ t.user.last_name.0|upper }}
+                        </div>
+                        <div>
+                            <p class="font-semibold text-gray-800 text-sm">{{ t.user.get_full_name }}</p>
+                            <p class="text-xs text-gray-500">{{ t.employee_id }}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="restoreTeacher('{{ t.pk }}')"
+                                class="flex items-center space-x-1 bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                            <span>Restore</span>
+                        </button>
+                        <button onclick="openPermDeleteTeacher('{{ t.pk }}', '{{ t.user.get_full_name|escapejs }}', '{{ t.employee_id|escapejs }}')"
+                                class="flex items-center space-x-1 bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                            <i class="bi bi-trash3"></i>
+                            <span>Delete</span>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-10">
+                <i class="bi bi-archive text-5xl text-gray-300"></i>
+                <p class="text-gray-500 mt-3">No archived teachers</p>
+            </div>
+            {% endif %}
+            <div class="mt-4 pt-4 border-t border-gray-200 text-right">
+                <button onclick="closeAllModals()" class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+
+<!-- ===================== PERMANENT DELETE TEACHER MODAL ===================== -->
+<div id="permDeleteModal" class="fixed inset-0 overflow-y-auto hidden" style="z-index: 60;">
+    <div class="flex min-h-full items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md" id="permDeleteModalContent">
+
+        <div class="bg-gradient-to-r from-red-600 to-red-700 px-8 py-6 rounded-t-2xl text-center relative">
+            <h2 class="text-xl font-bold text-white">Permanently Delete?</h2>
+            <p class="text-red-200 text-sm mt-1">This cannot be undone</p>
+        </div>
+
+        <div class="p-6">
+            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-5">
+                <p id="permDeleteTeacherName" class="font-bold text-gray-800"></p>
+                <p id="permDeleteTeacherEmpId" class="text-xs text-gray-500 font-mono mt-1"></p>
             </div>
             <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-5">
                 <div class="flex items-start space-x-3">
                     <i class="bi bi-exclamation-triangle-fill text-red-500 text-lg flex-shrink-0 mt-0.5"></i>
-                    <p class="text-sm text-red-700">Deleting this teacher will permanently remove their account and all associated data.</p>
+                    <p class="text-sm text-red-700">This will permanently delete the teacher's account and all associated data.</p>
                 </div>
             </div>
-            <form id="deleteForm" method="post" action="">
-                {% csrf_token %}
-                <div class="flex items-center space-x-4">
-                    <button type="button" onclick="closeAllModals()"
-                            class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium text-center">
-                        Cancel
-                    </button>
-                    <button type="submit"
-                            class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-md font-medium">
-                        <i class="bi bi-trash3"></i>
-                        <span>Yes, Delete</span>
-                    </button>
-                </div>
-            </form>
+            <div class="flex items-center space-x-4">
+                <button type="button" onclick="closePermDeleteModal()"
+                        class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
+                    Cancel
+                </button>
+                <button type="button" onclick="confirmPermDeleteTeacher()"
+                        class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-xl hover:from-red-700 hover:to-red-800 transition-all shadow-md font-medium">
+                    <i class="bi bi-trash3"></i>
+                    <span>Delete Forever</span>
+                </button>
+            </div>
         </div>
     </div>
     </div>
@@ -519,9 +633,11 @@
 
 <!-- ===================== JAVASCRIPT ===================== -->
 <script>
-    const EDIT_URL_TEMPLATE   = "{% url 'accounts:subadmin_edit_teacher' pk=0 %}";
-    const DELETE_URL_TEMPLATE = "{% url 'accounts:subadmin_delete_teacher' pk=0 %}";
-    const MODAL_IDS = ['addModal', 'editModal', 'deleteModal'];
+    const EDIT_URL_TEMPLATE        = "{% url 'accounts:subadmin_edit_teacher' pk=0 %}";
+    const ARCHIVE_URL_TEMPLATE     = "{% url 'accounts:subadmin_archive_teacher' pk=0 %}";
+    const UNARCHIVE_URL_TEMPLATE   = "{% url 'accounts:subadmin_unarchive_teacher' pk=0 %}";
+    const PERM_DELETE_URL_TEMPLATE = "{% url 'accounts:subadmin_permanent_delete_teacher' pk=0 %}";
+    const MODAL_IDS = ['addModal', 'editModal', 'archiveModal', 'archivedModal'];
 
     function makeUrl(template, pk) {
         return template.replace('/0/', '/' + pk + '/');
@@ -656,13 +772,70 @@
         openModal('editModal');
     }
 
-    function openDeleteModal(pk, fullName, email, employeeId, initials) {
-        document.getElementById('deleteAvatar').textContent       = initials;
-        document.getElementById('deleteTeacherName').textContent  = fullName;
-        document.getElementById('deleteTeacherEmail').textContent = email;
-        document.getElementById('deleteEmployeeId').textContent   = employeeId;
-        document.getElementById('deleteForm').action              = makeUrl(DELETE_URL_TEMPLATE, pk);
-        openModal('deleteModal');
+    function openArchiveModal(pk, fullName, email, employeeId, initials) {
+        document.getElementById('archiveAvatar').textContent       = initials;
+        document.getElementById('archiveTeacherName').textContent  = fullName;
+        document.getElementById('archiveTeacherEmail').textContent = email;
+        document.getElementById('archiveEmployeeId').textContent   = employeeId;
+        window._archivePk = pk;
+        openModal('archiveModal');
+    }
+
+    function confirmArchiveTeacher() {
+        fetch(makeUrl(ARCHIVE_URL_TEMPLATE, window._archivePk), {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                sessionStorage.setItem('flashMessage', data.message);
+                window.location.reload();
+            }
+        });
+    }
+
+    function restoreTeacher(pk) {
+        fetch(makeUrl(UNARCHIVE_URL_TEMPLATE, pk), {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                sessionStorage.setItem('flashMessage', data.message);
+                window.location.reload();
+            }
+        });
+    }
+
+    let _permDeletePk = null;
+
+    function openPermDeleteTeacher(pk, fullName, empId) {
+        _permDeletePk = pk;
+        document.getElementById('permDeleteTeacherName').textContent  = fullName;
+        document.getElementById('permDeleteTeacherEmpId').textContent = empId;
+        document.getElementById('permDeleteModal').classList.remove('hidden');
+    }
+
+    function closePermDeleteModal() {
+        document.getElementById('permDeleteModal').classList.add('hidden');
+        _permDeletePk = null;
+    }
+
+    function confirmPermDeleteTeacher() {
+        if (!_permDeletePk) return;
+        fetch(makeUrl(PERM_DELETE_URL_TEMPLATE, _permDeletePk), {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                sessionStorage.setItem('flashMessage', data.message);
+                window.location.reload();
+            }
+        });
     }
 
     // Flash message on reload

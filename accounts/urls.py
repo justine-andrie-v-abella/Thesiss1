@@ -60,6 +60,9 @@ urlpatterns = [
     path('subadmin/teachers/add/', views.subadmin_add_teacher, name='subadmin_add_teacher'),
     path('subadmin/teachers/edit/<int:pk>/', views.subadmin_edit_teacher, name='subadmin_edit_teacher'),
     path('subadmin/teachers/delete/<int:pk>/', views.subadmin_delete_teacher, name='subadmin_delete_teacher'),
+    path('subadmin/teachers/archive/<int:pk>/', views.subadmin_archive_teacher, name='subadmin_archive_teacher'),
+    path('subadmin/teachers/unarchive/<int:pk>/', views.subadmin_unarchive_teacher, name='subadmin_unarchive_teacher'),
+    path('subadmin/teachers/permanent-delete/<int:pk>/', views.subadmin_permanent_delete_teacher, name='subadmin_permanent_delete_teacher'),
 
     # ── Teacher ──────────────────────────────────────────────────────────────
 
@@ -70,10 +73,13 @@ urlpatterns = [
     path('mark-all-notifications-read/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
     path('test-activity/', views.test_activity, name='test_activity'),
     # Subject Management (sub-admin — their department only)
-    path('subadmin/subjects/',                          views.subadmin_manage_subjects,     name='subadmin_manage_subjects'),
-    path('subadmin/subjects/add/',                      views.subadmin_add_subject,         name='subadmin_add_subject'),
-    path('subadmin/subjects/<int:pk>/edit/',            views.subadmin_edit_subject,        name='subadmin_edit_subject'),
-    path('subadmin/subjects/<int:pk>/delete/',          views.subadmin_delete_subject,      name='subadmin_delete_subject'),
+    path('subadmin/subjects/',                          views.subadmin_manage_subjects,          name='subadmin_manage_subjects'),
+    path('subadmin/subjects/add/',                      views.subadmin_add_subject,              name='subadmin_add_subject'),
+    path('subadmin/subjects/<int:pk>/edit/',            views.subadmin_edit_subject,             name='subadmin_edit_subject'),
+    path('subadmin/subjects/<int:pk>/delete/',          views.subadmin_delete_subject,           name='subadmin_delete_subject'),
+    path('subadmin/subjects/<int:pk>/archive/',         views.subadmin_archive_subject,          name='subadmin_archive_subject'),
+    path('subadmin/subjects/<int:pk>/unarchive/',       views.subadmin_unarchive_subject,        name='subadmin_unarchive_subject'),
+    path('subadmin/subjects/<int:pk>/permanent-delete/', views.subadmin_permanent_delete_subject, name='subadmin_permanent_delete_subject'),
 
     # Browse Questionnaires (sub-admin — department-scoped)
     path('subadmin/questionnaires/',                    views.subadmin_browse_questionnaires, name='subadmin_browse_questionnaires'),
