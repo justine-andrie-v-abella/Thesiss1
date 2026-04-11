@@ -37,11 +37,21 @@
             <p class="text-sm text-gray-500">{{ subadmins.count }} sub-admin{{ subadmins.count|pluralize }} registered</p>
         </div>
     </div>
-    <button onclick="openAddModal()"
-        class="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-5 py-3 rounded-xl hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-md font-medium">
-        <i class="bi bi-person-plus text-lg"></i>
-        <span>Add Sub-Admin</span>
-    </button>
+    <div class="flex items-center space-x-3">
+        {% if archived_subadmins %}
+        <button onclick="openModal('archivedModal')"
+            class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-5 rounded-xl transition-all shadow flex items-center border border-gray-300">
+            <i class="bi bi-archive text-lg mr-2"></i>
+            Archived
+            <span class="ml-2 bg-gray-400 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ archived_subadmins.count }}</span>
+        </button>
+        {% endif %}
+        <button onclick="openAddModal()"
+            class="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-5 py-3 rounded-xl hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-md font-medium">
+            <i class="bi bi-person-plus text-lg"></i>
+            <span>Add Sub-Admin</span>
+        </button>
+    </div>
 </div>
 
 <!-- Sub-Admins Table -->
@@ -130,15 +140,15 @@
                                 <i class="bi bi-pencil"></i>
                                 <span>Edit</span>
                             </button>
-                            <button onclick="openDeleteModal(
+                            <button onclick="openArchiveModal(
                                         '{{ subadmin.pk }}',
                                         '{{ subadmin.user.get_full_name|escapejs }}',
                                         '{{ subadmin.user.email|escapejs }}',
                                         '{{ subadmin.department.name|default:''|escapejs }}'
                                     )"
-                                class="flex items-center space-x-1 bg-red-100 text-red-700 hover:bg-red-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
-                                <i class="bi bi-trash"></i>
-                                <span>Remove</span>
+                                class="flex items-center space-x-1 bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-lg text-xs font-medium transition-colors">
+                                <i class="bi bi-archive"></i>
+                                <span>Archive</span>
                             </button>
                         </div>
                     </td>
@@ -419,63 +429,143 @@
 </div>
 
 
-<!-- ===================== DELETE SUB-ADMIN MODAL ===================== -->
-<div id="deleteModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+<!-- ===================== ARCHIVE SUB-ADMIN MODAL ===================== -->
+<div id="archiveModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
     <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeAllModals();">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0"
-         id="deleteModalContent">
-
-        <div class="bg-gradient-to-r from-red-500 to-red-600 px-8 py-6 rounded-t-2xl text-center relative">
-            <button onclick="closeAllModals()" class="absolute top-4 right-4 text-white hover:text-red-200 transition-colors">
-                <i class="bi bi-x-lg text-xl"></i>
-            </button>
-            <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-3">
-                <i class="bi bi-person-dash text-white text-3xl"></i>
-            </div>
-            <h2 class="text-2xl font-bold text-white">Remove Sub-Admin?</h2>
-            <p class="text-red-200 text-sm mt-1">This action cannot be undone</p>
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0" id="archiveModalContent">
+        <div class="bg-gradient-to-r from-gray-500 to-gray-600 px-8 py-6 rounded-t-2xl text-center relative">
+            <button onclick="closeAllModals()" class="absolute top-4 right-4 text-white hover:text-gray-200 transition-colors"><i class="bi bi-x-lg text-xl"></i></button>
+            <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-3"><i class="bi bi-archive text-white text-3xl"></i></div>
+            <h2 class="text-2xl font-bold text-white">Archive Sub-Admin?</h2>
+            <p class="text-gray-200 text-sm mt-1">Account will be deactivated but data is preserved</p>
         </div>
-
         <div class="p-6">
-            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-5 mb-5">
-                <div class="flex items-center space-x-4">
-                    <div id="deleteAvatar"
-                         class="w-14 h-14 bg-red-200 rounded-full flex items-center justify-center text-red-700 font-bold text-xl flex-shrink-0">--</div>
-                    <div>
-                        <p id="deleteSubAdminName" class="font-bold text-gray-800 text-lg"></p>
-                        <p id="deleteSubAdminEmail" class="text-sm text-gray-600"></p>
-                        <p id="deleteSubAdminDept" class="text-sm text-gray-500 mt-1">
-                            <i class="bi bi-building mr-1"></i><span></span>
-                        </p>
-                    </div>
+            <div class="bg-gray-50 border-2 border-gray-200 rounded-xl p-5 mb-5 flex items-center space-x-4">
+                <div id="archiveAvatar" class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-bold text-lg flex-shrink-0">--</div>
+                <div>
+                    <p id="archiveSubAdminName" class="font-bold text-gray-800"></p>
+                    <p id="archiveSubAdminEmail" class="text-sm text-gray-500"></p>
+                    <p id="archiveSubAdminDept" class="text-xs text-gray-400 mt-0.5"><i class="bi bi-building mr-1"></i><span></span></p>
                 </div>
             </div>
-
             <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-5">
                 <div class="flex items-start space-x-3">
-                    <i class="bi bi-exclamation-triangle-fill text-yellow-500 text-lg flex-shrink-0 mt-0.5"></i>
-                    <div>
-                        <p class="text-sm font-semibold text-yellow-800 mb-1">This will permanently:</p>
-                        <ul class="text-sm text-yellow-700 space-y-1">
-                            <li>• Delete their sub-admin account and login access</li>
-                            <li>• Free up their department for a new sub-admin</li>
-                            <li>• Remove them from the system entirely</li>
-                        </ul>
-                    </div>
+                    <i class="bi bi-info-circle-fill text-yellow-500 text-lg flex-shrink-0 mt-0.5"></i>
+                    <ul class="text-sm text-yellow-700 space-y-1">
+                        <li>• Sub-admin login access will be disabled</li>
+                        <li>• Account data is preserved and can be restored</li>
+                        <li>• Their department slot will be freed up</li>
+                    </ul>
                 </div>
             </div>
-
-            <form id="deleteForm" method="post" action="">
+            <form id="archiveForm" method="post" action="">
                 {% csrf_token %}
                 <div class="flex items-center space-x-4">
-                    <button type="button" onclick="closeAllModals()"
-                            class="flex-1 text-center px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
-                        Cancel
+                    <button type="button" onclick="closeAllModals()" class="flex-1 text-center px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Cancel</button>
+                    <button type="submit" class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-gray-500 to-gray-600 text-white px-6 py-3 rounded-xl hover:from-gray-600 hover:to-gray-700 shadow-md font-medium">
+                        <i class="bi bi-archive"></i><span>Yes, Archive</span>
                     </button>
-                    <button type="submit"
-                            class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-md font-medium">
-                        <i class="bi bi-trash"></i>
-                        <span>Yes, Remove</span>
+                </div>
+            </form>
+        </div>
+    </div>
+    </div>
+</div>
+
+
+<!-- ===================== ARCHIVED SUB-ADMINS MODAL ===================== -->
+<div id="archivedModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeAllModals();">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl transform transition-all duration-200 scale-95 opacity-0" id="archivedModalContent">
+        <div class="bg-gradient-to-r from-gray-500 to-gray-600 px-8 py-5 rounded-t-2xl">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center"><i class="bi bi-archive text-white text-xl"></i></div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Archived Sub-Admins</h2>
+                        <p class="text-gray-200 text-xs">Deactivated accounts</p>
+                    </div>
+                </div>
+                <button onclick="closeAllModals()" class="text-white hover:text-gray-200 transition-colors"><i class="bi bi-x-lg text-xl"></i></button>
+            </div>
+        </div>
+        <div class="p-6">
+            {% if archived_subadmins %}
+            <div class="space-y-3 max-h-96 overflow-y-auto pr-1">
+                {% for subadmin in archived_subadmins %}
+                <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-5 py-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold text-sm flex-shrink-0">
+                            {{ subadmin.user.first_name.0|upper }}{{ subadmin.user.last_name.0|upper }}
+                        </div>
+                        <div>
+                            <p class="font-semibold text-gray-600">{{ subadmin.user.get_full_name }}</p>
+                            <p class="text-xs text-gray-400">{{ subadmin.user.email }} · {{ subadmin.department.name|default:"Unassigned" }}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2 flex-shrink-0">
+                        <form method="post" action="{% url 'accounts:unarchive_subadmin' subadmin.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow flex items-center space-x-1 text-sm">
+                                <i class="bi bi-arrow-counterclockwise"></i><span>Restore</span>
+                            </button>
+                        </form>
+                        <button onclick="openPermDeleteModal('{{ subadmin.pk }}', '{{ subadmin.user.get_full_name|escapejs }}', '{{ subadmin.user.email|escapejs }}')"
+                            class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow flex items-center space-x-1 text-sm">
+                            <i class="bi bi-trash3"></i><span>Delete</span>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-10">
+                <i class="bi bi-archive text-4xl text-gray-300 block mb-2"></i>
+                <p class="text-gray-500">No archived sub-admins</p>
+            </div>
+            {% endif %}
+            <div class="flex justify-end pt-4 border-t border-gray-200 mt-4">
+                <button type="button" onclick="closeAllModals()" class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Close</button>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+
+<!-- ===================== PERM DELETE SUB-ADMIN MODAL ===================== -->
+<div id="permDeleteModal" class="fixed inset-0 overflow-y-auto hidden" style="z-index:60;">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closePermDeleteModal();">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0" id="permDeleteModalContent">
+        <div class="bg-gradient-to-r from-red-500 to-red-600 px-8 py-6 rounded-t-2xl text-center relative">
+            <button onclick="closePermDeleteModal()" class="absolute top-4 right-4 text-white hover:text-red-200 transition-colors"><i class="bi bi-x-lg text-xl"></i></button>
+            <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-3"><i class="bi bi-trash3 text-white text-3xl"></i></div>
+            <h2 class="text-2xl font-bold text-white">Permanently Delete?</h2>
+            <p class="text-red-200 text-sm mt-1">This cannot be undone</p>
+        </div>
+        <div class="p-6">
+            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-5 flex items-center space-x-3">
+                <div id="permDeleteAvatar" class="w-10 h-10 bg-red-200 rounded-full flex items-center justify-center text-red-700 font-bold flex-shrink-0">--</div>
+                <div>
+                    <p id="permDeleteName" class="font-bold text-gray-800"></p>
+                    <p id="permDeleteEmail" class="text-xs text-gray-500"></p>
+                </div>
+            </div>
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-5">
+                <div class="flex items-start space-x-3">
+                    <i class="bi bi-exclamation-triangle-fill text-red-500 text-lg flex-shrink-0 mt-0.5"></i>
+                    <ul class="text-sm text-red-700 space-y-1">
+                        <li>• Permanently deletes account and login access</li>
+                        <li>• Removes them from the system entirely</li>
+                    </ul>
+                </div>
+            </div>
+            <form id="permDeleteForm" method="post" action="">
+                {% csrf_token %}
+                <div class="flex items-center space-x-3">
+                    <button type="button" onclick="closePermDeleteModal()" class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium text-center">Cancel</button>
+                    <button type="submit" class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-red-700 shadow-md font-medium">
+                        <i class="bi bi-trash3"></i><span>Delete Permanently</span>
                     </button>
                 </div>
             </form>
@@ -486,10 +576,11 @@
 
 
 <script>
-    const MODAL_IDS = ['addModal', 'editModal', 'deleteModal'];
+    const MODAL_IDS = ['addModal', 'editModal', 'archiveModal', 'archivedModal'];
 
-    const EDIT_URL_TEMPLATE   = "{% url 'accounts:edit_subadmin' pk=0 %}";
-    const DELETE_URL_TEMPLATE = "{% url 'accounts:delete_subadmin' pk=0 %}";
+    const EDIT_URL_TEMPLATE        = "{% url 'accounts:edit_subadmin' pk=0 %}";
+    const ARCHIVE_URL_TEMPLATE     = "{% url 'accounts:archive_subadmin' pk=0 %}";
+    const PERM_DELETE_URL_TEMPLATE = "{% url 'accounts:permanent_delete_subadmin' pk=0 %}";
 
     function makeUrl(template, pk) {
         return template.replace('/0/', '/' + pk + '/');
@@ -548,20 +639,42 @@
         openModal('editModal');
     }
 
-    function openDeleteModal(pk, fullName, email, deptName) {
-        const parts   = fullName.trim().split(' ');
+    function openArchiveModal(pk, fullName, email, deptName) {
+        const parts    = fullName.trim().split(' ');
         const initials = ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase();
-
-        document.getElementById('deleteAvatar').textContent = initials;
-        document.getElementById('deleteSubAdminName').textContent  = fullName;
-        document.getElementById('deleteSubAdminEmail').textContent = email;
-        document.getElementById('deleteSubAdminDept').querySelector('span').textContent = deptName || 'Unassigned';
-        document.getElementById('deleteForm').action = makeUrl(DELETE_URL_TEMPLATE, pk);
-
-        openModal('deleteModal');
+        document.getElementById('archiveAvatar').textContent = initials;
+        document.getElementById('archiveSubAdminName').textContent = fullName;
+        document.getElementById('archiveSubAdminEmail').textContent = email;
+        document.getElementById('archiveSubAdminDept').querySelector('span').textContent = deptName || 'Unassigned';
+        document.getElementById('archiveForm').action = makeUrl(ARCHIVE_URL_TEMPLATE, pk);
+        openModal('archiveModal');
     }
 
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
+    function openPermDeleteModal(pk, fullName, email) {
+        const parts    = fullName.trim().split(' ');
+        const initials = ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase();
+        document.getElementById('permDeleteAvatar').textContent = initials;
+        document.getElementById('permDeleteName').textContent   = fullName;
+        document.getElementById('permDeleteEmail').textContent  = email;
+        document.getElementById('permDeleteForm').action        = PERM_DELETE_URL_TEMPLATE.replace('/0/', '/' + pk + '/');
+        const modal   = document.getElementById('permDeleteModal');
+        const content = document.getElementById('permDeleteModalContent');
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+        }));
+    }
+
+    function closePermDeleteModal() {
+        const modal   = document.getElementById('permDeleteModal');
+        const content = document.getElementById('permDeleteModalContent');
+        content.classList.remove('scale-100', 'opacity-100');
+        content.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => modal.classList.add('hidden'), 200);
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAllModals(); closePermDeleteModal(); } });
 
     {% if form and form.errors %}
     window.addEventListener('DOMContentLoaded', () => openAddModal());

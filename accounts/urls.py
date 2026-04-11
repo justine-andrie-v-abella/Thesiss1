@@ -20,24 +20,36 @@ urlpatterns = [
     path('add-teacher/', views.add_teacher, name='add_teacher'),
     path('edit-teacher/<int:pk>/', views.edit_teacher, name='edit_teacher'),
     path('delete-teacher/<int:pk>/', views.delete_teacher, name='delete_teacher'),
+    path('archive-teacher/<int:pk>/', views.archive_teacher, name='archive_teacher'),
+    path('unarchive-teacher/<int:pk>/', views.unarchive_teacher, name='unarchive_teacher'),
+    path('permanent-delete-teacher/<int:pk>/', views.permanent_delete_teacher, name='permanent_delete_teacher'),
 
     # Department Management
     path('manage-departments/', views.manage_departments, name='manage_departments'),
     path('add-department/', views.add_department, name='add_department'),
     path('edit-department/<int:pk>/', views.edit_department, name='edit_department'),
     path('delete-department/<int:pk>/', views.delete_department, name='delete_department'),
+    path('archive-department/<int:pk>/', views.archive_department, name='archive_department'),
+    path('unarchive-department/<int:pk>/', views.unarchive_department, name='unarchive_department'),
+    path('permanent-delete-department/<int:pk>/', views.permanent_delete_department, name='permanent_delete_department'),
 
     # Subject Management
     path('manage-subjects/', views.manage_subjects, name='manage_subjects'),
     path('add-subject/', views.add_subject, name='add_subject'),
     path('edit-subject/<int:pk>/', views.edit_subject, name='edit_subject'),
     path('delete-subject/<int:pk>/', views.delete_subject, name='delete_subject'),
+    path('archive-subject/<int:pk>/', views.archive_subject, name='archive_subject'),
+    path('unarchive-subject/<int:pk>/', views.unarchive_subject, name='unarchive_subject'),
+    path('permanent-delete-subject/<int:pk>/', views.permanent_delete_subject, name='permanent_delete_subject'),
 
     # Sub-Admin Management (superadmin creates/assigns sub-admins)
     path('manage-subadmins/', views.manage_subadmins, name='manage_subadmins'),
     path('add-subadmin/', views.add_subadmin, name='add_subadmin'),
     path('edit-subadmin/<int:pk>/', views.edit_subadmin, name='edit_subadmin'),
     path('delete-subadmin/<int:pk>/', views.delete_subadmin, name='delete_subadmin'),
+    path('archive-subadmin/<int:pk>/', views.archive_subadmin, name='archive_subadmin'),
+    path('unarchive-subadmin/<int:pk>/', views.unarchive_subadmin, name='unarchive_subadmin'),
+    path('permanent-delete-subadmin/<int:pk>/', views.permanent_delete_subadmin, name='permanent_delete_subadmin'),
 
     # ── Sub-Admin ────────────────────────────────────────────────────────────
 

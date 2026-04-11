@@ -11,6 +11,7 @@ class Department(models.Model):
     name = models.CharField(max_length=200, unique=True)
     code = models.CharField(max_length=20, unique=True)
     description = models.TextField(blank=True)
+    is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -25,6 +26,7 @@ class Subject(models.Model):
     name = models.CharField(max_length=200)
     code = models.CharField(max_length=20)
     description = models.TextField(blank=True)
+    is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -47,6 +49,7 @@ class TeacherProfile(models.Model):
     employee_id = models.CharField(max_length=50, unique=True)
     phone = models.CharField(max_length=20, blank=True)
     is_active = models.BooleanField(default=True)
+    is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -74,6 +77,7 @@ class SubAdminProfile(models.Model):
         blank=True
     )
     is_active = models.BooleanField(default=True)
+    is_archived = models.BooleanField(default=False)
     assigned_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

@@ -365,7 +365,7 @@ def admin_dashboard(request):
 @login_required
 @user_passes_test(is_admin)
 def manage_teachers(request):
-    teachers = TeacherProfile.objects.select_related('user', 'department').all()
+    teachers = TeacherProfile.objects.select_related('user', 'department').filter(is_archived=False)
 
     search_query = request.GET.get('search', '')
     if search_query:
@@ -375,14 +375,16 @@ def manage_teachers(request):
             Q(employee_id__icontains=search_query)
         )
 
+    archived_teachers = TeacherProfile.objects.select_related('user', 'department').filter(is_archived=True)
     departments = Department.objects.all().order_by('name')
     form = TeacherCreationForm()
 
     context = {
-        'teachers':     teachers,
-        'search_query': search_query,
-        'departments':  departments,
-        'form':         form,
+        'teachers':          teachers,
+        'archived_teachers': archived_teachers,
+        'search_query':      search_query,
+        'departments':       departments,
+        'form':              form,
     }
     return render(request, 'admin_dashboard/manage_teachers.html', context)
 
@@ -533,7 +535,6 @@ def delete_teacher(request, pk):
     if request.method == 'POST':
         teacher_name = f"{teacher.user.get_full_name()} ({teacher.employee_id})"
         user = teacher.user
-
         ActivityLog.objects.create(
             activity_type='teacher_deleted',
             user=request.user,
@@ -541,10 +542,67 @@ def delete_teacher(request, pk):
         )
         teacher.delete()
         user.delete()
-        bust_dashboard_cache()  # ✅
+        bust_dashboard_cache()
         messages.success(request, 'Teacher deleted successfully')
         return redirect('accounts:manage_teachers')
     return render(request, 'admin_dashboard/delete_teacher.html', {'teacher': teacher})
+
+
+@login_required
+@user_passes_test(is_admin)
+def archive_teacher(request, pk):
+    teacher = get_object_or_404(TeacherProfile, pk=pk)
+    if request.method == 'POST':
+        teacher.is_archived = True
+        teacher.save()
+        ActivityLog.objects.create(
+            activity_type='teacher_updated',
+            user=request.user,
+            description=f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) was archived"
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Teacher "{teacher.user.get_full_name()}" has been archived.')
+        return redirect('accounts:manage_teachers')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def unarchive_teacher(request, pk):
+    teacher = get_object_or_404(TeacherProfile, pk=pk, is_archived=True)
+    if request.method == 'POST':
+        teacher.is_archived = False
+        teacher.save()
+        ActivityLog.objects.create(
+            activity_type='teacher_updated',
+            user=request.user,
+            description=f"Teacher {teacher.user.get_full_name()} ({teacher.employee_id}) was restored"
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Teacher "{teacher.user.get_full_name()}" has been restored.')
+        return redirect('accounts:manage_teachers')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def permanent_delete_teacher(request, pk):
+    teacher = get_object_or_404(TeacherProfile, pk=pk, is_archived=True)
+    if request.method == 'POST':
+        teacher_name = teacher.user.get_full_name()
+        employee_id  = teacher.employee_id
+        user = teacher.user
+        ActivityLog.objects.create(
+            activity_type='teacher_deleted',
+            user=request.user,
+            description=f"Teacher {teacher_name} ({employee_id}) was permanently deleted"
+        )
+        teacher.delete()
+        user.delete()
+        bust_dashboard_cache()
+        messages.success(request, f'Teacher "{teacher_name}" has been permanently deleted.')
+        return redirect('accounts:manage_teachers')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
 # ============================================================================
@@ -554,7 +612,7 @@ def delete_teacher(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def manage_departments(request):
-    departments = Department.objects.all().order_by('name')
+    departments = Department.objects.filter(is_archived=False).order_by('name')
 
     if request.method == 'POST':
         form = DepartmentForm(request.POST)
@@ -572,7 +630,8 @@ def manage_departments(request):
     else:
         form = DepartmentForm()
 
-    context = {'departments': departments, 'form': form}
+    archived_departments = Department.objects.filter(is_archived=True).order_by('name')
+    context = {'departments': departments, 'archived_departments': archived_departments, 'form': form}
     return render(request, 'admin_dashboard/manage_departments.html', context)
 
 
@@ -641,6 +700,67 @@ def delete_department(request, pk):
     return render(request, 'admin_dashboard/delete_department.html', {'department': department})
 
 
+@login_required
+@user_passes_test(is_admin)
+def archive_department(request, pk):
+    department = get_object_or_404(Department, pk=pk)
+
+    if request.method == 'POST':
+        department.is_archived = True
+        department.save()
+        ActivityLog.objects.create(
+            activity_type='department_updated',
+            user=request.user,
+            description=f"Department {department.name} ({department.code}) was archived"
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Department "{department.name}" has been archived successfully!')
+        return redirect('accounts:manage_departments')
+
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def permanent_delete_department(request, pk):
+    department = get_object_or_404(Department, pk=pk, is_archived=True)
+
+    if request.method == 'POST':
+        department_name = department.name
+        department_code = department.code
+        department.delete()
+        ActivityLog.objects.create(
+            activity_type='department_deleted',
+            user=request.user,
+            description=f"Department {department_name} ({department_code}) was permanently deleted"
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Department "{department_name}" has been permanently deleted.')
+        return redirect('accounts:manage_departments')
+
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def unarchive_department(request, pk):
+    department = get_object_or_404(Department, pk=pk)
+
+    if request.method == 'POST':
+        department.is_archived = False
+        department.save()
+        ActivityLog.objects.create(
+            activity_type='department_updated',
+            user=request.user,
+            description=f"Department {department.name} ({department.code}) was unarchived"
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Department "{department.name}" has been restored successfully!')
+        return redirect('accounts:manage_departments')
+
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
 # ============================================================================
 # SUPERADMIN — SUBJECT MANAGEMENT
 # ============================================================================
@@ -648,15 +768,17 @@ def delete_department(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def manage_subjects(request):
-    subjects        = Subject.objects.prefetch_related('departments').all()
-    all_departments = list(Department.objects.all().order_by('name'))
-    form            = SubjectForm()
+    subjects          = Subject.objects.prefetch_related('departments').filter(is_archived=False)
+    archived_subjects = Subject.objects.prefetch_related('departments').filter(is_archived=True)
+    all_departments   = list(Department.objects.all().order_by('name'))
+    form              = SubjectForm()
     form.fields['departments'].queryset = Department.objects.all().order_by('name')
 
     context = {
-        'subjects':         subjects,
-        'all_departments':  all_departments,
-        'form':             form,
+        'subjects':          subjects,
+        'archived_subjects': archived_subjects,
+        'all_departments':   all_departments,
+        'form':              form,
     }
     return render(request, 'admin_dashboard/manage_subjects.html', context)
 
@@ -720,22 +842,74 @@ def edit_subject(request, pk):
 @user_passes_test(is_admin)
 def delete_subject(request, pk):
     subject = get_object_or_404(Subject, pk=pk)
-
     if request.method == 'POST':
         subject_name = subject.name
         subject_code = subject.code
-
         ActivityLog.objects.create(
             activity_type='subject_deleted',
             user=request.user,
             description=f"Subject {subject_name} ({subject_code}) was deleted"
         )
         subject.delete()
-        bust_dashboard_cache()  # ✅
+        bust_dashboard_cache()
         messages.success(request, f'Subject "{subject_name}" ({subject_code}) has been deleted successfully!')
         return redirect('accounts:manage_subjects')
-
     return render(request, 'admin_dashboard/delete_subject.html', {'subject': subject})
+
+
+@login_required
+@user_passes_test(is_admin)
+def archive_subject(request, pk):
+    subject = get_object_or_404(Subject, pk=pk)
+    if request.method == 'POST':
+        subject.is_archived = True
+        subject.save()
+        ActivityLog.objects.create(
+            activity_type='subject_updated',
+            user=request.user,
+            description=f"Subject {subject.name} ({subject.code}) was archived"
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Subject "{subject.name}" has been archived.')
+        return redirect('accounts:manage_subjects')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def unarchive_subject(request, pk):
+    subject = get_object_or_404(Subject, pk=pk, is_archived=True)
+    if request.method == 'POST':
+        subject.is_archived = False
+        subject.save()
+        ActivityLog.objects.create(
+            activity_type='subject_updated',
+            user=request.user,
+            description=f"Subject {subject.name} ({subject.code}) was restored"
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Subject "{subject.name}" has been restored.')
+        return redirect('accounts:manage_subjects')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def permanent_delete_subject(request, pk):
+    subject = get_object_or_404(Subject, pk=pk, is_archived=True)
+    if request.method == 'POST':
+        subject_name = subject.name
+        subject_code = subject.code
+        ActivityLog.objects.create(
+            activity_type='subject_deleted',
+            user=request.user,
+            description=f"Subject {subject_name} ({subject_code}) was permanently deleted"
+        )
+        subject.delete()
+        bust_dashboard_cache()
+        messages.success(request, f'Subject "{subject_name}" has been permanently deleted.')
+        return redirect('accounts:manage_subjects')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
 # ============================================================================
@@ -745,14 +919,16 @@ def delete_subject(request, pk):
 @login_required
 @user_passes_test(is_admin)
 def manage_subadmins(request):
-    subadmins       = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
-    all_departments = Department.objects.all().order_by('name')
-    form            = SubAdminCreationForm()
+    subadmins          = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').filter(is_archived=False)
+    archived_subadmins = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').filter(is_archived=True)
+    all_departments    = Department.objects.all().order_by('name')
+    form               = SubAdminCreationForm()
 
     context = {
-        'subadmins':        subadmins,
-        'all_departments':  all_departments,
-        'form':             form,
+        'subadmins':          subadmins,
+        'archived_subadmins': archived_subadmins,
+        'all_departments':    all_departments,
+        'form':               form,
     }
     return render(request, 'admin_dashboard/manage_subadmins.html', context)
 
@@ -931,9 +1107,65 @@ def delete_subadmin(request, pk):
     subadmin = get_object_or_404(SubAdminProfile, pk=pk)
     if request.method == 'POST':
         subadmin.user.delete()
-        bust_dashboard_cache()  # ✅
+        bust_dashboard_cache()
         messages.success(request, 'Sub-admin removed successfully.')
     return redirect('accounts:manage_subadmins')
+
+
+@login_required
+@user_passes_test(is_admin)
+def archive_subadmin(request, pk):
+    subadmin = get_object_or_404(SubAdminProfile, pk=pk)
+    if request.method == 'POST':
+        subadmin.is_archived = True
+        subadmin.is_active = False
+        subadmin.save()
+        ActivityLog.objects.create(
+            activity_type='subadmin_updated',
+            user=request.user,
+            description=f"Sub-admin {subadmin.user.get_full_name()} was archived"
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Sub-admin "{subadmin.user.get_full_name()}" has been archived.')
+        return redirect('accounts:manage_subadmins')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def unarchive_subadmin(request, pk):
+    subadmin = get_object_or_404(SubAdminProfile, pk=pk, is_archived=True)
+    if request.method == 'POST':
+        subadmin.is_archived = False
+        subadmin.is_active = True
+        subadmin.save()
+        ActivityLog.objects.create(
+            activity_type='subadmin_updated',
+            user=request.user,
+            description=f"Sub-admin {subadmin.user.get_full_name()} was restored"
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Sub-admin "{subadmin.user.get_full_name()}" has been restored.')
+        return redirect('accounts:manage_subadmins')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def permanent_delete_subadmin(request, pk):
+    subadmin = get_object_or_404(SubAdminProfile, pk=pk, is_archived=True)
+    if request.method == 'POST':
+        subadmin_name = subadmin.user.get_full_name()
+        ActivityLog.objects.create(
+            activity_type='subadmin_deleted',
+            user=request.user,
+            description=f"Sub-admin {subadmin_name} was permanently deleted"
+        )
+        subadmin.user.delete()
+        bust_dashboard_cache()
+        messages.success(request, f'Sub-admin "{subadmin_name}" has been permanently deleted.')
+        return redirect('accounts:manage_subadmins')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
 # ============================================================================
