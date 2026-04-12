@@ -63,6 +63,7 @@ class Questionnaire(models.Model):
         default='pending',
     )
     extraction_error = models.TextField(blank=True, null=True)
+    is_archived      = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-uploaded_at']
@@ -321,9 +322,10 @@ class WorkspaceFolder(models.Model):
         on_delete=models.CASCADE,
         related_name='workspace_folders',
     )
-    name       = models.CharField(max_length=80)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    name        = models.CharField(max_length=80)
+    is_archived = models.BooleanField(default=False)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering            = ['-created_at']

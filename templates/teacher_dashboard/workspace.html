@@ -7,6 +7,7 @@
 {% block content %}
 
 <script id="ws-initial-data" type="application/json">{{ folders_json|safe }}</script>
+<script id="ws-archived-data" type="application/json">{{ archived_folders_json|safe }}</script>
 
 <!-- ══════════════════════════════════════════════════════════
      OVERVIEW — Folder Grid
@@ -58,12 +59,20 @@
         <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
             <i class="bi bi-folder2 text-indigo-500"></i> Your Folders
         </h2>
-        <button id="btn-new-folder"
-            class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600
-                   hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-xl shadow-lg
-                   transition-all text-sm">
-            <i class="bi bi-folder-plus"></i> New Folder
-        </button>
+        <div class="flex items-center gap-2">
+            <button id="btn-archived-folders"
+                class="relative flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200
+                       text-gray-700 font-bold rounded-xl border border-gray-300 transition-all text-sm hidden">
+                <i class="bi bi-archive"></i> Archived
+                <span id="ws-archived-badge" class="absolute -top-2 -right-2 w-5 h-5 bg-gray-500 text-white text-xs rounded-full flex items-center justify-center font-bold">0</span>
+            </button>
+            <button id="btn-new-folder"
+                class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600
+                       hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-xl shadow-lg
+                       transition-all text-sm">
+                <i class="bi bi-folder-plus"></i> New Folder
+            </button>
+        </div>
     </div>
 
     <!-- Empty state -->
@@ -128,10 +137,10 @@
                            text-white font-semibold rounded-xl transition-colors text-sm">
                     <i class="bi bi-pencil"></i> Rename
                 </button>
-                <button id="fv-delete-folder-btn"
-                    class="flex items-center gap-2 px-4 py-2 bg-red-500/70 hover:bg-red-500
+                <button id="fv-archive-folder-btn"
+                    class="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30
                            text-white font-semibold rounded-xl transition-colors text-sm">
-                    <i class="bi bi-trash"></i> Delete Folder
+                    <i class="bi bi-archive"></i> Archive Folder
                 </button>
             </div>
         </div>
@@ -291,24 +300,73 @@
     </div>
 </div>
 
-<!-- Delete Folder Confirm -->
-<div id="deleteFolderModal"
+<!-- Archive Folder Confirm -->
+<div id="archiveFolderModal"
     class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="bi bi-archive text-3xl text-gray-500"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Archive Folder?</h3>
+        <p class="text-gray-500 mb-1">You are about to archive</p>
+        <p class="font-bold text-gray-900 text-lg mb-2" id="archiveFolderName">"—"</p>
+        <p class="text-sm text-gray-400 mb-6">The folder will be hidden but not deleted. You can restore it later.</p>
+        <div class="flex gap-3 justify-center">
+            <button id="archiveFolderCancel"
+                class="px-6 py-2.5 border-2 border-gray-200 text-gray-600 font-semibold
+                       rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+            <button id="archiveFolderOk"
+                class="px-6 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-bold
+                       rounded-xl transition-colors flex items-center gap-2">
+                <i class="bi bi-archive"></i> Archive</button>
+        </div>
+    </div>
+</div>
+
+<!-- Archived Folders Modal -->
+<div id="archivedFoldersModal"
+    class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div class="bg-gradient-to-r from-gray-600 to-gray-700 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="bi bi-archive text-xl"></i> Archived Folders
+            </h3>
+            <button id="archivedFoldersClose"
+                class="w-8 h-8 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <div id="archivedFoldersList" class="space-y-3 max-h-80 overflow-y-auto"></div>
+            <div class="mt-4 pt-4 border-t border-gray-200 text-right">
+                <button id="archivedFoldersCloseBtn"
+                    class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Permanent Delete Folder Modal -->
+<div id="permDeleteFolderModal"
+    class="fixed inset-0 bg-black/70 hidden items-center justify-center p-4" style="z-index:60;">
     <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
         <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <i class="bi bi-trash3 text-3xl text-red-500"></i>
         </div>
-        <h3 class="text-xl font-bold text-gray-800 mb-2">Delete Folder?</h3>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Permanently Delete?</h3>
         <p class="text-gray-500 mb-1">You are about to permanently delete</p>
-        <p class="font-bold text-gray-900 text-lg mb-2" id="deleteFolderName">"—"</p>
-        <p class="text-sm text-gray-400 mb-6">All questions inside will be removed from your workspace.</p>
+        <p class="font-bold text-gray-900 text-lg mb-2" id="permDeleteFolderName">"—"</p>
+        <p class="text-sm text-red-500 mb-6">This cannot be undone.</p>
         <div class="flex gap-3 justify-center">
-            <button id="deleteFolderCancel"
+            <button id="permDeleteFolderCancel"
                 class="px-6 py-2.5 border-2 border-gray-200 text-gray-600 font-semibold
                        rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
-            <button id="deleteFolderOk"
+            <button id="permDeleteFolderOk"
                 class="px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold
-                       rounded-xl transition-colors">Delete</button>
+                       rounded-xl transition-colors flex items-center gap-2">
+                <i class="bi bi-trash3"></i> Delete Forever</button>
         </div>
     </div>
 </div>
@@ -338,12 +396,15 @@
 var BASE = '/questionnaires/workspace';
 
 var API = {
-    createFolder:   function()         { return BASE + '/folders/create/'; },
-    renameFolder:   function(id)       { return BASE + '/folders/' + id + '/rename/'; },
-    deleteFolder:   function(id)       { return BASE + '/folders/' + id + '/delete/'; },
-    addQuestions:   function(id)       { return BASE + '/folders/' + id + '/add-questions/'; },
-    removeQuestion: function(fid, qid) { return BASE + '/folders/' + fid + '/remove-question/' + qid + '/'; },
-    download:       function(ids, fmt) { return BASE + '/download/?questions=' + ids.join(',') + '&format=' + fmt; },
+    createFolder:        function()         { return BASE + '/folders/create/'; },
+    renameFolder:        function(id)       { return BASE + '/folders/' + id + '/rename/'; },
+    deleteFolder:        function(id)       { return BASE + '/folders/' + id + '/delete/'; },
+    archiveFolder:       function(id)       { return BASE + '/folders/' + id + '/archive/'; },
+    unarchiveFolder:     function(id)       { return BASE + '/folders/' + id + '/unarchive/'; },
+    permanentDeleteFolder: function(id)     { return BASE + '/folders/' + id + '/permanent-delete/'; },
+    addQuestions:        function(id)       { return BASE + '/folders/' + id + '/add-questions/'; },
+    removeQuestion:      function(fid, qid) { return BASE + '/folders/' + fid + '/remove-question/' + qid + '/'; },
+    download:            function(ids, fmt) { return BASE + '/download/?questions=' + ids.join(',') + '&format=' + fmt; },
 };
 
 /* CSRF */
@@ -364,15 +425,15 @@ function postJSON(url, data) {
    Structure matches what workspace() view returns:
    [ { id, name, created_at, questions: [...] } ]
 ════════════════════════════════════════════════ */
-var state = { folders: [] };
+var state = { folders: [], archivedFolders: [] };
 
 (function seedFromServer() {
     var el = document.getElementById('ws-initial-data');
     if (!el) return;
-    try {
-        var data = JSON.parse(el.textContent);
-        state.folders = data;
-    } catch(e) { console.error('workspace seed error', e); }
+    try { state.folders = JSON.parse(el.textContent); } catch(e) { console.error('workspace seed error', e); }
+    var el2 = document.getElementById('ws-archived-data');
+    if (!el2) return;
+    try { state.archivedFolders = JSON.parse(el2.textContent); } catch(e) { console.error('workspace archived seed error', e); }
 })();
 
 /* ── sidebar badge ── */
@@ -382,6 +443,18 @@ function refreshSidebarBadge() {
     if (b) b.textContent = total;
 }
 refreshSidebarBadge();
+
+/* ── archived badge button ── */
+function refreshArchivedBadge() {
+    var btn = document.getElementById('btn-archived-folders');
+    var badge = document.getElementById('ws-archived-badge');
+    var count = state.archivedFolders.length;
+    if (btn) {
+        if (count > 0) { btn.classList.remove('hidden'); } else { btn.classList.add('hidden'); }
+    }
+    if (badge) badge.textContent = count;
+}
+refreshArchivedBadge();
 
 /* Expose for browse_questionnaires.html */
 window.WS = {
@@ -466,7 +539,7 @@ function renderOverview() {
                     '</div>' +
                     '<div class="flex gap-1.5 mt-0.5">' +
                         '<button class="folder-rename-btn w-8 h-8 bg-white/20 hover:bg-white/35 rounded-lg flex items-center justify-center text-white transition-colors" data-folder-id="' + folder.id + '" title="Rename"><i class="bi bi-pencil text-xs"></i></button>' +
-                        '<button class="folder-delete-btn w-8 h-8 bg-white/20 hover:bg-red-400/70 rounded-lg flex items-center justify-center text-white transition-colors" data-folder-id="' + folder.id + '" title="Delete"><i class="bi bi-trash text-xs"></i></button>' +
+                        '<button class="folder-archive-btn w-8 h-8 bg-white/20 hover:bg-gray-400/70 rounded-lg flex items-center justify-center text-white transition-colors" data-folder-id="' + folder.id + '" title="Archive"><i class="bi bi-archive text-xs"></i></button>' +
                     '</div>' +
                 '</div>' +
                 '<h3 class="text-white font-bold text-base line-clamp-2">' + esc(folder.name) + '</h3>' +
@@ -490,15 +563,15 @@ function renderOverview() {
     });
     folderGrid.querySelectorAll('.ws-folder-card').forEach(function(card) {
         card.addEventListener('click', function(e) {
-            if (e.target.closest('.folder-rename-btn') || e.target.closest('.folder-delete-btn') || e.target.closest('.folder-open-btn')) return;
+            if (e.target.closest('.folder-rename-btn') || e.target.closest('.folder-archive-btn') || e.target.closest('.folder-open-btn')) return;
             openFolder(card.dataset.folderId);
         });
     });
     folderGrid.querySelectorAll('.folder-rename-btn').forEach(function(btn) {
         btn.addEventListener('click', function(e){ e.stopPropagation(); showFolderModal('rename', btn.dataset.folderId); });
     });
-    folderGrid.querySelectorAll('.folder-delete-btn').forEach(function(btn) {
-        btn.addEventListener('click', function(e){ e.stopPropagation(); showDeleteFolderModal(btn.dataset.folderId); });
+    folderGrid.querySelectorAll('.folder-archive-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e){ e.stopPropagation(); showArchiveFolderModal(btn.dataset.folderId); });
     });
 }
 
@@ -791,9 +864,9 @@ document.getElementById('btn-back-to-overview').addEventListener('click',functio
     renderOverview();
 });
 
-/* ── Rename / delete from detail ── */
+/* ── Rename / archive from detail ── */
 document.getElementById('fv-rename-btn').addEventListener('click',function(){showFolderModal('rename',currentFid);});
-document.getElementById('fv-delete-folder-btn').addEventListener('click',function(){showDeleteFolderModal(currentFid);});
+document.getElementById('fv-archive-folder-btn').addEventListener('click',function(){showArchiveFolderModal(currentFid);});
 
 /* ══════════════════════════════════════════════════
    CREATE / RENAME FOLDER MODAL
@@ -862,33 +935,116 @@ document.getElementById('btn-new-folder').addEventListener('click',function(){sh
 document.getElementById('btn-new-folder-empty').addEventListener('click',function(){showFolderModal('create');});
 
 /* ══════════════════════════════════════════════════
-   DELETE FOLDER MODAL
+   ARCHIVE FOLDER MODAL
 ════════════════════════════════════════════════ */
-var deleteFolderModal  = document.getElementById('deleteFolderModal');
-var deleteFolderTarget = null;
+var archiveFolderModal  = document.getElementById('archiveFolderModal');
+var archiveFolderTarget = null;
 
-function showDeleteFolderModal(fid){
+function showArchiveFolderModal(fid){
     var f=state.folders.find(function(x){return String(x.id)===String(fid);});
     if(!f) return;
-    deleteFolderTarget=fid;
-    document.getElementById('deleteFolderName').textContent='"'+f.name+'"';
-    deleteFolderModal.classList.remove('hidden'); deleteFolderModal.classList.add('flex');
+    archiveFolderTarget=fid;
+    document.getElementById('archiveFolderName').textContent='"'+f.name+'"';
+    archiveFolderModal.classList.remove('hidden'); archiveFolderModal.classList.add('flex');
 }
-function closeDeleteFolderModal(){ deleteFolderModal.classList.add('hidden'); deleteFolderModal.classList.remove('flex'); }
-document.getElementById('deleteFolderCancel').addEventListener('click',closeDeleteFolderModal);
-document.getElementById('deleteFolderOk').addEventListener('click',function(){
-    postJSON(API.deleteFolder(deleteFolderTarget),{})
+function closeArchiveFolderModal(){ archiveFolderModal.classList.add('hidden'); archiveFolderModal.classList.remove('flex'); }
+document.getElementById('archiveFolderCancel').addEventListener('click',closeArchiveFolderModal);
+document.getElementById('archiveFolderOk').addEventListener('click',function(){
+    postJSON(API.archiveFolder(archiveFolderTarget),{})
         .then(function(data){
-            state.folders=state.folders.filter(function(f){return String(f.id)!==String(deleteFolderTarget);});
+            var f=state.folders.find(function(x){return String(x.id)===String(archiveFolderTarget);});
+            if(f){ state.archivedFolders.unshift({id:f.id,name:f.name}); }
+            state.folders=state.folders.filter(function(x){return String(x.id)!==String(archiveFolderTarget);});
             refreshSidebarBadge();
-            closeDeleteFolderModal();
-            showToast('"'+(data.name||'Folder')+'" deleted.','info');
-            if(String(currentFid)===String(deleteFolderTarget)){
+            refreshArchivedBadge();
+            closeArchiveFolderModal();
+            showToast('"'+(data.name||'Folder')+'" archived.','info');
+            if(String(currentFid)===String(archiveFolderTarget)){
                 currentFid=null;
                 folderView.classList.add('hidden');
                 overview.classList.remove('hidden');
             }
             renderOverview();
+        })
+        .catch(function(){showToast('Failed to archive folder.','error');});
+});
+
+/* ══════════════════════════════════════════════════
+   ARCHIVED FOLDERS MODAL
+════════════════════════════════════════════════ */
+var archivedFoldersModal = document.getElementById('archivedFoldersModal');
+
+function renderArchivedFoldersList(){
+    var list = document.getElementById('archivedFoldersList');
+    if(state.archivedFolders.length===0){
+        list.innerHTML='<div class="text-center py-8"><i class="bi bi-archive text-5xl text-gray-300"></i><p class="text-gray-500 mt-3">No archived folders</p></div>';
+        return;
+    }
+    list.innerHTML='';
+    state.archivedFolders.forEach(function(f){
+        var row=document.createElement('div');
+        row.className='flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl p-4';
+        row.innerHTML=
+            '<div class="flex items-center gap-3">'+
+                '<div class="w-9 h-9 bg-gray-200 rounded-lg flex items-center justify-center"><i class="bi bi-folder2 text-gray-500"></i></div>'+
+                '<span class="font-semibold text-gray-800 text-sm">'+esc(f.name)+'</span>'+
+            '</div>'+
+            '<div class="flex gap-2">'+
+                '<button class="archived-restore-btn flex items-center gap-1 bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" data-folder-id="'+f.id+'">'+
+                    '<i class="bi bi-arrow-counterclockwise"></i> Restore</button>'+
+                '<button class="archived-permdelete-btn flex items-center gap-1 bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" data-folder-id="'+f.id+'" data-folder-name="'+esc(f.name)+'">'+
+                    '<i class="bi bi-trash3"></i> Delete</button>'+
+            '</div>';
+        row.querySelector('.archived-restore-btn').addEventListener('click',function(){
+            postJSON(API.unarchiveFolder(f.id),{})
+                .then(function(data){
+                    state.archivedFolders=state.archivedFolders.filter(function(x){return String(x.id)!==String(f.id);});
+                    state.folders.unshift({id:data.id,name:data.name,created_at:data.created_at,questions:[]});
+                    refreshSidebarBadge();
+                    refreshArchivedBadge();
+                    renderArchivedFoldersList();
+                    renderOverview();
+                    showToast('"'+f.name+'" restored.','success');
+                })
+                .catch(function(){showToast('Failed to restore folder.','error');});
+        });
+        row.querySelector('.archived-permdelete-btn').addEventListener('click',function(){
+            showPermDeleteFolderModal(f.id, f.name);
+        });
+        list.appendChild(row);
+    });
+}
+
+function openArchivedFoldersModal(){
+    renderArchivedFoldersList();
+    archivedFoldersModal.classList.remove('hidden'); archivedFoldersModal.classList.add('flex');
+}
+function closeArchivedFoldersModal(){ archivedFoldersModal.classList.add('hidden'); archivedFoldersModal.classList.remove('flex'); }
+document.getElementById('archivedFoldersClose').addEventListener('click',closeArchivedFoldersModal);
+document.getElementById('archivedFoldersCloseBtn').addEventListener('click',closeArchivedFoldersModal);
+document.getElementById('btn-archived-folders').addEventListener('click',openArchivedFoldersModal);
+
+/* ══════════════════════════════════════════════════
+   PERMANENT DELETE FOLDER MODAL
+════════════════════════════════════════════════ */
+var permDeleteFolderModal  = document.getElementById('permDeleteFolderModal');
+var permDeleteFolderTarget = null;
+
+function showPermDeleteFolderModal(fid, fname){
+    permDeleteFolderTarget=fid;
+    document.getElementById('permDeleteFolderName').textContent='"'+fname+'"';
+    permDeleteFolderModal.classList.remove('hidden'); permDeleteFolderModal.classList.add('flex');
+}
+function closePermDeleteFolderModal(){ permDeleteFolderModal.classList.add('hidden'); permDeleteFolderModal.classList.remove('flex'); permDeleteFolderTarget=null; }
+document.getElementById('permDeleteFolderCancel').addEventListener('click',closePermDeleteFolderModal);
+document.getElementById('permDeleteFolderOk').addEventListener('click',function(){
+    postJSON(API.permanentDeleteFolder(permDeleteFolderTarget),{})
+        .then(function(data){
+            state.archivedFolders=state.archivedFolders.filter(function(x){return String(x.id)!==String(permDeleteFolderTarget);});
+            refreshArchivedBadge();
+            closePermDeleteFolderModal();
+            renderArchivedFoldersList();
+            showToast('"'+(data.name||'Folder')+'" permanently deleted.','info');
         })
         .catch(function(){showToast('Failed to delete folder.','error');});
 });

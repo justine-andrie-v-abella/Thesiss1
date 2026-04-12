@@ -14,8 +14,11 @@ urlpatterns = [
     path('my-uploads/', views.my_uploads,            name='my_uploads'),
     path('browse/',    views.browse_questionnaires,  name='browse_questionnaires'),
     path('all/',       views.all_questionnaires,     name='all_questionnaires'),
-    path('edit/<int:pk>/',   views.edit_questionnaire,   name='edit_questionnaire'),
-    path('delete/<int:pk>/', views.delete_questionnaire, name='delete_questionnaire'),
+    path('edit/<int:pk>/',             views.edit_questionnaire,             name='edit_questionnaire'),
+    path('delete/<int:pk>/',           views.delete_questionnaire,           name='delete_questionnaire'),
+    path('archive/<int:pk>/',          views.archive_questionnaire,          name='archive_questionnaire'),
+    path('unarchive/<int:pk>/',        views.unarchive_questionnaire,        name='unarchive_questionnaire'),
+    path('permanent-delete/<int:pk>/', views.permanent_delete_questionnaire, name='permanent_delete_questionnaire'),
     path('download/<int:pk>/', views.download_questionnaire, name='download_questionnaire'),
 
     # ── Session-based review (upload + generate flow) ────────────────────────
@@ -48,7 +51,16 @@ urlpatterns = [
          views.workspace_rename_folder,    name='workspace_rename_folder'),
 
     path('workspace/folders/<int:folder_id>/delete/',
-         views.workspace_delete_folder,    name='workspace_delete_folder'),
+         views.workspace_delete_folder,         name='workspace_delete_folder'),
+
+    path('workspace/folders/<int:folder_id>/archive/',
+         views.workspace_archive_folder,        name='workspace_archive_folder'),
+
+    path('workspace/folders/<int:folder_id>/unarchive/',
+         views.workspace_unarchive_folder,      name='workspace_unarchive_folder'),
+
+    path('workspace/folders/<int:folder_id>/permanent-delete/',
+         views.workspace_permanent_delete_folder, name='workspace_permanent_delete_folder'),
 
     path('workspace/folders/<int:folder_id>/add-questions/',
          views.workspace_add_questions,    name='workspace_add_questions'),

@@ -5,6 +5,17 @@
 {% block header_subtitle %}Manage your uploaded questionnaires{% endblock %}
 
 {% block content %}
+<!-- Flash message -->
+<div id="ajaxFlash" class="hidden mb-4 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded-xl flex items-center justify-between">
+    <div class="flex items-center">
+        <i class="bi bi-check-circle-fill text-green-500 text-lg mr-2"></i>
+        <span id="ajaxFlashMessage"></span>
+    </div>
+    <button onclick="document.getElementById('ajaxFlash').classList.add('hidden')" class="text-green-600 hover:text-green-800">
+        <i class="bi bi-x-lg"></i>
+    </button>
+</div>
+
 <!-- Header Actions -->
 <div class="flex justify-between items-center mb-6">
     <div class="flex items-center">
@@ -14,10 +25,20 @@
             <p class="text-sm text-gray-500">{{ page_obj.paginator.count }} total upload{{ page_obj.paginator.count|pluralize }}</p>
         </div>
     </div>
-    <a href="{% url 'questionnaires:upload_questionnaire' %}" class="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center">
-        <i class="bi bi-upload text-xl mr-2"></i>
-        Upload New
-    </a>
+    <div class="flex items-center space-x-3">
+        {% if archived_questionnaires.count %}
+        <button onclick="openArchivedModal()"
+           class="relative flex items-center space-x-2 bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-3 rounded-lg transition-all font-bold border border-gray-300">
+            <i class="bi bi-archive text-lg mr-1"></i>
+            Archived
+            <span class="absolute -top-2 -right-2 w-5 h-5 bg-gray-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{{ archived_questionnaires.count }}</span>
+        </button>
+        {% endif %}
+        <a href="{% url 'questionnaires:upload_questionnaire' %}" class="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center">
+            <i class="bi bi-upload text-xl mr-2"></i>
+            Upload New
+        </a>
+    </div>
 </div>
 
 <!-- Search Bar -->
@@ -153,21 +174,20 @@
                 </button>
                 {% endwith %}
 
-                <!-- Delete — opens modal -->
+                <!-- Archive — opens modal -->
                 {% with uploaded=quest.uploaded_at|date:"M d, Y" %}
                 <button type="button"
-                    class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-3 rounded-lg transition-all"
-                    title="Delete"
-                    onclick="openDeleteModal(
+                    class="bg-gray-400 hover:bg-gray-500 text-white font-semibold py-2 px-3 rounded-lg transition-all"
+                    title="Archive"
+                    onclick="openArchiveModal(
                         '{{ quest.pk }}',
                         '{{ quest.title|escapejs }}',
                         '{{ quest.department.name|escapejs }}',
                         '{{ quest.subject.code }} - {{ quest.subject.name|escapejs }}',
                         '{{ quest.file_type|upper }} ({{ quest.get_file_size_display }})',
-                        '{{ uploaded }}',
-                        '{{ quest.exam_type }}'
+                        '{{ uploaded }}'
                     )">
-                    <i class="bi bi-trash3"></i>
+                    <i class="bi bi-archive"></i>
                 </button>
                 {% endwith %}
             </div>
@@ -375,90 +395,182 @@
 
 
 <!-- ═══════════════════════════════════════════════════════════════
-     DELETE MODAL
+     ARCHIVE MODAL
 ════════════════════════════════════════════════════════════════ -->
-<div id="deleteModal" style="display:none;"
+<div id="archiveModal" style="display:none;"
     class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
 
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg animate-modal border-2 border-red-200">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg animate-modal border-2 border-gray-200">
 
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 flex items-center justify-between rounded-t-xl">
+        <div class="bg-gradient-to-r from-gray-500 to-gray-600 px-6 py-4 flex items-center justify-between rounded-t-xl">
             <h3 class="text-xl font-bold text-white flex items-center">
-                <i class="bi bi-exclamation-triangle text-2xl mr-3"></i> Confirm Deletion
+                <i class="bi bi-archive text-2xl mr-3"></i> Archive Questionnaire
             </h3>
-            <button type="button" onclick="closeDeleteModal()"
+            <button type="button" onclick="closeArchiveModal()"
                 class="w-9 h-9 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors">
                 <i class="bi bi-x-lg text-xl"></i>
             </button>
         </div>
 
         <div class="p-8">
-            <p class="text-lg text-gray-700 mb-6 font-semibold">Are you sure you want to delete this questionnaire?</p>
+            <p class="text-lg text-gray-700 mb-6 font-semibold">Archive this questionnaire?</p>
 
-            <!-- Details -->
-            <div class="bg-gray-50 rounded-xl p-6 mb-6 border-l-4 border-red-500 space-y-3">
+            <div class="bg-gray-50 rounded-xl p-6 mb-6 border-l-4 border-gray-400 space-y-3">
                 <div class="flex items-center">
-                    <i class="bi bi-card-heading text-red-500 text-xl mr-3 flex-shrink-0"></i>
+                    <i class="bi bi-card-heading text-gray-500 text-xl mr-3 flex-shrink-0"></i>
                     <div>
                         <p class="text-xs text-gray-500">Title</p>
-                        <p id="deleteTitle" class="font-bold text-gray-800"></p>
+                        <p id="archiveTitle" class="font-bold text-gray-800"></p>
                     </div>
                 </div>
                 <div class="flex items-center">
-                    <i class="bi bi-building text-red-500 text-xl mr-3 flex-shrink-0"></i>
+                    <i class="bi bi-building text-gray-500 text-xl mr-3 flex-shrink-0"></i>
                     <div>
                         <p class="text-xs text-gray-500">Department</p>
-                        <p id="deleteDept" class="text-gray-700"></p>
+                        <p id="archiveDept" class="text-gray-700"></p>
                     </div>
                 </div>
                 <div class="flex items-center">
-                    <i class="bi bi-book text-red-500 text-xl mr-3 flex-shrink-0"></i>
+                    <i class="bi bi-book text-gray-500 text-xl mr-3 flex-shrink-0"></i>
                     <div>
                         <p class="text-xs text-gray-500">Subject</p>
-                        <p id="deleteSubject" class="text-gray-700"></p>
+                        <p id="archiveSubject" class="text-gray-700"></p>
                     </div>
                 </div>
                 <div class="flex items-center">
-                    <i class="bi bi-file-earmark text-red-500 text-xl mr-3 flex-shrink-0"></i>
+                    <i class="bi bi-file-earmark text-gray-500 text-xl mr-3 flex-shrink-0"></i>
                     <div>
                         <p class="text-xs text-gray-500">File</p>
-                        <p id="deleteFile" class="text-gray-700"></p>
+                        <p id="archiveFile" class="text-gray-700"></p>
                     </div>
                 </div>
                 <div class="flex items-center">
-                    <i class="bi bi-calendar text-red-500 text-xl mr-3 flex-shrink-0"></i>
+                    <i class="bi bi-calendar text-gray-500 text-xl mr-3 flex-shrink-0"></i>
                     <div>
                         <p class="text-xs text-gray-500">Uploaded</p>
-                        <p id="deleteDate" class="text-gray-700"></p>
+                        <p id="archiveDate" class="text-gray-700"></p>
                     </div>
                 </div>
             </div>
 
-            <!-- Warning -->
-            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-lg">
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-lg">
                 <div class="flex items-start">
-                    <i class="bi bi-exclamation-triangle-fill text-red-600 text-2xl mr-3 mt-1 flex-shrink-0"></i>
-                    <div>
-                        <p class="font-bold text-red-800 mb-1">Warning: This action cannot be undone!</p>
-                        <p class="text-sm text-red-700">The file will be permanently removed from the system.</p>
-                    </div>
+                    <i class="bi bi-info-circle-fill text-yellow-500 text-xl mr-3 mt-0.5 flex-shrink-0"></i>
+                    <p class="text-sm text-yellow-800">The questionnaire will be hidden but not deleted. You can restore it later from the Archived list.</p>
                 </div>
             </div>
 
-            <form id="deleteForm" method="post" action="">
-                {% csrf_token %}
-                <div class="flex space-x-3">
-                    <button type="submit"
-                        class="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 px-6 rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-lg flex items-center justify-center gap-2">
-                        <i class="bi bi-trash3"></i> Yes, Delete Questionnaire
-                    </button>
-                    <button type="button" onclick="closeDeleteModal()"
-                        class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all">
-                        Cancel
-                    </button>
+            <div class="flex space-x-3">
+                <button type="button" onclick="confirmArchive()"
+                    class="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-bold py-3 px-6 rounded-lg hover:from-gray-600 hover:to-gray-700 transition-all shadow-lg flex items-center justify-center gap-2">
+                    <i class="bi bi-archive"></i> Yes, Archive
+                </button>
+                <button type="button" onclick="closeArchiveModal()"
+                    class="flex-1 bg-white border-2 border-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg hover:bg-gray-50 transition-all">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ARCHIVED LIST MODAL
+════════════════════════════════════════════════════════════════ -->
+<div id="archivedModal" style="display:none;"
+    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl animate-modal">
+
+        <div class="bg-gradient-to-r from-gray-600 to-gray-700 px-6 py-4 flex items-center justify-between rounded-t-xl">
+            <h3 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-archive text-2xl mr-3"></i> Archived Questionnaires
+            </h3>
+            <button type="button" onclick="closeArchivedModal()"
+                class="w-9 h-9 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors">
+                <i class="bi bi-x-lg text-xl"></i>
+            </button>
+        </div>
+
+        <div class="p-6">
+            {% if archived_questionnaires %}
+            <div class="space-y-3 max-h-96 overflow-y-auto">
+                {% for q in archived_questionnaires %}
+                <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-center space-x-3 min-w-0 flex-1">
+                        <div class="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="bi bi-file-earmark-text text-gray-500 text-lg"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="font-semibold text-gray-800 text-sm truncate">{{ q.title }}</p>
+                            <p class="text-xs text-gray-500">{{ q.subject.code }} · {{ q.department.code }} · {{ q.uploaded_at|date:"M d, Y" }}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2 ml-3 flex-shrink-0">
+                        <button onclick="restoreQuestionnaire('{{ q.pk }}')"
+                                class="flex items-center space-x-1 bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                            <span>Restore</span>
+                        </button>
+                        <button onclick="openPermDeleteModal('{{ q.pk }}', '{{ q.title|escapejs }}')"
+                                class="flex items-center space-x-1 bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                            <i class="bi bi-trash3"></i>
+                            <span>Delete</span>
+                        </button>
+                    </div>
                 </div>
-            </form>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-10">
+                <i class="bi bi-archive text-5xl text-gray-300"></i>
+                <p class="text-gray-500 mt-3">No archived questionnaires</p>
+            </div>
+            {% endif %}
+            <div class="mt-4 pt-4 border-t border-gray-200 text-right">
+                <button onclick="closeArchivedModal()" class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     PERMANENT DELETE MODAL
+════════════════════════════════════════════════════════════════ -->
+<div id="permDeleteModal" style="display:none; z-index:60;"
+    class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md animate-modal border-2 border-red-300">
+
+        <div class="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4 rounded-t-xl text-center">
+            <h3 class="text-xl font-bold text-white">Permanently Delete?</h3>
+            <p class="text-red-200 text-sm mt-1">This cannot be undone</p>
+        </div>
+
+        <div class="p-6">
+            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-5">
+                <p id="permDeleteTitle" class="font-bold text-gray-800"></p>
+            </div>
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-5">
+                <div class="flex items-start space-x-3">
+                    <i class="bi bi-exclamation-triangle-fill text-red-500 text-lg flex-shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-red-700">The file will be permanently removed from the system and cannot be recovered.</p>
+                </div>
+            </div>
+            <div class="flex space-x-3">
+                <button type="button" onclick="confirmPermDelete()"
+                    class="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold py-3 px-6 rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-lg flex items-center justify-center gap-2">
+                    <i class="bi bi-trash3"></i> Delete Forever
+                </button>
+                <button type="button" onclick="closePermDeleteModal()"
+                    class="flex-1 bg-white border-2 border-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg hover:bg-gray-50 transition-all">
+                    Cancel
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -489,9 +601,22 @@
 <script>
 (function () {
 
-    /* ── URL helpers: adjust these to match your urls.py ── */
-    function editUrl(pk)   { return '/questionnaires/edit/' + pk + '/'; }
-    function deleteUrl(pk) { return '/questionnaires/delete/' + pk + '/'; }
+    /* ── URL helpers ── */
+    function editUrl(pk)        { return '/questionnaires/edit/' + pk + '/'; }
+    function archiveUrl(pk)     { return '/questionnaires/archive/' + pk + '/'; }
+    function unarchiveUrl(pk)   { return '/questionnaires/unarchive/' + pk + '/'; }
+    function permDeleteUrl(pk)  { return '/questionnaires/permanent-delete/' + pk + '/'; }
+
+    function getCsrf() {
+        var m = document.cookie.match(/csrftoken=([^;]+)/);
+        return m ? m[1] : '';
+    }
+    function postFetch(url) {
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrf() },
+        }).then(function(r) { return r.json(); });
+    }
 
     /* ══════════════════════════════════════════
        EDIT MODAL
@@ -518,36 +643,98 @@
     };
 
     /* ══════════════════════════════════════════
-       DELETE MODAL
+       ARCHIVE MODAL
     ══════════════════════════════════════════ */
-    window.openDeleteModal = function (pk, title, dept, subject, file, date) {
-        document.getElementById('deleteForm').action           = deleteUrl(pk);
-        document.getElementById('deleteTitle').textContent     = title;
-        document.getElementById('deleteDept').textContent      = dept;
-        document.getElementById('deleteSubject').textContent   = subject;
-        document.getElementById('deleteFile').textContent      = file;
-        document.getElementById('deleteDate').textContent      = date;
+    var _archivePk = null;
 
-        document.getElementById('deleteModal').style.display = 'flex';
+    window.openArchiveModal = function (pk, title, dept, subject, file, date) {
+        _archivePk = pk;
+        document.getElementById('archiveTitle').textContent   = title;
+        document.getElementById('archiveDept').textContent    = dept;
+        document.getElementById('archiveSubject').textContent = subject;
+        document.getElementById('archiveFile').textContent    = file;
+        document.getElementById('archiveDate').textContent    = date;
+        document.getElementById('archiveModal').style.display = 'flex';
         document.body.style.overflow = 'hidden';
     };
 
-    window.closeDeleteModal = function () {
-        document.getElementById('deleteModal').style.display = 'none';
+    window.closeArchiveModal = function () {
+        document.getElementById('archiveModal').style.display = 'none';
         document.body.style.overflow = 'auto';
+    };
+
+    window.confirmArchive = function () {
+        if (!_archivePk) return;
+        postFetch(archiveUrl(_archivePk)).then(function (data) {
+            if (data.success) {
+                sessionStorage.setItem('flashMessage', data.message);
+                window.location.reload();
+            }
+        });
+    };
+
+    /* ══════════════════════════════════════════
+       ARCHIVED LIST MODAL
+    ══════════════════════════════════════════ */
+    window.openArchivedModal = function () {
+        document.getElementById('archivedModal').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    };
+
+    window.closeArchivedModal = function () {
+        document.getElementById('archivedModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    };
+
+    window.restoreQuestionnaire = function (pk) {
+        postFetch(unarchiveUrl(pk)).then(function (data) {
+            if (data.success) {
+                sessionStorage.setItem('flashMessage', data.message);
+                window.location.reload();
+            }
+        });
+    };
+
+    /* ══════════════════════════════════════════
+       PERMANENT DELETE MODAL
+    ══════════════════════════════════════════ */
+    var _permDeletePk = null;
+
+    window.openPermDeleteModal = function (pk, title) {
+        _permDeletePk = pk;
+        document.getElementById('permDeleteTitle').textContent = title;
+        document.getElementById('permDeleteModal').style.display = 'flex';
+    };
+
+    window.closePermDeleteModal = function () {
+        document.getElementById('permDeleteModal').style.display = 'none';
+        _permDeletePk = null;
+    };
+
+    window.confirmPermDelete = function () {
+        if (!_permDeletePk) return;
+        postFetch(permDeleteUrl(_permDeletePk)).then(function (data) {
+            if (data.success) {
+                sessionStorage.setItem('flashMessage', data.message);
+                window.location.reload();
+            }
+        });
     };
 
     /* ── Close on backdrop click ── */
     document.getElementById('editModal').addEventListener('click', function (e) {
         if (e.target === this) closeEditModal();
     });
-    document.getElementById('deleteModal').addEventListener('click', function (e) {
-        if (e.target === this) closeDeleteModal();
+    document.getElementById('archiveModal').addEventListener('click', function (e) {
+        if (e.target === this) closeArchiveModal();
+    });
+    document.getElementById('archivedModal').addEventListener('click', function (e) {
+        if (e.target === this) closeArchivedModal();
     });
 
     /* ── Close on Escape ── */
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') { closeEditModal(); closeDeleteModal(); }
+        if (e.key === 'Escape') { closeEditModal(); closeArchiveModal(); closeArchivedModal(); closePermDeleteModal(); }
     });
 
     /* ══════════════════════════════════════════
@@ -645,6 +832,21 @@
     window.addEventListener('resize', closeDropdown);
 
 })();
+
+    /* ── Flash message on reload ── */
+    window.addEventListener('load', function () {
+        var msg = sessionStorage.getItem('flashMessage');
+        if (msg) {
+            var flash    = document.getElementById('ajaxFlash');
+            var flashMsg = document.getElementById('ajaxFlashMessage');
+            if (flash && flashMsg) {
+                flashMsg.textContent = msg;
+                flash.classList.remove('hidden');
+                sessionStorage.removeItem('flashMessage');
+                setTimeout(function() { flash.classList.add('hidden'); }, 4000);
+            }
+        }
+    });
 </script>
 
 {% endblock %}

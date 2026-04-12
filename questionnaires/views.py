@@ -913,7 +913,7 @@ def my_uploads(request):
 
     questionnaires = (
         Questionnaire.objects
-        .filter(uploader=teacher)
+        .filter(uploader=teacher, is_archived=False)
         .select_related('department', 'subject')
     )
 
@@ -925,13 +925,21 @@ def my_uploads(request):
             Q(subject__name__icontains=search_query)
         )
 
+    archived_questionnaires = (
+        Questionnaire.objects
+        .filter(uploader=teacher, is_archived=True)
+        .select_related('department', 'subject')
+        .order_by('-uploaded_at')
+    )
+
     paginator   = Paginator(questionnaires, 10)
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)
 
     return render(request, 'teacher_dashboard/my_uploads.html', {
-        'page_obj':     page_obj,
-        'search_query': search_query,
+        'page_obj':               page_obj,
+        'search_query':           search_query,
+        'archived_questionnaires': archived_questionnaires,
     })
 
 
@@ -1002,6 +1010,79 @@ def delete_questionnaire(request, pk):
         return redirect('questionnaires:my_uploads')
 
     return redirect('questionnaires:my_uploads')
+
+
+@login_required
+def archive_questionnaire(request, pk):
+    questionnaire = get_object_or_404(Questionnaire, pk=pk, is_archived=False)
+    if request.user.is_staff:
+        can_act = True
+    elif hasattr(request.user, 'teacher_profile'):
+        can_act = questionnaire.uploader == request.user.teacher_profile
+    else:
+        can_act = False
+    if not can_act:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    if request.method == 'POST':
+        questionnaire.is_archived = True
+        questionnaire.save()
+        from accounts.models import ActivityLog
+        ActivityLog.objects.create(
+            activity_type='questionnaire_archived',
+            user=request.user,
+            description=f'Archived questionnaire "{questionnaire.title}"',
+        )
+        return JsonResponse({'success': True, 'message': f'"{questionnaire.title}" archived successfully.'})
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+def unarchive_questionnaire(request, pk):
+    questionnaire = get_object_or_404(Questionnaire, pk=pk, is_archived=True)
+    if request.user.is_staff:
+        can_act = True
+    elif hasattr(request.user, 'teacher_profile'):
+        can_act = questionnaire.uploader == request.user.teacher_profile
+    else:
+        can_act = False
+    if not can_act:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    if request.method == 'POST':
+        questionnaire.is_archived = False
+        questionnaire.save()
+        from accounts.models import ActivityLog
+        ActivityLog.objects.create(
+            activity_type='questionnaire_restored',
+            user=request.user,
+            description=f'Restored questionnaire "{questionnaire.title}"',
+        )
+        return JsonResponse({'success': True, 'message': f'"{questionnaire.title}" restored successfully.'})
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+def permanent_delete_questionnaire(request, pk):
+    questionnaire = get_object_or_404(Questionnaire, pk=pk, is_archived=True)
+    if request.user.is_staff:
+        can_act = True
+    elif hasattr(request.user, 'teacher_profile'):
+        can_act = questionnaire.uploader == request.user.teacher_profile
+    else:
+        can_act = False
+    if not can_act:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    if request.method == 'POST':
+        title = questionnaire.title
+        from accounts.models import ActivityLog
+        ActivityLog.objects.create(
+            activity_type='questionnaire_deleted',
+            user=request.user,
+            description=f'Permanently deleted questionnaire "{title}"',
+        )
+        questionnaire.file.delete()
+        questionnaire.delete()
+        return JsonResponse({'success': True, 'message': f'"{title}" permanently deleted.'})
+    return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
 # ============================================================================
@@ -1286,7 +1367,7 @@ def workspace(request):
 
     folders = (
         WorkspaceFolder.objects
-        .filter(teacher=teacher)
+        .filter(teacher=teacher, is_archived=False)
         .prefetch_related(
             'folder_questions__question__question_type',
             'folder_questions__question__questionnaire__subject',
@@ -1325,9 +1406,17 @@ def workspace(request):
             'questions':  questions_data,
         })
 
+    archived_folders = (
+        WorkspaceFolder.objects
+        .filter(teacher=teacher, is_archived=True)
+        .order_by('-created_at')
+    )
+    archived_folders_data = [{'id': f.pk, 'name': f.name} for f in archived_folders]
+
     import json
     return render(request, 'teacher_dashboard/workspace.html', {
-        'folders_json': json.dumps(folders_data),
+        'folders_json':          json.dumps(folders_data),
+        'archived_folders_json': json.dumps(archived_folders_data),
     })
 
 
@@ -1384,7 +1473,44 @@ def workspace_delete_folder(request, folder_id):
     folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher)
     name    = folder.name
     folder.delete()
-    cache.delete(f'workspace_folders_{teacher.id}')  # ✅ bust cache after deleting folder
+    cache.delete(f'workspace_folders_{teacher.id}')
+    return JsonResponse({'deleted': True, 'name': name})
+
+
+@login_required
+@require_POST
+def workspace_archive_folder(request, folder_id):
+    from django.core.cache import cache
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+    folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher, is_archived=False)
+    folder.is_archived = True
+    folder.save()
+    cache.delete(f'workspace_folders_{teacher.id}')
+    return JsonResponse({'archived': True, 'name': folder.name})
+
+
+@login_required
+@require_POST
+def workspace_unarchive_folder(request, folder_id):
+    from django.core.cache import cache
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+    folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher, is_archived=True)
+    folder.is_archived = False
+    folder.save()
+    cache.delete(f'workspace_folders_{teacher.id}')
+    return JsonResponse({'unarchived': True, 'id': folder.pk, 'name': folder.name,
+                         'created_at': folder.created_at.isoformat(), 'questions': []})
+
+
+@login_required
+@require_POST
+def workspace_permanent_delete_folder(request, folder_id):
+    from django.core.cache import cache
+    teacher = get_object_or_404(TeacherProfile, user=request.user)
+    folder  = get_object_or_404(WorkspaceFolder, pk=folder_id, teacher=teacher, is_archived=True)
+    name    = folder.name
+    folder.delete()
+    cache.delete(f'workspace_folders_{teacher.id}')
     return JsonResponse({'deleted': True, 'name': name})
 
 
