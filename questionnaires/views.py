@@ -1357,6 +1357,35 @@ def get_questions_json(request, pk):
 # WORKSPACE VIEWS
 # ============================================================================
 
+def _build_folder_questions_data(folder):
+    """Return the list of question dicts for a WorkspaceFolder."""
+    questions_data = []
+    for fq in folder.folder_questions.select_related(
+        'question__question_type',
+        'question__questionnaire__subject',
+    ).all():
+        q  = fq.question
+        qd = {
+            'id':             q.pk,
+            'question_text':  q.question_text,
+            'type':           q.question_type.name,
+            'type_display':   q.question_type.get_name_display(),
+            'difficulty':     q.difficulty,
+            'points':         q.points,
+            'correct_answer': q.correct_answer,
+            'explanation':    q.explanation or '',
+            'subject_code':   q.questionnaire.subject.code,
+            'subject_name':   q.questionnaire.subject.name,
+        }
+        if q.question_type.name == 'multiple_choice':
+            qd['options'] = [
+                q.option_a or '', q.option_b or '',
+                q.option_c or '', q.option_d or '',
+            ]
+        questions_data.append(qd)
+    return questions_data
+
+
 @login_required
 def workspace(request):
     if request.user.is_staff:
@@ -1365,53 +1394,35 @@ def workspace(request):
 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
 
-    folders = (
+    active_folders = (
         WorkspaceFolder.objects
         .filter(teacher=teacher, is_archived=False)
-        .prefetch_related(
-            'folder_questions__question__question_type',
-            'folder_questions__question__questionnaire__subject',
-        )
         .order_by('-created_at')
     )
-
-    folders_data = []
-    for folder in folders:
-        questions_data = []
-        for fq in folder.folder_questions.all():
-            q  = fq.question
-            qd = {
-                'id':             q.pk,
-                'question_text':  q.question_text,
-                'type':           q.question_type.name,
-                'type_display':   q.question_type.get_name_display(),
-                'difficulty':     q.difficulty,
-                'points':         q.points,
-                'correct_answer': q.correct_answer,
-                'explanation':    q.explanation or '',
-                'subject_code':   q.questionnaire.subject.code,
-                'subject_name':   q.questionnaire.subject.name,
-            }
-            if q.question_type.name == 'multiple_choice':
-                qd['options'] = [
-                    q.option_a or '', q.option_b or '',
-                    q.option_c or '', q.option_d or '',
-                ]
-            questions_data.append(qd)
-
-        folders_data.append({
-            'id':         folder.pk,
-            'name':       folder.name,
-            'created_at': folder.created_at.isoformat(),
-            'questions':  questions_data,
-        })
+    folders_data = [
+        {
+            'id':         f.pk,
+            'name':       f.name,
+            'created_at': f.created_at.isoformat(),
+            'questions':  _build_folder_questions_data(f),
+        }
+        for f in active_folders
+    ]
 
     archived_folders = (
         WorkspaceFolder.objects
         .filter(teacher=teacher, is_archived=True)
         .order_by('-created_at')
     )
-    archived_folders_data = [{'id': f.pk, 'name': f.name} for f in archived_folders]
+    archived_folders_data = [
+        {
+            'id':         f.pk,
+            'name':       f.name,
+            'created_at': f.created_at.isoformat(),
+            'questions':  _build_folder_questions_data(f),
+        }
+        for f in archived_folders
+    ]
 
     import json
     return render(request, 'teacher_dashboard/workspace.html', {
@@ -1498,8 +1509,13 @@ def workspace_unarchive_folder(request, folder_id):
     folder.is_archived = False
     folder.save()
     cache.delete(f'workspace_folders_{teacher.id}')
-    return JsonResponse({'unarchived': True, 'id': folder.pk, 'name': folder.name,
-                         'created_at': folder.created_at.isoformat(), 'questions': []})
+    return JsonResponse({
+        'unarchived':  True,
+        'id':          folder.pk,
+        'name':        folder.name,
+        'created_at':  folder.created_at.isoformat(),
+        'questions':   _build_folder_questions_data(folder),
+    })
 
 
 @login_required

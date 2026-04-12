@@ -999,7 +999,12 @@ function renderArchivedFoldersList(){
             postJSON(API.unarchiveFolder(f.id),{})
                 .then(function(data){
                     state.archivedFolders=state.archivedFolders.filter(function(x){return String(x.id)!==String(f.id);});
-                    state.folders.unshift({id:data.id,name:data.name,created_at:data.created_at,questions:[]});
+                    state.folders.unshift({
+                        id:         data.id,
+                        name:       data.name,
+                        created_at: data.created_at,
+                        questions:  data.questions || [],
+                    });
                     refreshSidebarBadge();
                     refreshArchivedBadge();
                     renderArchivedFoldersList();
