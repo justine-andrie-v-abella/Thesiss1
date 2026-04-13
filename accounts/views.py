@@ -65,10 +65,22 @@ def get_subadmin_department(user):
 def bust_dashboard_cache():
     """Call this after any create/update/delete to keep dashboard fresh."""
     from django.core.cache import cache
-    from .models import Department
     cache.delete('admin_dashboard_stats_all')
-    for dept in Department.objects.values_list('id', flat=True):
-        cache.delete(f'admin_dashboard_stats_{dept}')
+    cache.delete_many([
+        f'admin_dashboard_stats_{dept_id}'
+        for dept_id in _cached_department_ids()
+    ])
+
+
+def _cached_department_ids():
+    from django.core.cache import cache
+    from .models import Department
+    key = 'all_department_ids'
+    ids = cache.get(key)
+    if ids is None:
+        ids = list(Department.objects.values_list('id', flat=True))
+        cache.set(key, ids, 300)  # cache for 5 minutes
+    return ids
 
 
 # ============================================================================
@@ -642,6 +654,8 @@ def add_department(request):
         form = DepartmentForm(request.POST)
         if form.is_valid():
             department = form.save()
+            from django.core.cache import cache
+            cache.delete('all_department_ids')
             bust_dashboard_cache()
             ActivityLog.objects.create(
                 activity_type='department_created',
@@ -693,7 +707,9 @@ def delete_department(request, pk):
             description=f"Department {department_name} ({department_code}) was deleted"
         )
         department.delete()
-        bust_dashboard_cache()  # ✅
+        from django.core.cache import cache
+        cache.delete('all_department_ids')
+        bust_dashboard_cache()
         messages.success(request, f'Department "{department_name}" has been deleted successfully!')
         return redirect('accounts:manage_departments')
 
@@ -729,6 +745,8 @@ def permanent_delete_department(request, pk):
         department_name = department.name
         department_code = department.code
         department.delete()
+        from django.core.cache import cache
+        cache.delete('all_department_ids')
         ActivityLog.objects.create(
             activity_type='department_deleted',
             user=request.user,

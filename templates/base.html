@@ -7,9 +7,15 @@
     <title>{% block title %}Test Banking System{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
-    /* Notification dropdown scrollable container */
+    /* ── Global font ── */
+    *, body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+    /* ── Notification dropdown ── */
     .notification-dropdown {
         max-height: 400px;
         overflow-y: auto;
@@ -20,9 +26,144 @@
     .notification-dropdown::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     .notification-dropdown::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     .notification-dropdown { scrollbar-width: thin; scrollbar-color: #cbd5e1 #f1f5f9; scroll-behavior: smooth; }
+
+    /* ── Top progress bar ── */
+    #top-progress-bar {
+        position: fixed;
+        top: 0; left: 0;
+        height: 3px;
+        width: 0%;
+        background: linear-gradient(90deg, #3b82f6, #6366f1, #8b5cf6);
+        z-index: 99999;
+        transition: width 0.25s ease, opacity 0.4s ease;
+        box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
+        border-radius: 0 2px 2px 0;
+    }
+    #top-progress-bar.done {
+        width: 100% !important;
+        opacity: 0;
+    }
+
+    /* ── Full-page loader ── */
+    #page-loader {
+        position: fixed;
+        inset: 0;
+        background: #fff;
+        z-index: 99998;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        transition: opacity 0.35s ease;
+    }
+    #page-loader.hidden-loader {
+        opacity: 0;
+        pointer-events: none;
+    }
+    #page-loader .loader-ring {
+        width: 56px;
+        height: 56px;
+        border: 4px solid #dbeafe;
+        border-top-color: #2563eb;
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+    }
+    #page-loader .loader-dots {
+        display: flex;
+        gap: 6px;
+    }
+    #page-loader .loader-dots span {
+        width: 7px; height: 7px;
+        background: #3b82f6;
+        border-radius: 50%;
+        animation: dotBounce 1.2s ease-in-out infinite;
+    }
+    #page-loader .loader-dots span:nth-child(2) { animation-delay: 0.2s; }
+    #page-loader .loader-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes dotBounce {
+        0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+        40%            { transform: translateY(-8px); opacity: 1; }
+    }
+
+    /* ── Page content fade-in ── */
+    @keyframes pageContentIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+    #main-page-content {
+        animation: pageContentIn 0.3s ease forwards;
+    }
+
+    /* ── Skeleton shimmer (reusable) ── */
+    .skeleton {
+        background: linear-gradient(90deg, #f0f4f8 25%, #e2e8f0 50%, #f0f4f8 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.4s ease infinite;
+        border-radius: 6px;
+    }
+    @keyframes shimmer {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+
+    /* ── Skeleton page overlay ── */
+    #skeleton-overlay {
+        position: fixed;
+        top: 0;
+        left: 288px; /* sidebar width — sidebar stays visible */
+        right: 0;
+        bottom: 0;
+        background: #f8fafc;
+        z-index: 99997;
+        display: none;
+        padding: 80px 32px 32px 32px;
+        overflow: hidden;
+    }
+    #skeleton-overlay.show { display: block; }
+    @media (max-width: 1023px) {
+        /* sidebar is hidden on mobile, so cover full width */
+        #skeleton-overlay { left: 0; padding: 80px 16px 32px 16px; }
+    }
+    .sk-header { height: 36px; width: 220px; margin-bottom: 6px; }
+    .sk-sub    { height: 16px; width: 140px; margin-bottom: 32px; }
+    .sk-grid   { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; margin-bottom: 24px; }
+    .sk-card   { height: 140px; border-radius: 14px; }
+    .sk-table  { height: 320px; border-radius: 14px; }
     </style>
 </head>
 <body class="bg-gray-50">
+
+    <!-- ── Top progress bar ── -->
+    <div id="top-progress-bar"></div>
+
+    <!-- ── Full-page loader (shows on first load) ── -->
+    <div id="page-loader">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+            <img src="{% static 'images/bisulogo.png' %}" alt="BISU" style="width:52px;height:52px;object-fit:contain;opacity:0.85;">
+            <div class="loader-ring"></div>
+            <div class="loader-dots">
+                <span></span><span></span><span></span>
+            </div>
+            <p style="font-size:13px;color:#6b7280;font-weight:500;letter-spacing:0.02em;">Loading...</p>
+        </div>
+    </div>
+
+    <!-- ── Skeleton overlay (shows on navigation) ── -->
+    <div id="skeleton-overlay">
+        <div class="skeleton sk-header"></div>
+        <div class="skeleton sk-sub"></div>
+        <div class="sk-grid">
+            <div class="skeleton sk-card"></div>
+            <div class="skeleton sk-card"></div>
+            <div class="skeleton sk-card"></div>
+            <div class="skeleton sk-card"></div>
+        </div>
+        <div class="skeleton sk-table"></div>
+    </div>
+
     {% if user.is_authenticated %}
     <!-- Mobile Menu Button -->
     <button id="mobileMenuBtn" class="lg:hidden fixed top-4 left-4 z-50 bg-white p-2 rounded-lg shadow-lg hover:bg-gray-50 transition-colors">
@@ -362,7 +503,7 @@
         </header>
 
         <!-- Page Content -->
-        <main class="p-4 sm:p-6 lg:p-8">
+        <main class="p-4 sm:p-6 lg:p-8" id="main-page-content">
             {% block content %}{% endblock %}
         </main>
     </div>
@@ -1022,7 +1163,121 @@ document.getElementById('new_password')?.addEventListener('input', function() {
     indicator.innerHTML = `<div class="font-semibold ${strengthColor}">Strength: ${strengthText}</div>${reqHtml}`;
 });
 </script>
-{% block modals %}{% endblock %}   {# ← ADD THIS LINE #}
+{% block modals %}{% endblock %}
 {% block extra_js %}{% endblock %}
+
+<script>
+(function () {
+    'use strict';
+
+    var bar      = document.getElementById('top-progress-bar');
+    var loader   = document.getElementById('page-loader');
+    var skeleton = document.getElementById('skeleton-overlay');
+    var content  = document.getElementById('main-page-content');
+    var barVal   = 0;
+    var barTimer = null;
+
+    /* ── Detect whether this page has a sidebar (authenticated layout) ── */
+    var hasSidebar = !!document.getElementById('sidebar');
+
+    /* ── If sidebar exists, never show the full-page loader ── */
+    if (hasSidebar && loader) {
+        loader.style.display = 'none';
+    }
+
+    /* ── If no sidebar, never show the skeleton ── */
+    if (!hasSidebar && skeleton) {
+        skeleton.style.display = 'none';
+    }
+
+    /* ── Progress bar helpers ── */
+    function barStart() {
+        barVal = 0;
+        if (bar) { bar.style.opacity = '1'; bar.classList.remove('done'); }
+        clearInterval(barTimer);
+        barTimer = setInterval(function () {
+            barVal += Math.random() * 8;
+            if (barVal > 85) barVal = 85;
+            if (bar) bar.style.width = barVal + '%';
+        }, 120);
+    }
+
+    function barFinish() {
+        clearInterval(barTimer);
+        if (bar) bar.classList.add('done');
+        setTimeout(function () {
+            if (bar) { bar.style.width = '0%'; bar.style.opacity = '1'; bar.classList.remove('done'); }
+        }, 600);
+    }
+
+    /* ── Full-page loader (no-sidebar pages only) ── */
+    function hidePageLoader() {
+        if (!loader || hasSidebar) return;
+        loader.classList.add('hidden-loader');
+        setTimeout(function () { loader.style.display = 'none'; }, 380);
+    }
+
+    /* ── Skeleton (sidebar pages only) ── */
+    function showSkeleton() {
+        if (!hasSidebar) return;
+        if (skeleton) skeleton.classList.add('show');
+        if (content)  content.style.visibility = 'hidden';
+    }
+
+    function hideSkeleton() {
+        if (skeleton) skeleton.classList.remove('show');
+        if (content)  content.style.visibility = 'visible';
+    }
+
+    /* ── On first load ── */
+    barStart();
+
+    window.addEventListener('load', function () {
+        barFinish();
+        hideSkeleton();
+        hidePageLoader();
+    });
+
+    /* ── Intercept link clicks ── */
+    document.addEventListener('click', function (e) {
+        var anchor = e.target.closest('a');
+        if (!anchor) return;
+        var href = anchor.getAttribute('href');
+        if (!href) return;
+        if (anchor.target === '_blank') return;
+        if (anchor.download) return;
+        if (href.startsWith('#')) return;
+        if (href.startsWith('javascript')) return;
+        if (href.startsWith('mailto') || href.startsWith('tel')) return;
+        if (anchor.getAttribute('onclick')) return;
+        try {
+            var url = new URL(href, window.location.href);
+            if (url.origin !== window.location.origin) return;
+            if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+        } catch (err) { return; }
+
+        barStart();
+        /* Only show skeleton on sidebar pages; no-sidebar pages navigate normally */
+        if (hasSidebar) showSkeleton();
+    });
+
+    /* ── GET form submissions (search bars etc.) on sidebar pages ── */
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (hasSidebar && form.method && form.method.toLowerCase() === 'get') {
+            barStart();
+            showSkeleton();
+        }
+    });
+
+    /* ── Browser back/forward (bfcache restore) ── */
+    window.addEventListener('pageshow', function () {
+        hideSkeleton();
+        barFinish();
+        hidePageLoader();
+    });
+
+})();
+</script>
 </body>
 </html>
