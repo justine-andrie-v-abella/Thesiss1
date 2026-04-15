@@ -665,7 +665,7 @@ def review_extracted_questions(request):
                 file_size         = 0,
                 file_type         = 'txt',
             )
-            questionnaire.file = ''
+            questionnaire.file = None
             questionnaire.save()
 
             type_name_map = {
@@ -1323,17 +1323,50 @@ def download_questionnaire(request, pk):
 @login_required
 def get_subjects_ajax(request):
     department_id = request.GET.get('department')
-    if department_id:
-        subjects = Subject.objects.filter(
-            departments__id=department_id
-        ).values('id', 'code', 'name')
-        return JsonResponse({'subjects': list(subjects)})
-    return JsonResponse({'subjects': []})
+    if not department_id:
+        return JsonResponse({'subjects': []})
+
+    # Teachers and sub-admins may only query their own department
+    if not request.user.is_staff:
+        try:
+            from accounts.models import TeacherProfile, SubAdminProfile
+            user_dept_id = None
+            if hasattr(request.user, 'teacher'):
+                user_dept_id = request.user.teacher.department_id
+            elif hasattr(request.user, 'subadmin_profile'):
+                user_dept_id = request.user.subadmin_profile.department_id
+            if user_dept_id and str(user_dept_id) != str(department_id):
+                return JsonResponse({'subjects': [], 'error': 'Not authorized'}, status=403)
+        except Exception:
+            pass
+
+    subjects = Subject.objects.filter(
+        departments__id=department_id
+    ).values('id', 'code', 'name')
+    return JsonResponse({'subjects': list(subjects)})
 
 
 @login_required
 def get_questions_json(request, pk):
-    questionnaire  = get_object_or_404(Questionnaire, pk=pk)
+    questionnaire = get_object_or_404(Questionnaire, pk=pk)
+
+    # Uploader, staff, or a user from the same department may view questions
+    is_owner = (
+        hasattr(questionnaire, 'uploader') and
+        questionnaire.uploader is not None and
+        questionnaire.uploader.user_id == request.user.pk
+    )
+    is_same_dept = False
+    try:
+        if hasattr(request.user, 'teacher'):
+            is_same_dept = (request.user.teacher.department_id == questionnaire.department_id)
+        elif hasattr(request.user, 'subadmin_profile'):
+            is_same_dept = (request.user.subadmin_profile.department_id == questionnaire.department_id)
+    except Exception:
+        pass
+    if not request.user.is_staff and not is_owner and not is_same_dept:
+        return JsonResponse({'error': 'You do not have permission to view these questions.'}, status=403)
+
     questions_data = []
 
     for q in questionnaire.extracted_questions.select_related('question_type').order_by('created_at'):
@@ -1380,10 +1413,13 @@ def get_questions_json(request, pk):
         questions_data.append(base)
 
     return JsonResponse({
-        'questionnaire_id':    questionnaire.pk,
-        'questionnaire_title': questionnaire.title,
-        'total':               len(questions_data),
-        'questions':           questions_data,
+        'questionnaire_id':      questionnaire.pk,
+        'questionnaire_title':   questionnaire.title,
+        'questionnaire_subject': f"{questionnaire.subject.code} \u2014 {questionnaire.subject.name}",
+        'exam_type_display':     questionnaire.get_exam_type_display(),
+        'department':            questionnaire.department.name,
+        'total':                 len(questions_data),
+        'questions':             questions_data,
     })
 
 
@@ -1732,7 +1768,11 @@ def workspace_list_folders(request):
     folders = (
         WorkspaceFolder.objects
         .filter(teacher=teacher)
-        .prefetch_related('folder_questions')
+        .prefetch_related(
+            'folder_questions',
+            'folder_questions__question',
+            'folder_questions__question__question_type',
+        )
         .order_by('-created_at')
     )
 

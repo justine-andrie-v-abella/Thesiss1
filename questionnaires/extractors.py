@@ -6,9 +6,12 @@
 import os
 import json
 import re
+import logging
 from typing import List, Dict, Any
 from django.conf import settings
 import google.generativeai as genai
+
+logger = logging.getLogger(__name__)
 
 # File reading libraries
 try:
@@ -82,7 +85,7 @@ class AIQuestionExtractor:
                 )
                 created_questions.append(question)
             except Exception as e:
-                print(f"Error saving question: {e}")
+                logger.error("Error saving question: %s", e, exc_info=True)
                 continue
 
         return created_questions
@@ -174,8 +177,8 @@ class AIQuestionExtractor:
             return questions
 
         except Exception as e:
-            print(f"Gemini API Error: {str(e)}")
-            raise Exception(f"AI extraction failed: {str(e)}")
+            logger.error("Gemini API error: %s", e, exc_info=True)
+            raise Exception(f"AI extraction failed: {str(e)}") from e
 
     def _build_extraction_prompt(self, content: str, type_names: List[str]) -> str:
         """
@@ -270,7 +273,9 @@ INSTRUCTIONS:
 JSON:"""
 
         return prompt
-        """Parse Gemini's JSON response"""
+
+    def _parse_ai_response(self, response_text: str) -> List[Dict[str, Any]]:
+        """Parse Gemini's JSON response into a list of question dicts."""
 
         response_text = response_text.strip()
 
@@ -302,19 +307,18 @@ JSON:"""
                     if self._validate_question(q):
                         validated.append(q)
                     else:
-                        print(f"Skipping question {i+1} — failed validation")
+                        logger.debug("Skipping question %d — failed validation", i + 1)
                 except Exception as e:
-                    print(f"Error validating question {i+1}: {str(e)}")
+                    logger.warning("Error validating question %d: %s", i + 1, e)
                     continue
 
-            print(f"Found {len(validated)} questions in file")
+            logger.debug("Found %d valid questions in AI response", len(validated))
             return validated
 
         except json.JSONDecodeError as e:
-            print(f"Failed to parse AI response: {str(e)}")
-            print(f"Response preview:\n{response_text[:500]}")
+            logger.error("Failed to parse AI response: %s\nPreview: %s", e, response_text[:500])
 
-            # Try to recover individual objects
+            # Try to recover individual objects from a malformed response
             try:
                 objects = re.findall(r'\{[^{}]+\}', response_text, re.DOTALL)
                 recovered = []
@@ -323,15 +327,15 @@ JSON:"""
                         q = json.loads(obj_str)
                         if self._validate_question(q):
                             recovered.append(q)
-                    except:
+                    except (ValueError, json.JSONDecodeError):
                         continue
                 if recovered:
-                    print(f"Recovered {len(recovered)} questions from malformed response")
+                    logger.warning("Recovered %d questions from malformed response", len(recovered))
                     return recovered
-            except:
-                pass
+            except Exception as recover_err:
+                logger.error("Recovery attempt failed: %s", recover_err)
 
-            raise ValueError(f"Could not parse AI response: {str(e)}")
+            raise ValueError(f"Could not parse AI response: {str(e)}") from e
 
     def _validate_question(self, question: Dict[str, Any]) -> bool:
         """Validate a question has the minimum required fields"""

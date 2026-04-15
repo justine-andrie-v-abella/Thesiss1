@@ -71,7 +71,6 @@ urlpatterns = [
     # ── Shared ───────────────────────────────────────────────────────────────
 
     path('mark-all-notifications-read/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
-    path('test-activity/', views.test_activity, name='test_activity'),
     # Subject Management (sub-admin — their department only)
     path('subadmin/subjects/',                          views.subadmin_manage_subjects,          name='subadmin_manage_subjects'),
     path('subadmin/subjects/add/',                      views.subadmin_add_subject,              name='subadmin_add_subject'),

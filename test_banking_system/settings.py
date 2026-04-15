@@ -58,7 +58,7 @@ WSGI_APPLICATION = 'test_banking_system.wsgi.application'
 
 DATABASES = {
     "default": dj_database_url.parse(
-        "postgresql://postgres.fijiitislcpxpvbzhbfr:BISUtestbankingsystem@aws-1-ap-southeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+        config('DATABASE_URL')
     )
 }
 

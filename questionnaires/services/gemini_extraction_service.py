@@ -60,7 +60,7 @@ class GeminiQuestionnaireExtractor:
                     if extracted:
                         text += extracted + "\n"
         except Exception as e:
-            raise Exception(f"Error extracting PDF: {str(e)}")
+            raise Exception(f"Error extracting PDF: {str(e)}") from e
         return text
 
     def _extract_from_docx(self, file_path: str) -> str:
@@ -139,7 +139,7 @@ class GeminiQuestionnaireExtractor:
             return self._reconstruct_matching_sections(raw_text)
 
         except Exception as e:
-            raise Exception(f"Error extracting DOCX: {str(e)}")
+            raise Exception(f"Error extracting DOCX: {str(e)}") from e
 
     def _reconstruct_matching_sections(self, text: str) -> str:
         """
@@ -240,7 +240,7 @@ class GeminiQuestionnaireExtractor:
                     text += " ".join([str(cell) for cell in row if cell]) + "\n"
             return text
         except Exception as e:
-            raise Exception(f"Error extracting Excel: {str(e)}")
+            raise Exception(f"Error extracting Excel: {str(e)}") from e
 
     # =========================================================================
     # AI PROCESSING

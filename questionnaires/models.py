@@ -2,11 +2,10 @@
 # FILE: questionnaires/models.py  —  FIXED VERSION
 # ============================================================================
 
-from django.db import models
+from django.db import models, migrations
 from accounts.models import TeacherProfile, Department, Subject
 from django.contrib.auth.models import User
 import os
-from django.db import migrations
 import json as _json
 
 

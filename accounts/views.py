@@ -105,7 +105,7 @@ def send_teacher_invite_email(teacher, plain_password):
     full_name  = teacher.user.get_full_name()
     username   = teacher.user.username
     email      = teacher.user.email
-    site_url   = getattr(settings, 'SITE_URL', 'http://localhost:2000')
+    site_url   = settings.SITE_URL
     login_url  = f"{site_url}/accounts/login/"
 
     subject = "Your Teacher Account Has Been Created"
@@ -190,7 +190,7 @@ def send_subadmin_invite_email(subadmin, plain_password):
     username   = subadmin.user.username
     email      = subadmin.user.email
     department = subadmin.department.name
-    site_url   = getattr(settings, 'SITE_URL', 'http://localhost:2000')
+    site_url   = settings.SITE_URL
     login_url  = f"{site_url}/accounts/login/"
 
     subject = "Your Sub-Admin Account Has Been Created"
@@ -1638,15 +1638,6 @@ def get_department_chart_data():
     }
 
 
-@login_required
-@user_passes_test(is_admin)
-def test_activity(request):
-    ActivityLog.objects.create(
-        activity_type='system',
-        user=request.user,
-        description='Test activity created manually'
-    )
-    return redirect('accounts:admin_dashboard')
 
 
 # ============================================================================
