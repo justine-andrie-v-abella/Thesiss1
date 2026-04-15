@@ -4,11 +4,15 @@
 
 import json
 import re
+import time
 import PyPDF2
 import docx
 import openpyxl
 from typing import List, Dict
 from django.conf import settings
+
+# Transient HTTP codes worth retrying
+_RETRYABLE = ('503', '429', 'UNAVAILABLE', 'RESOURCE_EXHAUSTED', 'rate limit', 'overloaded')
 
 
 class GeminiQuestionnaireExtractor:
@@ -254,34 +258,53 @@ class GeminiQuestionnaireExtractor:
         else:
             prompt = self._build_extraction_prompt(content, question_types)
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-            )
+        max_retries = 3
+        base_delay  = 3   # seconds; doubles each attempt
 
-            response_text = response.text
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                )
 
-            if '```json' in response_text:
-                response_text = response_text.split('```json')[1].split('```')[0]
-            elif '```' in response_text:
-                response_text = response_text.split('```')[1].split('```')[0]
+                response_text = response.text
 
-            response_text = response_text.strip()
-            data = json.loads(response_text)
+                if '```json' in response_text:
+                    response_text = response_text.split('```json')[1].split('```')[0]
+                elif '```' in response_text:
+                    response_text = response_text.split('```')[1].split('```')[0]
 
-            if 'questions' not in data or not data['questions']:
-                raise Exception("AI response did not contain any questions")
+                response_text = response_text.strip()
+                data = json.loads(response_text)
 
-            return data
+                if 'questions' not in data or not data['questions']:
+                    raise Exception("AI response did not contain any questions")
 
-        except json.JSONDecodeError as e:
-            raise Exception(
-                f"Failed to parse AI response as JSON: {str(e)}\n"
-                f"Response preview: {response_text[:200]}"
-            )
-        except Exception as e:
-            raise Exception(f"AI extraction failed: {str(e)}")
+                return data
+
+            except json.JSONDecodeError as e:
+                raise Exception(
+                    f"Failed to parse AI response as JSON: {str(e)}\n"
+                    f"Response preview: {response_text[:200]}"
+                )
+            except Exception as e:
+                err_str    = str(e)
+                is_transient = any(code in err_str for code in _RETRYABLE)
+
+                if is_transient and attempt < max_retries - 1:
+                    wait = base_delay * (2 ** attempt)   # 3s → 6s → 12s
+                    print(f"[Gemini] transient error on attempt {attempt + 1}, "
+                          f"retrying in {wait}s… ({err_str[:120]})")
+                    time.sleep(wait)
+                    last_error = e
+                    continue
+
+                # Non-retryable or exhausted retries — raise clean message
+                raise Exception(err_str) from e
+
+        raise Exception(str(last_error))
 
     # =========================================================================
     # PROMPTS

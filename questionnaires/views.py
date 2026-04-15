@@ -175,6 +175,31 @@ def upload_questionnaire(request):
                         {'form': form},
                     )
 
+                # ── Answer-key check ────────────────────────────────────────
+                # Essays legitimately have no answer key; all others should.
+                non_essay_qs = [
+                    q for q in created_questions
+                    if q.question_type and q.question_type.name != 'essay'
+                ]
+                answered_qs = [
+                    q for q in non_essay_qs
+                    if q.correct_answer and q.correct_answer.strip()
+                ]
+                if non_essay_qs and not answered_qs:
+                    questionnaire.file.delete(save=False)
+                    questionnaire.delete()
+                    messages.error(
+                        request,
+                        'No answer key was detected in your file. '
+                        'Please upload a file that includes an answer key '
+                        '(e.g. "Answer: A" or a key section at the end).',
+                    )
+                    return render(
+                        request,
+                        'teacher_dashboard/upload_questionnaire.html',
+                        {'form': form, 'no_answer_key': True},
+                    )
+
                 # Keep the file and questionnaire — store only PK in session
                 questionnaire.extraction_status = 'pending_review'
                 questionnaire.save()
@@ -203,11 +228,20 @@ def upload_questionnaire(request):
                     description='Extraction failed — file was not saved.',
                 )
 
-                messages.error(
-                    request,
-                    f'AI extraction failed: {str(e)}. '
-                    f'Your file was not saved. Please try again.',
-                )
+                err = str(e)
+                if any(code in err for code in ('503', '429', 'UNAVAILABLE',
+                                                 'RESOURCE_EXHAUSTED',
+                                                 'rate limit', 'overloaded')):
+                    user_msg = (
+                        'The AI service is temporarily unavailable due to high demand. '
+                        'Your file was not saved. Please wait a moment and try again.'
+                    )
+                else:
+                    user_msg = (
+                        f'AI extraction failed: {err}. '
+                        f'Your file was not saved. Please try again.'
+                    )
+                messages.error(request, user_msg)
                 return render(
                     request,
                     'teacher_dashboard/upload_questionnaire.html',
