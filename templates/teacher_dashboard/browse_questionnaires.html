@@ -518,7 +518,7 @@
 .dp-match-item{font-size:12px;color:#374151;margin-bottom:3px;}
 .dp-essay-lines{padding-left:20px;margin-top:7px;}
 .dp-essay-line{border-bottom:1px solid #D1D5DB;height:20px;margin-bottom:7px;}
-.dp-ans-key{margin-top:26px;padding-top:10px;border-top:2px dashed #D1D5DB;}
+.dp-ans-key{margin-top:26px;padding-top:10px;border-top:2px dashed #D1D5DB;page-break-before:always;}
 .dp-ak-hd{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#9CA3AF;margin-bottom:6px;font-family:Arial,sans-serif;}
 .dp-ak-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:3px;}
 .dp-ak-item{font-size:11px;color:#374151;font-family:Arial,sans-serif;}
@@ -1170,8 +1170,18 @@ function renderDP(data,titleOverride,subjectOverride,examTypeOverride){
         html+='<div class="dp-directions">'+dpEsc(DP_DIRECTIONS[type]||'')+'</div>';
         qs.forEach(function(q,idx){
             globalN++;
-            html+=renderDPQ(q,idx+1,type);
-            if(q.correct_answer&&type!=='essay')keyItems.push(globalN+'. '+q.correct_answer);
+            html+=renderDPQ(q,globalN,type);  /* use global number so it matches the answer key */
+            if(type!=='essay'){
+                if(type==='matching'&&q.matching_pairs&&q.matching_pairs.length){
+                    var pStr=q.matching_pairs.map(function(p){
+                        var n=p.item?(String(p.item).split('.')[0].trim()):String(p.item||'');
+                        return n+'\u2192'+p.match;
+                    }).join(', ');
+                    keyItems.push(globalN+'. '+pStr);
+                }else if(q.correct_answer){
+                    keyItems.push(globalN+'. '+q.correct_answer);
+                }
+            }
         });
         html+='</div>';
         secIdx++;
@@ -1194,17 +1204,14 @@ function renderDPQ(q,num,type){
             html+='<div class="dp-mc-opts">';
             q.options.forEach(function(opt,i){
                 if(!opt)return;
-                var isC=q.correct_answer&&q.correct_answer.toUpperCase()===L[i];
-                html+='<div class="dp-opt'+(isC?' dp-correct':'')+'"><span style="font-weight:700;">'+L[i]+'.</span>&nbsp;'+dpEsc(opt)+(isC?'&nbsp;<small>&#10003;</small>':'')+'</div>';
+                html+='<div class="dp-opt"><span style="font-weight:700;">'+L[i]+'.</span>&nbsp;'+dpEsc(opt)+'</div>';
             });
             html+='</div>';
         }
     }else if(type==='true_false'){
         html+=dpEsc(q.question_text)+'&nbsp;<span class="dp-tf-line"></span>';
-        if(q.correct_answer)html+='&nbsp;<small style="color:#065F46;font-weight:700;">('+dpEsc(q.correct_answer)+')</small>';
     }else if(type==='identification'||type==='fill_blank'){
         html+='<span class="dp-blank-line"></span>&nbsp;'+dpEsc(q.question_text);
-        if(q.correct_answer)html+='&nbsp;<small style="color:#065F46;font-weight:700;">('+dpEsc(q.correct_answer)+')</small>';
     }else if(type==='matching'){
         html+=dpEsc(q.question_text);
         if(q.column_a&&q.column_a.length&&q.column_b&&q.column_b.length){
@@ -1221,7 +1228,6 @@ function renderDPQ(q,num,type){
         html+='</div>';
     }else{
         html+=dpEsc(q.question_text);
-        if(q.correct_answer)html+='&nbsp;<small style="color:#065F46;font-weight:700;">('+dpEsc(q.correct_answer)+')</small>';
     }
     html+='</div>';
     return html;

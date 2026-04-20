@@ -5,7 +5,7 @@
 
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 import io
@@ -38,7 +38,9 @@ class BISUQuestionnaireGenerator:
 
     def generate_questionnaire(self, questionnaire_data):
         self._fill_placeholders(questionnaire_data)
-        self._add_questions_by_type(questionnaire_data['questions'])
+        answer_key_data = self._add_questions_by_type(questionnaire_data['questions'])
+        if answer_key_data:
+            self._add_answer_key_page(answer_key_data)
         return self.doc
 
     # =========================================================================
@@ -138,7 +140,10 @@ class BISUQuestionnaireGenerator:
     # =========================================================================
 
     def _add_questions_by_type(self, questions_by_type):
+        """Adds all question sections and returns answer-key data grouped by type."""
         question_number = 1
+        answer_key = {}
+
         for section_key, section_data in questions_by_type.items():
             if not section_data.get('questions'):
                 continue
@@ -155,11 +160,30 @@ class BISUQuestionnaireGenerator:
 
             self.doc.add_paragraph()
 
+            section_answers = []
             for question in section_data['questions']:
                 self._add_question(question, question_number)
+                qtype = question.question_type.name
+                if qtype != 'essay':
+                    if qtype == 'matching':
+                        md = question.get_matching_data()
+                        pairs = md.get('pairs', []) if md else []
+                        section_answers.append((question_number, 'matching', pairs))
+                    else:
+                        section_answers.append(
+                            (question_number, qtype, question.correct_answer or '')
+                        )
                 question_number += 1
 
+            if section_answers:
+                answer_key[section_key] = {
+                    'title':   section_data['title'],
+                    'answers': section_answers,
+                }
+
             self.doc.add_paragraph()
+
+        return answer_key
 
     def _add_question(self, question, number):
         """Dispatch to the correct renderer based on question type."""
@@ -219,8 +243,6 @@ class BISUQuestionnaireGenerator:
             r = p.add_run(f"{letter}. {text or ''}")
             r.font.size = Pt(12)
             r.font.name = 'Arial'
-            if question.correct_answer and question.correct_answer.lower() == letter:
-                r.font.color.rgb = RGBColor(0, 128, 0)
         self.doc.add_paragraph()
 
     # =========================================================================
@@ -356,29 +378,6 @@ class BISUQuestionnaireGenerator:
 
         self.doc.add_paragraph()
 
-        # ── Answer key ────────────────────────────────────────────────────
-        if pairs:
-            p  = self.doc.add_paragraph()
-            r  = p.add_run("Answer Key:  ")
-            r.bold           = True
-            r.font.size      = Pt(10)
-            r.font.name      = 'Arial'
-            r.font.color.rgb = RGBColor(0, 100, 0)
-
-            key_parts = []
-            for pair in pairs:
-                item  = pair.get('item', '')
-                match = pair.get('match', '?')
-                num   = item.split('.')[0].strip() if '.' in str(item) else str(item)
-                key_parts.append(f"{num} → {match}")
-
-            r2 = p.add_run('   '.join(key_parts))
-            r2.font.size      = Pt(10)
-            r2.font.name      = 'Arial'
-            r2.font.color.rgb = RGBColor(0, 100, 0)
-
-        self.doc.add_paragraph()
-
     # =========================================================================
     # TABLE HELPERS
     # =========================================================================
@@ -433,6 +432,102 @@ class BISUQuestionnaireGenerator:
         if existing is not None:
             tcPr.remove(existing)
         tcPr.append(shd)
+
+    # =========================================================================
+    # ANSWER KEY PAGE
+    # =========================================================================
+
+    def _add_answer_key_page(self, answer_key_data):
+        """
+        Appends a dedicated Answer Key page at the very end of the document.
+        A hard page-break separates it from the question body so it can be
+        detached before handing out the test.
+        """
+        # ── Hard page break ───────────────────────────────────────────────
+        p   = self.doc.add_paragraph()
+        run = p.add_run()
+        run.add_break(WD_BREAK.PAGE)
+
+        # ── Page heading ──────────────────────────────────────────────────
+        p = self.doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run('ANSWER KEY')
+        r.bold           = True
+        r.font.size      = Pt(16)
+        r.font.name      = 'Arial'
+
+        p = self.doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run('(For Instructor Use Only — Detach Before Distributing)')
+        r.italic         = True
+        r.font.size      = Pt(10)
+        r.font.name      = 'Arial'
+        r.font.color.rgb = RGBColor(100, 100, 100)
+
+        self._add_horizontal_rule()
+        self.doc.add_paragraph()
+
+        # ── Answers grouped by section ────────────────────────────────────
+        for section_key, section_data in answer_key_data.items():
+            answers = section_data.get('answers', [])
+            if not answers:
+                continue
+
+            # Section label
+            p = self.doc.add_paragraph()
+            r = p.add_run(section_data['title'] + ':')
+            r.bold      = True
+            r.font.size = Pt(12)
+            r.font.name = 'Arial'
+
+            if section_key == 'matching':
+                # Show Column-A-item → Column-B-letter pairs
+                for num, _qtype, pairs in answers:
+                    if not pairs:
+                        continue
+                    parts = []
+                    for pair in pairs:
+                        item  = pair.get('item', '')
+                        match = pair.get('match', '?')
+                        n     = item.split('.')[0].strip() if '.' in str(item) else str(item)
+                        parts.append(f"{n}\u2192{match}")
+                    p = self.doc.add_paragraph()
+                    r = p.add_run('   '.join(parts))
+                    r.font.size = Pt(11)
+                    r.font.name = 'Arial'
+
+            else:
+                # Layout as a compact grid (5 answers per row)
+                cols = 5
+                rows_needed = (len(answers) + cols - 1) // cols
+                table = self.doc.add_table(rows=rows_needed, cols=cols)
+
+                # Invisible borders
+                tbl   = table._tbl
+                tblPr = tbl.find(qn('w:tblPr'))
+                if tblPr is None:
+                    tblPr = OxmlElement('w:tblPr')
+                    tbl.insert(0, tblPr)
+                self._set_table_borders_invisible(tblPr)
+
+                for idx, (num, _qtype, answer) in enumerate(answers):
+                    row_i = idx // cols
+                    col_i = idx % cols
+                    cell  = table.rows[row_i].cells[col_i]
+                    p     = cell.paragraphs[0]
+                    r     = p.add_run(f"{num}. {answer}")
+                    r.font.size = Pt(11)
+                    r.font.name = 'Arial'
+
+            self.doc.add_paragraph()
+
+    def _add_horizontal_rule(self):
+        """Add a simple decorative rule paragraph."""
+        p = self.doc.add_paragraph()
+        r = p.add_run('\u2500' * 55)
+        r.font.size      = Pt(9)
+        r.font.name      = 'Arial'
+        r.font.color.rgb = RGBColor(150, 150, 150)
 
     # =========================================================================
     # SAVE METHODS

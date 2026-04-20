@@ -28,14 +28,8 @@ def get_client_ip(request):
 
 
 def get_extractor():
-    if hasattr(settings, 'GEMINI_API_KEY') and settings.GEMINI_API_KEY:
-        from .services.gemini_extraction_service import GeminiQuestionnaireExtractor
-        return GeminiQuestionnaireExtractor()
-    elif hasattr(settings, 'ANTHROPIC_API_KEY') and settings.ANTHROPIC_API_KEY:
-        from .services.extraction_service import QuestionnaireExtractor
-        return QuestionnaireExtractor()
-    else:
-        raise ValueError("No AI API key configured. Please add GEMINI_API_KEY to your .env file.")
+    from .extractors import AIQuestionExtractor
+    return AIQuestionExtractor()
 
 
 def is_admin(user):
@@ -229,9 +223,14 @@ def upload_questionnaire(request):
                 )
 
                 err = str(e)
-                if any(code in err for code in ('503', '429', 'UNAVAILABLE',
-                                                 'RESOURCE_EXHAUSTED',
-                                                 'rate limit', 'overloaded')):
+                if 'credit balance is too low' in err or 'credit' in err.lower() and 'low' in err.lower():
+                    user_msg = (
+                        'The AI service account has run out of credits. '
+                        'Please contact the administrator to top up the API credits.'
+                    )
+                elif any(code in err for code in ('503', '429', 'UNAVAILABLE',
+                                                   'RESOURCE_EXHAUSTED',
+                                                   'rate limit', 'overloaded')):
                     user_msg = (
                         'The AI service is temporarily unavailable due to high demand. '
                         'Your file was not saved. Please wait a moment and try again.'
@@ -349,11 +348,25 @@ def generate_questionnaire(request):
                     description='AI question generation failed — file was not saved.',
                 )
 
-                messages.error(
-                    request,
-                    f'AI generation failed: {str(e)}. '
-                    f'Your file was not saved. Please try again.',
-                )
+                err = str(e)
+                if 'credit balance is too low' in err or 'credit' in err.lower() and 'low' in err.lower():
+                    gen_msg = (
+                        'The AI service account has run out of credits. '
+                        'Please contact the administrator to top up the API credits.'
+                    )
+                elif any(code in err for code in ('503', '429', 'UNAVAILABLE',
+                                                   'RESOURCE_EXHAUSTED',
+                                                   'rate limit', 'overloaded')):
+                    gen_msg = (
+                        'The AI service is temporarily unavailable due to high demand. '
+                        'Your file was not saved. Please wait a moment and try again.'
+                    )
+                else:
+                    gen_msg = (
+                        f'AI generation failed: {err}. '
+                        f'Your file was not saved. Please try again.'
+                    )
+                messages.error(request, gen_msg)
                 return render(
                     request,
                     'teacher_dashboard/generate_questionnaire.html',

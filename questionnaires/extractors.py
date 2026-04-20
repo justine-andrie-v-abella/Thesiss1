@@ -1,6 +1,6 @@
 # ============================================================================
 # FILE: questionnaires/extractors.py
-# AI-Powered Question Extraction System using Gemini API
+# AI-Powered Question Extraction System using Anthropic Claude API
 # ============================================================================
 
 import os
@@ -9,7 +9,7 @@ import re
 import logging
 from typing import List, Dict, Any
 from django.conf import settings
-import google.generativeai as genai
+import anthropic
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +29,16 @@ class AIQuestionExtractor:
     Supports: PDF, DOCX, TXT, XLSX, XLS
     """
 
+    CLAUDE_MODEL = 'claude-3-haiku-20240307'
+
     def __init__(self):
-        api_key = getattr(settings, 'GEMINI_API_KEY', None)
+        api_key = getattr(settings, 'ANTHROPIC_API_KEY', None)
         if not api_key:
             raise ValueError(
-                "GEMINI_API_KEY not found in settings. "
-                "Please add GEMINI_API_KEY to your settings.py"
+                "ANTHROPIC_API_KEY not found in settings. "
+                "Please add ANTHROPIC_API_KEY to your .env file."
             )
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.client = anthropic.Anthropic(api_key=api_key)
 
     def process_questionnaire(self, questionnaire, type_names: List[str], mode: str = 'extract') -> List:
         """
@@ -124,9 +125,31 @@ class AIQuestionExtractor:
         try:
             doc = Document(file_path)
             text = []
-            for paragraph in doc.paragraphs:
-                if paragraph.text.strip():
-                    text.append(paragraph.text)
+            # Read paragraphs AND table cells so no content is missed
+            # (answer keys are sometimes placed inside tables in Word documents)
+            for block in doc.element.body:
+                tag = block.tag.split('}')[-1] if '}' in block.tag else block.tag
+                if tag == 'p':
+                    # Plain paragraph
+                    para_text = ''.join(
+                        node.text for node in block.iter()
+                        if node.tag.endswith('}t') and node.text
+                    ).strip()
+                    if para_text:
+                        text.append(para_text)
+                elif tag == 'tbl':
+                    # Table — read every cell row by row
+                    for row in block.iter('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tr'):
+                        row_cells = []
+                        for cell in row.iter('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tc'):
+                            cell_text = ''.join(
+                                node.text for node in cell.iter()
+                                if node.tag.endswith('}t') and node.text
+                            ).strip()
+                            if cell_text:
+                                row_cells.append(cell_text)
+                        if row_cells:
+                            text.append('  |  '.join(row_cells))
             return '\n'.join(text)
         except Exception as e:
             raise ValueError(f"Failed to read DOCX: {str(e)}")
@@ -152,38 +175,49 @@ class AIQuestionExtractor:
         mode='generate' → creates new questions based on the file content
         """
 
-        # Limit content to avoid token limits
-        if len(content) > 30000:
-            content = content[:30000] + "\n... (content truncated)"
+        # Claude Haiku supports up to 200k tokens.
+        # Always preserve the END of the document — that's where answer keys live.
+        MAX_CHARS = 150_000
+        if len(content) > MAX_CHARS:
+            head = content[:100_000]
+            tail = content[-50_000:]
+            content = head + "\n\n... (middle section truncated) ...\n\n" + tail
 
         if mode == 'generate':
             prompt = self._build_generation_prompt(content, type_names)
-            temperature = 0.7  # Higher — more creative for generation
+            temperature = 0.7
         else:
             prompt = self._build_extraction_prompt(content, type_names)
-            temperature = 0.1  # Very low — exact copying, no creativity
+            temperature = 0.1
 
         try:
-            response = self.model.generate_content(
-                prompt,
-                generation_config=genai.GenerationConfig(
-                    temperature=temperature,
-                    max_output_tokens=8000,
-                    response_mime_type="application/json",
-                )
+            response = self.client.messages.create(
+                model=self.CLAUDE_MODEL,
+                max_tokens=8096,
+                temperature=temperature,
+                system=(
+                    "You are a precise document scanner that extracts exam questions. "
+                    "You always respond with valid JSON only — no explanation, no markdown."
+                ),
+                messages=[
+                    {"role": "user",      "content": prompt},
+                    {"role": "assistant", "content": "["},   # force JSON array start
+                ],
             )
 
-            questions = self._parse_ai_response(response.text)
+            # Claude prefill: the response continues after our "[" prefix
+            raw = "[" + response.content[0].text
+            questions = self._parse_ai_response(raw)
             return questions
 
         except Exception as e:
-            logger.error("Gemini API error: %s", e, exc_info=True)
+            logger.error("Anthropic API error: %s", e, exc_info=True)
             raise Exception(f"AI extraction failed: {str(e)}") from e
 
     def _build_extraction_prompt(self, content: str, type_names: List[str]) -> str:
         """
-        Prompt that strictly tells Gemini to copy questions from the file,
-        not generate new ones.
+        Prompt that tells Claude to copy questions from the file and match
+        answers from any answer key section (inline or end-of-document).
         """
 
         type_descriptions = {
@@ -199,33 +233,52 @@ class AIQuestionExtractor:
             f"- {type_descriptions.get(t, t)}" for t in type_names
         ])
 
-        prompt = f"""You are a question scanner. Your ONLY job is to find and copy questions that are ALREADY WRITTEN in the text below.
+        prompt = f"""You are scanning a test questionnaire document. Do exactly two things: extract every question, and find the correct answer for each one.
 
-STRICT RULES — READ CAREFULLY:
-- DO NOT create, generate, invent, or add any new questions whatsoever
-- DO NOT rephrase, rewrite, or improve any question — copy the text EXACTLY word for word
-- ONLY include questions that are literally present in the provided text
-- If the text contains no questions, return an empty array []
-
-QUESTION TYPES TO LOOK FOR:
+QUESTION TYPES TO FIND:
 {types_list}
+
+RULES FOR EXTRACTING QUESTIONS:
+- Copy every question text EXACTLY word for word — do NOT rephrase or invent anything.
+- Do NOT treat answer key entries as questions.
+- If no questions are found at all, return [].
+
+RULES FOR FINDING ANSWERS:
+1. First, look for an answer key section anywhere in the document (usually at the end).
+   It may be labeled: "Answer Key", "ANSWER KEY", "Key", "Answers", or similar.
+
+2. The answer key often restarts numbering per section. For example:
+     "Part I: 1. Subset   2. V   3. Cartesian Product ..."
+     "Part II: 1. C   2. A   3. B ..."
+   Here "Part II: 1. C" is the answer for the FIRST question under the Part II heading
+   in the document body, NOT for question number 1 overall.
+   Match answers by counting position within each section.
+
+3. If the answer is a letter (A/B/C/D), store only that letter in uppercase.
+   If the answer is text, store it exactly as written.
+   For True/False, store "True" or "False".
+
+4. If an answer is written inline next to a question (e.g. "Answer: X"), use that.
+
+5. If no answer can be found for a question anywhere in the document, use "".
 
 TEXT TO SCAN:
 {content}
 
-FOR EACH QUESTION YOU FIND IN THE TEXT, return a JSON object with:
-- "type": classify it as one of {type_names}
-- "question": copy the question text EXACTLY as it appears in the file
-- "option_a", "option_b", "option_c", "option_d": copy the options exactly (multiple choice only, leave out for other types)
-- "answer": copy the correct answer if it is shown in the text, otherwise use ""
-- "explanation": copy any explanation if it is shown in the text, otherwise use ""
-- "difficulty": estimate "easy", "medium", or "hard" based on the question
-- "points": copy the point value if shown, otherwise use 1
+OUTPUT: Return ONLY a valid JSON array — no extra text, no markdown, no code fences.
+Each element must have these fields:
+  "type"        - one of {type_names}
+  "question"    - exact question text copied from the document
+  "option_a"    - (multiple choice only, otherwise omit)
+  "option_b"    - (multiple choice only, otherwise omit)
+  "option_c"    - (multiple choice only, otherwise omit)
+  "option_d"    - (multiple choice only, otherwise omit)
+  "answer"      - correct answer matched from the answer key, or ""
+  "explanation" - any explanation text found, or ""
+  "difficulty"  - "easy", "medium", or "hard"
+  "points"      - point value if shown, otherwise 1
 
-Return ONLY a valid JSON array with no extra text, no markdown formatting.
-If no questions are found in the text, return: []
-
-JSON:"""
+If no questions found, return: []"""
 
         return prompt
 
@@ -275,7 +328,7 @@ JSON:"""
         return prompt
 
     def _parse_ai_response(self, response_text: str) -> List[Dict[str, Any]]:
-        """Parse Gemini's JSON response into a list of question dicts."""
+        """Parse Claude's JSON response into a list of question dicts."""
 
         response_text = response_text.strip()
 
@@ -289,7 +342,7 @@ JSON:"""
             response_text = re.sub(r'\n```\s*$', '', response_text)
             response_text = response_text.strip()
 
-        # Find JSON array
+        # Find JSON array if response has extra text around it
         if not response_text.startswith('['):
             json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
             if json_match:
