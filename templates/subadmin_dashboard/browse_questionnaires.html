@@ -42,14 +42,14 @@
             </select>
         </div>
 
-        <!-- Exam Type Filter -->
+        <!-- Term Filter -->
         <div>
             <label class="block text-sm font-semibold text-gray-700 mb-2">
-                <i class="bi bi-tag-fill text-orange-500 mr-1"></i> Exam Type
+                <i class="bi bi-tag-fill text-orange-500 mr-1"></i> Term
             </label>
             <select name="exam_type"
                 class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition-colors">
-                <option value="">All Types</option>
+                <option value="">All Terms</option>
                 {% for val, label in exam_type_choices %}
                     <option value="{{ val }}" {% if exam_type == val %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
@@ -86,10 +86,7 @@
         {% if exam_type == 'final' %}bg-red-600
         {% elif exam_type == 'midterm' %}bg-orange-500
         {% elif exam_type == 'prelim' %}bg-amber-500
-        {% elif exam_type == 'prefinal' %}bg-yellow-500
-        {% elif exam_type == 'long_quiz' %}bg-blue-600
-        {% elif exam_type == 'short_quiz' %}bg-cyan-500
-        {% elif exam_type == 'activity' %}bg-green-600
+        {% elif exam_type == 'semi_final' %}bg-yellow-500
         {% else %}bg-purple-600
         {% endif %}">
         <i class="bi bi-tag-fill"></i>
@@ -152,10 +149,7 @@
             {% if quest.exam_type == 'final' %}bg-gradient-to-r from-red-600 to-rose-700
             {% elif quest.exam_type == 'midterm' %}bg-gradient-to-r from-orange-500 to-red-600
             {% elif quest.exam_type == 'prelim' %}bg-gradient-to-r from-amber-500 to-orange-600
-            {% elif quest.exam_type == 'prefinal' %}bg-gradient-to-r from-yellow-500 to-amber-600
-            {% elif quest.exam_type == 'long_quiz' %}bg-gradient-to-r from-blue-600 to-indigo-700
-            {% elif quest.exam_type == 'short_quiz' %}bg-gradient-to-r from-cyan-500 to-blue-600
-            {% elif quest.exam_type == 'activity' %}bg-gradient-to-r from-green-500 to-emerald-600
+            {% elif quest.exam_type == 'semi_final' %}bg-gradient-to-r from-yellow-500 to-amber-600
             {% else %}bg-gradient-to-r from-blue-500 to-indigo-600
             {% endif %}
             px-5 py-4">

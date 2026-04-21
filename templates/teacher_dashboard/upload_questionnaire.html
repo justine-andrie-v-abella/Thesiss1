@@ -80,21 +80,18 @@
                     </div>
                 </div>
 
-                <!-- Exam Type -->
+                <!-- Term -->
                 <div>
                     <label for="id_exam_type" class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="bi bi-tag-fill text-orange-500 mr-1"></i> Exam Type *
+                        <i class="bi bi-tag-fill text-orange-500 mr-1"></i> Term *
                     </label>
                     <select name="exam_type" id="id_exam_type" required
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition-colors">
-                        <option value="" disabled {% if not form.exam_type.value %}selected{% endif %}>-- Select Exam Type --</option>
-                        <option value="short_quiz"  {% if form.exam_type.value == 'short_quiz'  %}selected{% endif %}>Short Quiz</option>
-                        <option value="long_quiz"   {% if form.exam_type.value == 'long_quiz'   %}selected{% endif %}>Long Quiz</option>
-                        <option value="prelim"      {% if form.exam_type.value == 'prelim'      %}selected{% endif %}>Prelim Exam</option>
-                        <option value="midterm"     {% if form.exam_type.value == 'midterm'     %}selected{% endif %}>Midterm Exam</option>
-                        <option value="prefinal"    {% if form.exam_type.value == 'prefinal'    %}selected{% endif %}>Pre-Final Exam</option>
-                        <option value="final"       {% if form.exam_type.value == 'final'       %}selected{% endif %}>Final Exam</option>
-                        <option value="activity"    {% if form.exam_type.value == 'activity'    %}selected{% endif %}>Activity / Seatwork</option>
+                        <option value="" disabled {% if not form.exam_type.value %}selected{% endif %}>-- Select Term --</option>
+                        <option value="prelim"      {% if form.exam_type.value == 'prelim'      %}selected{% endif %}>Prelim</option>
+                        <option value="midterm"     {% if form.exam_type.value == 'midterm'     %}selected{% endif %}>Midterm</option>
+                        <option value="semi_final"  {% if form.exam_type.value == 'semi_final'  %}selected{% endif %}>Semi-Final</option>
+                        <option value="final"       {% if form.exam_type.value == 'final'       %}selected{% endif %}>Final Term</option>
                         <option value="others"      {% if form.exam_type.value == 'others'      %}selected{% endif %}>Others</option>
                     </select>
                     {% if form.exam_type.errors %}
@@ -262,7 +259,7 @@
                 </li>
                 <li class="flex items-start">
                     <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
-                    <span>Choose the correct <strong>Exam Type</strong> so others can filter and find your questionnaire easily</span>
+                    <span>Choose the correct <strong>Term</strong> so others can filter and find your questionnaire easily</span>
                 </li>
                 <li class="flex items-start">
                     <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>

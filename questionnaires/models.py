@@ -22,13 +22,10 @@ class Questionnaire(models.Model):
     ]
 
     EXAM_TYPE_CHOICES = [
-        ('short_quiz', 'Short Quiz'),
-        ('long_quiz',  'Long Quiz'),
-        ('prelim',     'Prelim Exam'),
-        ('midterm',    'Midterm Exam'),
-        ('prefinal',   'Pre-Final Exam'),
-        ('final',      'Final Exam'),
-        ('activity',   'Activity / Seatwork'),
+        ('prelim',     'Prelim'),
+        ('midterm',    'Midterm'),
+        ('semi_final', 'Semi-Final'),
+        ('final',      'Final Term'),
         ('others',     'Others'),
     ]
 
@@ -47,7 +44,7 @@ class Questionnaire(models.Model):
         max_length=20,
         choices=EXAM_TYPE_CHOICES,
         default='others',
-        help_text='Type of exam or test this questionnaire is intended for',
+        help_text='Academic term this questionnaire is intended for',
     )
 
     is_extracted      = models.BooleanField(default=False, help_text='Whether questions have been extracted')

@@ -17,9 +17,9 @@ class QuestionnaireUploadForm(forms.ModelForm):
     )
 
     exam_type = forms.ChoiceField(
-        choices=[('', '-- Select Exam Type --')] + Questionnaire.EXAM_TYPE_CHOICES,
+        choices=[('', '-- Select Term --')] + Questionnaire.EXAM_TYPE_CHOICES,
         required=True,
-        label="Exam Type",
+        label="Term",
         widget=forms.Select(attrs={
             'id': 'id_exam_type',
             'class': (
@@ -63,10 +63,10 @@ class QuestionnaireUploadForm(forms.ModelForm):
     def clean_exam_type(self):
         value = self.cleaned_data.get('exam_type')
         if not value:
-            raise forms.ValidationError('Please select an exam type.')
+            raise forms.ValidationError('Please select a term.')
         valid = [k for k, _ in Questionnaire.EXAM_TYPE_CHOICES]
         if value not in valid:
-            raise forms.ValidationError('Invalid exam type selected.')
+            raise forms.ValidationError('Invalid term selected.')
         return value
 
     def clean_file(self):
@@ -84,9 +84,9 @@ class QuestionnaireUploadForm(forms.ModelForm):
 
 class QuestionnaireEditForm(forms.ModelForm):
     exam_type = forms.ChoiceField(
-        choices=[('', '-- Select Exam Type --')] + Questionnaire.EXAM_TYPE_CHOICES,
+        choices=[('', '-- Select Term --')] + Questionnaire.EXAM_TYPE_CHOICES,
         required=True,
-        label="Exam Type",
+        label="Term",
         widget=forms.Select(attrs={
             'class': (
                 'w-full px-4 py-3 border-2 border-gray-300 rounded-lg '
@@ -115,8 +115,8 @@ class QuestionnaireFilterForm(forms.Form):
         empty_label="All Subjects",
     )
     exam_type = forms.ChoiceField(
-        choices=[('', 'All Exam Types')] + Questionnaire.EXAM_TYPE_CHOICES,
+        choices=[('', 'All Terms')] + Questionnaire.EXAM_TYPE_CHOICES,
         required=False,
-        label="Exam Type",
+        label="Term",
     )
     search = forms.CharField(required=False, max_length=200)
