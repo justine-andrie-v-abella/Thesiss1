@@ -9,12 +9,13 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Q, Count
-from .models import ActivityLog, TeacherProfile, Department, Subject, SubAdminProfile
+from .models import ActivityLog, TeacherProfile, Department, Subject, SubAdminProfile, Program
 from .forms import (
     TeacherCreationForm, TeacherEditForm,
     DepartmentForm, SubjectForm,
     SubAdminCreationForm, SubAdminEditForm,
     SubAdminTeacherCreationForm, SubAdminTeacherEditForm,
+    ProgramForm,
 )
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -2052,3 +2053,305 @@ If you did not make these changes, please contact your administrator immediately
         return redirect(request.META.get('HTTP_REFERER', 'home'))
 
     return redirect('home')
+
+
+# ============================================================================
+# SUPERADMIN — PROGRAMS  (Departments → Programs → Subjects)
+# ============================================================================
+
+@login_required
+@user_passes_test(is_admin)
+def department_detail(request, pk):
+    """Superadmin: view programs inside a department."""
+    department = get_object_or_404(Department, pk=pk, is_archived=False)
+    programs   = Program.objects.filter(department=department).order_by('name')
+    form       = ProgramForm()
+    return render(request, 'admin_dashboard/department_detail.html', {
+        'department': department,
+        'programs':   programs,
+        'form':       form,
+    })
+
+
+@login_required
+@user_passes_test(is_admin)
+def add_program(request, dept_pk):
+    """Superadmin: add a new program to a department."""
+    department = get_object_or_404(Department, pk=dept_pk, is_archived=False)
+    if request.method == 'POST':
+        form = ProgramForm(request.POST)
+        if form.is_valid():
+            program = form.save(commit=False)
+            program.department = department
+            program.save()
+            log_activity(
+                'program_created',
+                f'Program "{program.name}" ({program.code}) created in {department.name}',
+                user=request.user,
+                metadata={'program_id': program.pk, 'department_id': department.pk},
+            )
+            bust_dashboard_cache()
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'message': f'Program "{program.name}" added successfully.'})
+            messages.success(request, f'Program "{program.name}" added successfully.')
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'errors': form.errors})
+            messages.error(request, 'Please correct the errors below.')
+    return redirect('accounts:department_detail', pk=dept_pk)
+
+
+@login_required
+@user_passes_test(is_admin)
+def edit_program(request, pk):
+    """Superadmin: edit an existing program."""
+    program    = get_object_or_404(Program, pk=pk)
+    department = program.department
+    if request.method == 'POST':
+        form = ProgramForm(request.POST, instance=program)
+        if form.is_valid():
+            form.save()
+            log_activity(
+                'program_updated',
+                f'Program "{program.name}" ({program.code}) updated in {department.name}',
+                user=request.user,
+                metadata={'program_id': program.pk, 'department_id': department.pk},
+            )
+            bust_dashboard_cache()
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'message': f'Program "{program.name}" updated successfully.'})
+            messages.success(request, f'Program "{program.name}" updated successfully.')
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'errors': form.errors})
+    return redirect('accounts:department_detail', pk=department.pk)
+
+
+@login_required
+@user_passes_test(is_admin)
+def delete_program(request, pk):
+    """Superadmin: delete a program."""
+    program    = get_object_or_404(Program, pk=pk)
+    department = program.department
+    if request.method == 'POST':
+        prog_name = program.name
+        prog_code = program.code
+        program.delete()
+        log_activity(
+            'program_deleted',
+            f'Program "{prog_name}" ({prog_code}) deleted from {department.name}',
+            user=request.user,
+            metadata={'department_id': department.pk},
+        )
+        bust_dashboard_cache()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'message': f'Program "{prog_name}" deleted successfully.'})
+        messages.success(request, f'Program "{prog_name}" deleted successfully.')
+    return redirect('accounts:department_detail', pk=department.pk)
+
+
+@login_required
+@user_passes_test(is_admin)
+def program_detail(request, pk):
+    """Superadmin: view subjects inside a program."""
+    program    = get_object_or_404(Program, pk=pk)
+    department = program.department
+    # All subjects belonging to this department (available to add)
+    dept_subjects     = Subject.objects.filter(departments=department, is_archived=False).order_by('code')
+    # Already assigned subjects
+    assigned_subjects = program.subjects.filter(is_archived=False).order_by('code')
+    # Subjects not yet in this program
+    available_subjects = dept_subjects.exclude(pk__in=assigned_subjects.values_list('pk', flat=True))
+    return render(request, 'admin_dashboard/program_detail.html', {
+        'program':             program,
+        'department':          department,
+        'assigned_subjects':   assigned_subjects,
+        'available_subjects':  available_subjects,
+    })
+
+
+@login_required
+@user_passes_test(is_admin)
+def add_subject_to_program(request, prog_pk):
+    """Superadmin: assign an existing subject to a program."""
+    program = get_object_or_404(Program, pk=prog_pk)
+    if request.method == 'POST':
+        subj_pk = request.POST.get('subject_id')
+        subject = get_object_or_404(Subject, pk=subj_pk, departments=program.department, is_archived=False)
+        program.subjects.add(subject)
+        log_activity(
+            'program_updated',
+            f'Subject "{subject.name}" ({subject.code}) added to program "{program.name}"',
+            user=request.user,
+            metadata={'program_id': program.pk, 'subject_id': subject.pk},
+        )
+        messages.success(request, f'Subject "{subject.name}" added to {program.name}.')
+    return redirect('accounts:program_detail', pk=prog_pk)
+
+
+@login_required
+@user_passes_test(is_admin)
+def remove_subject_from_program(request, prog_pk, subj_pk):
+    """Superadmin: remove a subject from a program."""
+    program = get_object_or_404(Program, pk=prog_pk)
+    subject = get_object_or_404(Subject, pk=subj_pk)
+    if request.method == 'POST':
+        program.subjects.remove(subject)
+        log_activity(
+            'program_updated',
+            f'Subject "{subject.name}" ({subject.code}) removed from program "{program.name}"',
+            user=request.user,
+            metadata={'program_id': program.pk, 'subject_id': subject.pk},
+        )
+        messages.success(request, f'Subject "{subject.name}" removed from {program.name}.')
+    return redirect('accounts:program_detail', pk=prog_pk)
+
+
+# ============================================================================
+# SUB-ADMIN — PROGRAMS  (their department only)
+# ============================================================================
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_manage_programs(request):
+    """Sub-admin: list programs for their department."""
+    department = request.user.subadmin_profile.department
+    programs   = Program.objects.filter(department=department).order_by('name')
+    form       = ProgramForm()
+    return render(request, 'subadmin_dashboard/manage_programs.html', {
+        'department': department,
+        'programs':   programs,
+        'form':       form,
+    })
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_add_program(request):
+    """Sub-admin: add a new program to their department."""
+    department = request.user.subadmin_profile.department
+    if request.method == 'POST':
+        form = ProgramForm(request.POST)
+        if form.is_valid():
+            program = form.save(commit=False)
+            program.department = department
+            program.save()
+            log_activity(
+                'program_created',
+                f'Program "{program.name}" ({program.code}) created in {department.name} by Sub-Admin {request.user.get_full_name()}',
+                user=request.user,
+                metadata={'program_id': program.pk, 'department_id': department.pk},
+            )
+            bust_dashboard_cache()
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'message': f'Program "{program.name}" added successfully.'})
+            messages.success(request, f'Program "{program.name}" added successfully.')
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'errors': form.errors})
+    return redirect('accounts:subadmin_manage_programs')
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_edit_program(request, pk):
+    """Sub-admin: edit a program in their department."""
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=pk, department=department)
+    if request.method == 'POST':
+        form = ProgramForm(request.POST, instance=program)
+        if form.is_valid():
+            form.save()
+            log_activity(
+                'program_updated',
+                f'Program "{program.name}" ({program.code}) updated in {department.name} by Sub-Admin {request.user.get_full_name()}',
+                user=request.user,
+                metadata={'program_id': program.pk, 'department_id': department.pk},
+            )
+            bust_dashboard_cache()
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'message': f'Program "{program.name}" updated successfully.'})
+            messages.success(request, f'Program "{program.name}" updated successfully.')
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'errors': form.errors})
+    return redirect('accounts:subadmin_manage_programs')
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_delete_program(request, pk):
+    """Sub-admin: delete a program from their department."""
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=pk, department=department)
+    if request.method == 'POST':
+        prog_name = program.name
+        prog_code = program.code
+        program.delete()
+        log_activity(
+            'program_deleted',
+            f'Program "{prog_name}" ({prog_code}) deleted from {department.name} by Sub-Admin {request.user.get_full_name()}',
+            user=request.user,
+            metadata={'department_id': department.pk},
+        )
+        bust_dashboard_cache()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'message': f'Program "{prog_name}" deleted successfully.'})
+        messages.success(request, f'Program "{prog_name}" deleted successfully.')
+    return redirect('accounts:subadmin_manage_programs')
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_program_detail(request, pk):
+    """Sub-admin: view and manage subjects inside one of their programs."""
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=pk, department=department)
+    dept_subjects      = Subject.objects.filter(departments=department, is_archived=False).order_by('code')
+    assigned_subjects  = program.subjects.filter(is_archived=False).order_by('code')
+    available_subjects = dept_subjects.exclude(pk__in=assigned_subjects.values_list('pk', flat=True))
+    return render(request, 'subadmin_dashboard/program_detail.html', {
+        'program':            program,
+        'department':         department,
+        'assigned_subjects':  assigned_subjects,
+        'available_subjects': available_subjects,
+    })
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_add_subject_to_program(request, prog_pk):
+    """Sub-admin: assign a subject to one of their programs."""
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=prog_pk, department=department)
+    if request.method == 'POST':
+        subj_pk = request.POST.get('subject_id')
+        subject = get_object_or_404(Subject, pk=subj_pk, departments=department, is_archived=False)
+        program.subjects.add(subject)
+        log_activity(
+            'program_updated',
+            f'Subject "{subject.name}" ({subject.code}) added to program "{program.name}" by Sub-Admin {request.user.get_full_name()}',
+            user=request.user,
+            metadata={'program_id': program.pk, 'subject_id': subject.pk},
+        )
+        messages.success(request, f'Subject "{subject.name}" added to {program.name}.')
+    return redirect('accounts:subadmin_program_detail', pk=prog_pk)
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_remove_subject_from_program(request, prog_pk, subj_pk):
+    """Sub-admin: remove a subject from one of their programs."""
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=prog_pk, department=department)
+    subject    = get_object_or_404(Subject, pk=subj_pk)
+    if request.method == 'POST':
+        program.subjects.remove(subject)
+        log_activity(
+            'program_updated',
+            f'Subject "{subject.name}" ({subject.code}) removed from program "{program.name}" by Sub-Admin {request.user.get_full_name()}',
+            user=request.user,
+            metadata={'program_id': program.pk, 'subject_id': subject.pk},
+        )
+        messages.success(request, f'Subject "{subject.name}" removed from {program.name}.')
+    return redirect('accounts:subadmin_program_detail', pk=prog_pk)

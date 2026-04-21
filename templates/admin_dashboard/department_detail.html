@@ -1,0 +1,482 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ department.name }} Programs - Admin{% endblock %}
+{% block header_title %}{{ department.name }}{% endblock %}
+{% block header_subtitle %}Manage programs offered by this department{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+    <!-- Flash messages -->
+    {% if messages %}
+    <div class="mb-4 space-y-2">
+        {% for message in messages %}
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl
+            {% if message.tags == 'success' %}bg-green-100 border border-green-400 text-green-800
+            {% elif message.tags == 'error' %}bg-red-100 border border-red-400 text-red-800
+            {% else %}bg-blue-100 border border-blue-400 text-blue-800{% endif %}">
+            <div class="flex items-center">
+                <i class="bi bi-check-circle-fill mr-2"></i>
+                <span>{{ message }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Breadcrumb -->
+    <nav class="flex items-center space-x-2 text-sm text-gray-500 mb-6">
+        <a href="{% url 'accounts:manage_departments' %}" class="hover:text-blue-600 transition-colors flex items-center">
+            <i class="bi bi-buildings mr-1"></i> Departments
+        </a>
+        <i class="bi bi-chevron-right text-gray-400"></i>
+        <span class="text-gray-800 font-semibold">{{ department.name }}</span>
+    </nav>
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <div class="flex items-center space-x-4">
+            <div class="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center">
+                <i class="bi bi-building text-white text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">{{ department.name }}</h1>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-blue-100 text-blue-800">
+                    {{ department.code }}
+                </span>
+            </div>
+        </div>
+        <button onclick="openAddModal()"
+            class="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg flex items-center">
+            <i class="bi bi-plus-circle text-xl mr-2"></i>
+            Add Program
+        </button>
+    </div>
+
+    <!-- Programs List -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+            <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                <i class="bi bi-mortarboard text-2xl text-blue-500 mr-3"></i>
+                Programs
+                <span class="ml-3 bg-blue-100 text-blue-700 text-sm font-semibold px-3 py-1 rounded-full">
+                    {{ programs.count }}
+                </span>
+            </h2>
+        </div>
+
+        <div class="p-6">
+            {% if programs %}
+            <!-- Desktop -->
+            <div class="hidden md:block overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b-2 border-gray-200">
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Code</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Program Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Description</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Subjects</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for program in programs %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-4 py-4">
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-indigo-100 text-indigo-800">
+                                    {{ program.code }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-4">
+                                <a href="{% url 'accounts:program_detail' program.pk %}" class="flex items-center group">
+                                    <div class="w-10 h-10 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-lg flex items-center justify-center mr-3">
+                                        <i class="bi bi-mortarboard text-white"></i>
+                                    </div>
+                                    <span class="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">{{ program.name }}</span>
+                                </a>
+                            </td>
+                            <td class="px-4 py-4 text-gray-600 text-sm">
+                                {{ program.description|truncatewords:10|default:"No description" }}
+                            </td>
+                            <td class="px-4 py-4 text-center">
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                    {{ program.subjects.count }} subject{{ program.subjects.count|pluralize }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-4 text-center">
+                                {% if program.is_active %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                    <i class="bi bi-check-circle-fill mr-1"></i> Active
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+                                    <i class="bi bi-dash-circle-fill mr-1"></i> Inactive
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-4">
+                                <div class="flex items-center justify-center space-x-2">
+                                    <a href="{% url 'accounts:program_detail' program.pk %}"
+                                        class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow text-sm" title="View Subjects">
+                                        <i class="bi bi-book"></i>
+                                    </a>
+                                    <button onclick="openEditModal({{ program.pk }}, '{{ program.name|escapejs }}', '{{ program.code|escapejs }}', '{{ program.description|escapejs }}', {{ program.is_active|yesno:'true,false' }})"
+                                        class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow text-sm" title="Edit">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <button onclick="openDeleteModal({{ program.pk }}, '{{ program.name|escapejs }}')"
+                                        class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow text-sm" title="Delete">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Mobile -->
+            <div class="md:hidden space-y-4">
+                {% for program in programs %}
+                <div class="bg-gray-50 rounded-xl p-4 border-l-4 border-indigo-500 hover:shadow-md transition-shadow">
+                    <div class="flex items-start justify-between mb-2">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-lg flex items-center justify-center">
+                                <i class="bi bi-mortarboard text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-gray-800">{{ program.name }}</h3>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">
+                                    {{ program.code }}
+                                </span>
+                            </div>
+                        </div>
+                        {% if program.is_active %}
+                        <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">Active</span>
+                        {% else %}
+                        <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-semibold">Inactive</span>
+                        {% endif %}
+                    </div>
+                    {% if program.description %}
+                    <p class="text-sm text-gray-500 mb-3">{{ program.description|truncatewords:12 }}</p>
+                    {% endif %}
+                    <p class="text-xs text-gray-500 mb-3">{{ program.subjects.count }} subject{{ program.subjects.count|pluralize }}</p>
+                    <div class="flex space-x-2">
+                        <a href="{% url 'accounts:program_detail' program.pk %}"
+                            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
+                            <i class="bi bi-book mr-1"></i> Subjects
+                        </a>
+                        <button onclick="openEditModal({{ program.pk }}, '{{ program.name|escapejs }}', '{{ program.code|escapejs }}', '{{ program.description|escapejs }}', {{ program.is_active|yesno:'true,false' }})"
+                            class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
+                            <i class="bi bi-pencil-square mr-1"></i> Edit
+                        </button>
+                        <button onclick="openDeleteModal({{ program.pk }}, '{{ program.name|escapejs }}')"
+                            class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
+                            <i class="bi bi-trash3 mr-1"></i> Delete
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% else %}
+            <div class="text-center py-16">
+                <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="bi bi-mortarboard text-5xl text-gray-400"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-700 mb-2">No Programs Yet</h3>
+                <p class="text-gray-500 mb-6">Add programs offered by {{ department.name }}</p>
+                <button onclick="openAddModal()"
+                    class="inline-flex items-center px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-all">
+                    <i class="bi bi-plus-circle mr-2"></i> Add Program
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+
+<!-- ===================== MODAL BACKDROP ===================== -->
+<div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
+
+
+<!-- ===================== ADD PROGRAM MODAL ===================== -->
+<div id="addModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeModals();">
+    <div id="addModalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform transition-all duration-200 scale-95 opacity-0">
+
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-8 py-5 rounded-t-2xl">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                        <i class="bi bi-mortarboard text-white text-xl"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-white">Add New Program</h2>
+                </div>
+                <button onclick="closeModals()" class="text-white hover:text-blue-200"><i class="bi bi-x-lg text-xl"></i></button>
+            </div>
+        </div>
+
+        <form id="addForm" method="post" action="{% url 'accounts:add_program' department.pk %}" class="p-6 space-y-4">
+            {% csrf_token %}
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Program Name <span class="text-red-500">*</span></label>
+                <input type="text" name="name" id="add_name"
+                    class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors"
+                    placeholder="e.g., Bachelor of Science in Computer Science">
+                <p class="text-red-500 text-xs mt-1 hidden" id="add_name_error"></p>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Program Code <span class="text-red-500">*</span></label>
+                <input type="text" name="code" id="add_code"
+                    class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-mono uppercase"
+                    placeholder="e.g., BSCS">
+                <p class="text-xs text-gray-400 mt-1">Short unique code, will be uppercased automatically</p>
+                <p class="text-red-500 text-xs mt-1 hidden" id="add_code_error"></p>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
+                <textarea name="description" id="add_description" rows="3"
+                    class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                    placeholder="Brief description..."></textarea>
+            </div>
+            <div class="flex items-center space-x-2">
+                <input type="checkbox" name="is_active" id="add_is_active" checked class="w-4 h-4 text-blue-600 rounded">
+                <label for="add_is_active" class="text-sm font-medium text-gray-700">Active</label>
+            </div>
+            <div class="flex items-center justify-end space-x-3 pt-2 border-t border-gray-200">
+                <button type="button" onclick="closeModals()"
+                    class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Cancel</button>
+                <button type="button" onclick="submitAjax('addForm', 'add')"
+                    class="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-2.5 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-md font-medium">
+                    <i class="bi bi-plus-circle"></i><span>Add Program</span>
+                </button>
+            </div>
+        </form>
+    </div>
+    </div>
+</div>
+
+
+<!-- ===================== EDIT PROGRAM MODAL ===================== -->
+<div id="editModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeModals();">
+    <div id="editModalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform transition-all duration-200 scale-95 opacity-0">
+
+        <div class="bg-gradient-to-r from-yellow-500 to-amber-500 px-8 py-5 rounded-t-2xl">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                        <i class="bi bi-pencil-square text-white text-xl"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-white">Edit Program</h2>
+                </div>
+                <button onclick="closeModals()" class="text-white hover:text-yellow-200"><i class="bi bi-x-lg text-xl"></i></button>
+            </div>
+        </div>
+
+        <form id="editForm" method="post" action="" class="p-6 space-y-4">
+            {% csrf_token %}
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Program Name <span class="text-red-500">*</span></label>
+                <input type="text" name="name" id="edit_name"
+                    class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors">
+                <p class="text-red-500 text-xs mt-1 hidden" id="edit_name_error"></p>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Program Code <span class="text-red-500">*</span></label>
+                <input type="text" name="code" id="edit_code"
+                    class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors font-mono uppercase">
+                <p class="text-red-500 text-xs mt-1 hidden" id="edit_code_error"></p>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
+                <textarea name="description" id="edit_description" rows="3"
+                    class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors resize-none"></textarea>
+            </div>
+            <div class="flex items-center space-x-2">
+                <input type="checkbox" name="is_active" id="edit_is_active" class="w-4 h-4 text-blue-600 rounded">
+                <label for="edit_is_active" class="text-sm font-medium text-gray-700">Active</label>
+            </div>
+            <div class="flex items-center justify-end space-x-3 pt-2 border-t border-gray-200">
+                <button type="button" onclick="closeModals()"
+                    class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Cancel</button>
+                <button type="button" onclick="submitAjax('editForm', 'edit')"
+                    class="flex items-center space-x-2 bg-gradient-to-r from-yellow-500 to-amber-500 text-white px-8 py-2.5 rounded-xl hover:from-yellow-600 hover:to-amber-600 transition-all shadow-md font-medium">
+                    <i class="bi bi-check-lg"></i><span>Save Changes</span>
+                </button>
+            </div>
+        </form>
+    </div>
+    </div>
+</div>
+
+
+<!-- ===================== DELETE CONFIRM MODAL ===================== -->
+<div id="deleteModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeModals();">
+    <div id="deleteModalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0">
+
+        <div class="bg-gradient-to-r from-red-500 to-red-600 px-8 py-6 rounded-t-2xl text-center relative">
+            <button onclick="closeModals()" class="absolute top-4 right-4 text-white hover:text-red-200">
+                <i class="bi bi-x-lg text-xl"></i>
+            </button>
+            <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="bi bi-trash3 text-white text-3xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Delete Program?</h2>
+            <p class="text-red-200 text-sm mt-1">This action cannot be undone</p>
+        </div>
+
+        <div class="p-6">
+            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-5">
+                <p id="deleteProgName" class="font-bold text-gray-800 text-center text-lg"></p>
+            </div>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-5">
+                <div class="flex items-start space-x-2">
+                    <i class="bi bi-exclamation-triangle-fill text-yellow-500 flex-shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-yellow-700">The program will be permanently removed. Subject assignments within it will also be removed.</p>
+                </div>
+            </div>
+            <form id="deleteForm" method="post" action="">
+                {% csrf_token %}
+                <div class="flex items-center space-x-3">
+                    <button type="button" onclick="closeModals()"
+                        class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium text-center">Cancel</button>
+                    <button type="submit"
+                        class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-md font-medium">
+                        <i class="bi bi-trash3"></i><span>Delete</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    </div>
+</div>
+
+
+<script>
+const EDIT_URL   = "{% url 'accounts:edit_program' pk=0 %}";
+const DELETE_URL = "{% url 'accounts:delete_program' pk=0 %}";
+
+const MODALS = ['addModal', 'editModal', 'deleteModal'];
+
+function openModal(id) {
+    document.getElementById('modalBackdrop').classList.remove('hidden');
+    MODALS.forEach(m => {
+        const el = document.getElementById(m);
+        if (m === id) {
+            el.classList.remove('hidden');
+            const c = document.getElementById(m + 'Content');
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                c.classList.remove('scale-95', 'opacity-0');
+                c.classList.add('scale-100', 'opacity-100');
+            }));
+        } else {
+            el.classList.add('hidden');
+        }
+    });
+}
+
+function closeModals() {
+    MODALS.forEach(m => {
+        const c = document.getElementById(m + 'Content');
+        c.classList.remove('scale-100', 'opacity-100');
+        c.classList.add('scale-95', 'opacity-0');
+    });
+    setTimeout(() => {
+        MODALS.forEach(m => document.getElementById(m).classList.add('hidden'));
+        document.getElementById('modalBackdrop').classList.add('hidden');
+    }, 200);
+}
+
+function openAddModal() {
+    document.getElementById('addForm').reset();
+    ['add_name_error', 'add_code_error'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = ''; el.classList.add('hidden'); }
+    });
+    openModal('addModal');
+}
+
+function openEditModal(pk, name, code, description, isActive) {
+    document.getElementById('edit_name').value        = name;
+    document.getElementById('edit_code').value        = code;
+    document.getElementById('edit_description').value = description;
+    document.getElementById('edit_is_active').checked = isActive;
+    document.getElementById('editForm').action        = EDIT_URL.replace('/0/', '/' + pk + '/');
+    ['edit_name_error', 'edit_code_error'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = ''; el.classList.add('hidden'); }
+    });
+    openModal('editModal');
+}
+
+function openDeleteModal(pk, name) {
+    document.getElementById('deleteProgName').textContent = name;
+    document.getElementById('deleteForm').action          = DELETE_URL.replace('/0/', '/' + pk + '/');
+    openModal('deleteModal');
+}
+
+function getCookie(name) {
+    let val = null;
+    if (document.cookie) {
+        document.cookie.split(';').forEach(c => {
+            c = c.trim();
+            if (c.startsWith(name + '=')) val = decodeURIComponent(c.substring(name.length + 1));
+        });
+    }
+    return val;
+}
+
+function submitAjax(formId, prefix) {
+    const form = document.getElementById(formId);
+    const data = new FormData(form);
+    // Ensure checkbox state is included
+    const cb = form.querySelector('[type=checkbox][name=is_active]');
+    if (cb && !cb.checked) data.set('is_active', '');
+
+    fetch(form.action, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': getCookie('csrftoken') },
+        body: data,
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            sessionStorage.setItem('flashMsg', res.message);
+            window.location.reload();
+        } else {
+            // Show errors
+            Object.entries(res.errors || {}).forEach(([field, msgs]) => {
+                const el = document.getElementById(`${prefix}_${field}_error`);
+                if (el) { el.textContent = msgs[0]; el.classList.remove('hidden'); }
+            });
+        }
+    })
+    .catch(() => alert('An unexpected error occurred. Please try again.'));
+}
+
+window.addEventListener('load', () => {
+    const msg = sessionStorage.getItem('flashMsg');
+    if (msg) {
+        sessionStorage.removeItem('flashMsg');
+        // Insert a quick flash at top
+        const div = document.createElement('div');
+        div.className = 'fixed top-4 right-4 z-50 bg-green-100 border border-green-400 text-green-800 px-5 py-3 rounded-xl shadow-lg flex items-center space-x-2';
+        div.innerHTML = `<i class="bi bi-check-circle-fill text-green-500"></i><span>${msg}</span>`;
+        document.body.appendChild(div);
+        setTimeout(() => div.remove(), 4000);
+    }
+});
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(); });
+</script>
+
+<style>
+    input[name="code"] { text-transform: uppercase; }
+</style>
+{% endblock %}

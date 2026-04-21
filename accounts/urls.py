@@ -83,6 +83,24 @@ urlpatterns = [
     # Browse Questionnaires (sub-admin — department-scoped)
     path('subadmin/questionnaires/',                    views.subadmin_browse_questionnaires, name='subadmin_browse_questionnaires'),
 
+    # ── Program Management (superadmin) ─────────────────────────────────────
+    path('departments/<int:pk>/programs/',                            views.department_detail,            name='department_detail'),
+    path('departments/<int:dept_pk>/programs/add/',                   views.add_program,                  name='add_program'),
+    path('programs/<int:pk>/edit/',                                   views.edit_program,                 name='edit_program'),
+    path('programs/<int:pk>/delete/',                                 views.delete_program,               name='delete_program'),
+    path('programs/<int:pk>/subjects/',                               views.program_detail,               name='program_detail'),
+    path('programs/<int:prog_pk>/subjects/add/',                      views.add_subject_to_program,       name='add_subject_to_program'),
+    path('programs/<int:prog_pk>/subjects/<int:subj_pk>/remove/',     views.remove_subject_from_program,  name='remove_subject_from_program'),
+
+    # ── Program Management (sub-admin) ──────────────────────────────────────
+    path('subadmin/programs/',                                        views.subadmin_manage_programs,              name='subadmin_manage_programs'),
+    path('subadmin/programs/add/',                                    views.subadmin_add_program,                  name='subadmin_add_program'),
+    path('subadmin/programs/<int:pk>/edit/',                          views.subadmin_edit_program,                 name='subadmin_edit_program'),
+    path('subadmin/programs/<int:pk>/delete/',                        views.subadmin_delete_program,               name='subadmin_delete_program'),
+    path('subadmin/programs/<int:pk>/subjects/',                      views.subadmin_program_detail,               name='subadmin_program_detail'),
+    path('subadmin/programs/<int:prog_pk>/subjects/add/',             views.subadmin_add_subject_to_program,       name='subadmin_add_subject_to_program'),
+    path('subadmin/programs/<int:prog_pk>/subjects/<int:subj_pk>/remove/', views.subadmin_remove_subject_from_program, name='subadmin_remove_subject_from_program'),
+
     path('profile/update/', views.update_profile, name='update_profile'),
     path('profile/change-password/', views.change_credentials, name='change_credentials'),
 ]

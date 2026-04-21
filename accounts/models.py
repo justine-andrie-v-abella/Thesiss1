@@ -92,6 +92,27 @@ class SubAdminProfile(models.Model):
         return f"SubAdmin: {self.user.get_full_name()} — {dept_name}"
 
 
+class Program(models.Model):
+    name        = models.CharField(max_length=255)
+    code        = models.CharField(max_length=20)
+    description = models.TextField(blank=True)
+    department  = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='programs')
+    subjects    = models.ManyToManyField('Subject', blank=True, related_name='programs')
+    is_active   = models.BooleanField(default=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering      = ['name']
+        unique_together = [['code', 'department']]
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        self.code = self.code.upper()
+        super().save(*args, **kwargs)
+
+
 class ActivityLog(models.Model):
     ACTIVITY_TYPES = [
         ('teacher_created', 'Teacher Created'),
@@ -103,10 +124,12 @@ class ActivityLog(models.Model):
         ('subject_created', 'Subject Created'),
         ('subject_updated', 'Subject Updated'),
         ('subject_deleted', 'Subject Deleted'),
+        ('program_created', 'Program Created'),
+        ('program_updated', 'Program Updated'),
+        ('program_deleted', 'Program Deleted'),
         ('questionnaire_uploaded', 'Questionnaire Uploaded'),
         ('user_login', 'User Login'),
         ('system', 'System Activity'),
-        # NEW: sub-admin specific activity types
         ('subadmin_created', 'Sub-Admin Created'),
         ('subadmin_updated', 'Sub-Admin Updated'),
         ('subadmin_deleted', 'Sub-Admin Deleted'),

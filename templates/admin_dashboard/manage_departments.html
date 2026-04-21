@@ -84,6 +84,10 @@
                             </td>
                             <td class="px-4 py-4">
                                 <div class="flex items-center justify-center space-x-2">
+                                    <a href="{% url 'accounts:department_detail' dept.pk %}"
+                                        class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow flex items-center" title="View Programs">
+                                        <i class="bi bi-mortarboard"></i>
+                                    </a>
                                     <button onclick="openEditModal(
                                                 '{{ dept.pk }}',
                                                 '{{ dept.name|escapejs }}',
@@ -129,6 +133,10 @@
                     <p class="text-sm text-gray-600 mb-3">{{ dept.description|truncatewords:15 }}</p>
                     {% endif %}
                     <div class="flex space-x-2">
+                        <a href="{% url 'accounts:department_detail' dept.pk %}"
+                            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-center">
+                            <i class="bi bi-mortarboard mr-1"></i> Programs
+                        </a>
                         <button onclick="openEditModal('{{ dept.pk }}','{{ dept.name|escapejs }}','{{ dept.code|escapejs }}','{{ dept.description|escapejs }}')"
                             class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-center">
                             <i class="bi bi-pencil-square mr-1"></i> Edit

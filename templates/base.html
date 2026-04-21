@@ -240,6 +240,11 @@
                     <i class="bi bi-book text-xl"></i>
                     <span class="font-medium">Manage Subjects</span>
                 </a>
+                <a href="{% url 'accounts:subadmin_manage_programs' %}"
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'subadmin/programs' in request.path %}bg-blue-700 shadow-lg{% endif %}">
+                    <i class="bi bi-mortarboard text-xl"></i>
+                    <span class="font-medium">Manage Programs</span>
+                </a>
                 <a href="{% url 'accounts:subadmin_browse_questionnaires' %}"
                     class="flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 hover:bg-blue-700 transition-colors {% if 'subadmin/questionnaires' in request.path %}bg-blue-700 shadow-lg{% endif %}">
                     <i class="bi bi-file-earmark-text text-xl"></i>

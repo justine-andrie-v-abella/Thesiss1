@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q
-from .models import TeacherProfile, Department, Subject, SubAdminProfile
+from .models import TeacherProfile, Department, Subject, SubAdminProfile, Program
 
 
 # ============================================================================
@@ -541,3 +541,28 @@ class SubAdminEditForm(forms.ModelForm):
             subadmin.save()
 
         return subadmin
+
+
+# ============================================================================
+# PROGRAM FORM  (used by superadmin and sub-admin)
+# ============================================================================
+
+class ProgramForm(forms.ModelForm):
+    class Meta:
+        model   = Program
+        fields  = ['name', 'code', 'description', 'is_active']
+        widgets = {
+            'name':        forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Bachelor of Science in Computer Science'}),
+            'code':        forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., BSCS', 'style': 'text-transform:uppercase'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Brief description of the program...'}),
+            'is_active':   forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def clean_code(self):
+        return self.cleaned_data.get('code', '').upper().strip()
+
+    def clean_name(self):
+        name = self.cleaned_data.get('name', '').strip()
+        if not name:
+            raise forms.ValidationError('Program name is required.')
+        return name
