@@ -2207,6 +2207,38 @@ def remove_subject_from_program(request, prog_pk, subj_pk):
     return redirect('accounts:program_detail', pk=prog_pk)
 
 
+@login_required
+@user_passes_test(is_admin)
+def bulk_add_subjects_to_program(request, prog_pk):
+    """Superadmin: assign multiple subjects to a program at once."""
+    program = get_object_or_404(Program, pk=prog_pk)
+    if request.method == 'POST':
+        subject_ids = request.POST.getlist('subject_ids')
+        if not subject_ids:
+            messages.warning(request, 'No subjects were selected.')
+            return redirect('accounts:program_detail', pk=prog_pk)
+        subjects = Subject.objects.filter(
+            pk__in=subject_ids,
+            departments=program.department,
+            is_archived=False,
+        )
+        added = []
+        for subject in subjects:
+            program.subjects.add(subject)
+            added.append(f"{subject.code}")
+        if added:
+            log_activity(
+                'program_updated',
+                f'{len(added)} subject(s) added to program "{program.name}": {", ".join(added)}',
+                user=request.user,
+                metadata={'program_id': program.pk},
+            )
+            messages.success(request, f'{len(added)} subject(s) added to {program.name} successfully.')
+        else:
+            messages.warning(request, 'No valid subjects were selected.')
+    return redirect('accounts:program_detail', pk=prog_pk)
+
+
 # ============================================================================
 # SUB-ADMIN — PROGRAMS  (their department only)
 # ============================================================================
@@ -2354,4 +2386,37 @@ def subadmin_remove_subject_from_program(request, prog_pk, subj_pk):
             metadata={'program_id': program.pk, 'subject_id': subject.pk},
         )
         messages.success(request, f'Subject "{subject.name}" removed from {program.name}.')
+    return redirect('accounts:subadmin_program_detail', pk=prog_pk)
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_bulk_add_subjects_to_program(request, prog_pk):
+    """Sub-admin: assign multiple subjects to a program at once."""
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=prog_pk, department=department)
+    if request.method == 'POST':
+        subject_ids = request.POST.getlist('subject_ids')
+        if not subject_ids:
+            messages.warning(request, 'No subjects were selected.')
+            return redirect('accounts:subadmin_program_detail', pk=prog_pk)
+        subjects = Subject.objects.filter(
+            pk__in=subject_ids,
+            departments=department,
+            is_archived=False,
+        )
+        added = []
+        for subject in subjects:
+            program.subjects.add(subject)
+            added.append(f"{subject.code}")
+        if added:
+            log_activity(
+                'program_updated',
+                f'{len(added)} subject(s) added to program "{program.name}": {", ".join(added)} by Sub-Admin {request.user.get_full_name()}',
+                user=request.user,
+                metadata={'program_id': program.pk},
+            )
+            messages.success(request, f'{len(added)} subject(s) added to {program.name} successfully.')
+        else:
+            messages.warning(request, 'No valid subjects were selected.')
     return redirect('accounts:subadmin_program_detail', pk=prog_pk)

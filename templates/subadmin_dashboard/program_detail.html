@@ -5,20 +5,18 @@
 {% block header_subtitle %}Manage subjects offered in this program{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<div class="max-w-5xl mx-auto">
 
     <!-- Flash messages -->
     {% if messages %}
     <div class="mb-4 space-y-2">
         {% for message in messages %}
-        <div class="flex items-center justify-between px-4 py-3 rounded-xl
+        <div class="flex items-center px-4 py-3 rounded-xl
             {% if message.tags == 'success' %}bg-green-100 border border-green-400 text-green-800
             {% elif message.tags == 'error' %}bg-red-100 border border-red-400 text-red-800
             {% else %}bg-blue-100 border border-blue-400 text-blue-800{% endif %}">
-            <div class="flex items-center">
-                <i class="bi bi-check-circle-fill mr-2"></i>
-                <span>{{ message }}</span>
-            </div>
+            <i class="bi bi-check-circle-fill mr-2"></i>
+            <span>{{ message }}</span>
         </div>
         {% endfor %}
     </div>
@@ -34,14 +32,14 @@
     </nav>
 
     <!-- Program Header Card -->
-    <div class="bg-white rounded-xl shadow-lg p-6 mb-6 flex items-center justify-between">
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
         <div class="flex items-center space-x-4">
-            <div class="w-14 h-14 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-xl flex items-center justify-center">
+            <div class="w-14 h-14 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
                 <i class="bi bi-mortarboard text-white text-2xl"></i>
             </div>
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">{{ program.name }}</h1>
-                <div class="flex items-center space-x-3 mt-1">
+                <div class="flex flex-wrap items-center gap-2 mt-1">
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-indigo-100 text-indigo-800">
                         {{ program.code }}
                     </span>
@@ -63,11 +61,11 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        <!-- Assigned Subjects -->
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div class="bg-gradient-to-r from-indigo-50 to-indigo-100 px-6 py-4 border-b border-indigo-200">
+    <!-- Subjects Card -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <!-- Card Header -->
+        <div class="bg-gradient-to-r from-indigo-50 to-indigo-100 px-6 py-4 border-b border-indigo-200">
+            <div class="flex items-center justify-between">
                 <h2 class="text-lg font-bold text-gray-800 flex items-center">
                     <i class="bi bi-book text-xl text-indigo-500 mr-2"></i>
                     Subjects in this Program
@@ -75,97 +73,241 @@
                         {{ assigned_subjects.count }}
                     </span>
                 </h2>
-            </div>
-            <div class="p-4">
-                {% if assigned_subjects %}
-                <div class="space-y-2">
-                    {% for subject in assigned_subjects %}
-                    <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center">
-                                <i class="bi bi-journal-text text-indigo-600"></i>
-                            </div>
-                            <div>
-                                <p class="font-semibold text-gray-800 text-sm">{{ subject.name }}</p>
-                                <span class="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{{ subject.code }}</span>
-                            </div>
-                        </div>
-                        <form method="post" action="{% url 'accounts:subadmin_remove_subject_from_program' program.pk subject.pk %}">
-                            {% csrf_token %}
-                            <button type="submit"
-                                class="bg-red-100 hover:bg-red-200 text-red-600 font-semibold py-1.5 px-3 rounded-lg transition-all text-xs flex items-center space-x-1"
-                                onclick="return confirm('Remove {{ subject.name }} from this program?')">
-                                <i class="bi bi-dash-circle"></i>
-                                <span>Remove</span>
-                            </button>
-                        </form>
-                    </div>
-                    {% endfor %}
-                </div>
+                {% if available_subjects %}
+                <button onclick="openAddSubjectsModal()"
+                    class="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-2 px-5 rounded-lg transition-all shadow flex items-center space-x-2">
+                    <i class="bi bi-plus-circle text-lg"></i>
+                    <span>Add Subjects</span>
+                </button>
                 {% else %}
-                <div class="text-center py-10">
-                    <div class="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <i class="bi bi-book text-3xl text-gray-300"></i>
-                    </div>
-                    <p class="text-gray-500 font-medium text-sm">No subjects assigned yet</p>
-                    <p class="text-gray-400 text-xs mt-1">Add subjects from the panel on the right</p>
-                </div>
+                <span class="text-xs text-gray-400 italic">All department subjects are assigned</span>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Available Subjects to Add -->
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div class="bg-gradient-to-r from-green-50 to-green-100 px-6 py-4 border-b border-green-200">
-                <h2 class="text-lg font-bold text-gray-800 flex items-center">
-                    <i class="bi bi-plus-circle text-xl text-green-500 mr-2"></i>
-                    Available Subjects
-                    <span class="ml-3 bg-green-100 text-green-700 text-sm font-semibold px-3 py-1 rounded-full">
-                        {{ available_subjects.count }}
-                    </span>
-                </h2>
-            </div>
-            <div class="p-4">
-                {% if available_subjects %}
-                <div class="space-y-2">
-                    {% for subject in available_subjects %}
-                    <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
-                                <i class="bi bi-journal text-green-600"></i>
-                            </div>
-                            <div>
-                                <p class="font-semibold text-gray-800 text-sm">{{ subject.name }}</p>
-                                <span class="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{{ subject.code }}</span>
-                            </div>
+        <!-- Subject List -->
+        <div class="p-6">
+            {% if assigned_subjects %}
+            <div class="space-y-2">
+                {% for subject in assigned_subjects %}
+                <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-5 py-3 hover:border-indigo-200 transition-colors">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="bi bi-journal-text text-indigo-600 text-lg"></i>
                         </div>
-                        <form method="post" action="{% url 'accounts:subadmin_add_subject_to_program' program.pk %}">
-                            {% csrf_token %}
-                            <input type="hidden" name="subject_id" value="{{ subject.pk }}">
-                            <button type="submit"
-                                class="bg-green-500 hover:bg-green-600 text-white font-semibold py-1.5 px-3 rounded-lg transition-all text-xs flex items-center space-x-1">
-                                <i class="bi bi-plus-circle"></i>
-                                <span>Add</span>
-                            </button>
-                        </form>
+                        <div>
+                            <p class="font-semibold text-gray-800">{{ subject.name }}</p>
+                            <span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{{ subject.code }}</span>
+                        </div>
                     </div>
-                    {% endfor %}
+                    <form method="post" action="{% url 'accounts:subadmin_remove_subject_from_program' program.pk subject.pk %}">
+                        {% csrf_token %}
+                        <button type="submit"
+                            class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-1.5 px-4 rounded-lg transition-all text-sm flex items-center space-x-1.5"
+                            onclick="return confirm('Remove \'{{ subject.name|escapejs }}\' from this program?')">
+                            <i class="bi bi-dash-circle"></i>
+                            <span>Remove</span>
+                        </button>
+                    </form>
                 </div>
-                {% else %}
-                <div class="text-center py-10">
-                    <div class="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <i class="bi bi-check-all text-3xl text-gray-300"></i>
-                    </div>
-                    <p class="text-gray-500 font-medium text-sm">All department subjects are assigned</p>
-                    <p class="text-gray-400 text-xs mt-1">
-                        <a href="{% url 'accounts:subadmin_manage_subjects' %}" class="text-blue-500 hover:underline">Add more subjects</a>
-                        to your department to assign them here
-                    </p>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-16">
+                <div class="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="bi bi-book text-4xl text-indigo-300"></i>
                 </div>
+                <h3 class="text-lg font-bold text-gray-600 mb-2">No Subjects Assigned Yet</h3>
+                <p class="text-gray-400 text-sm mb-5">Click "Add Subjects" to assign subjects from {{ department.name }}</p>
+                {% if available_subjects %}
+                <button onclick="openAddSubjectsModal()"
+                    class="inline-flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 px-6 rounded-lg transition-all">
+                    <i class="bi bi-plus-circle"></i>
+                    <span>Add Subjects</span>
+                </button>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
+    </div>
+
+</div>
+
+
+<!-- ===================== MODAL BACKDROP ===================== -->
+<div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
+
+
+<!-- ===================== ADD SUBJECTS MODAL ===================== -->
+<div id="addSubjectsModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4">
+    <div id="addSubjectsModalContent"
+         class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl transform transition-all duration-200 scale-95 opacity-0">
+
+        <!-- Modal Header -->
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-5 rounded-t-2xl">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                        <i class="bi bi-journal-plus text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Add Subjects</h2>
+                        <p class="text-blue-100 text-xs">Select subjects to add to <strong>{{ program.name }}</strong></p>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="text-white hover:text-blue-200 transition-colors">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="px-6 pt-4 pb-2">
+            <div class="relative">
+                <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input type="text" id="subjectSearch" placeholder="Search subjects..."
+                    oninput="filterSubjects(this.value)"
+                    class="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400 transition-colors text-sm">
+            </div>
+        </div>
+
+        <!-- Select All row -->
+        <div class="px-6 py-2 border-b border-gray-100">
+            <label class="flex items-center space-x-3 cursor-pointer group">
+                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)"
+                    class="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer">
+                <span class="text-sm font-semibold text-gray-700 group-hover:text-blue-600 transition-colors">
+                    Select All
+                </span>
+                <span id="selectedCountBadge" class="hidden bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">0 selected</span>
+            </label>
+        </div>
+
+        <!-- Subject Checkboxes -->
+        <form id="bulkAddForm" method="post" action="{% url 'accounts:subadmin_bulk_add_subjects_to_program' program.pk %}">
+            {% csrf_token %}
+            <div class="px-4 py-2 max-h-96 overflow-y-auto space-y-1" id="subjectCheckboxList">
+                {% for subject in available_subjects %}
+                <label class="subject-item flex items-center space-x-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 cursor-pointer transition-colors border border-transparent hover:border-blue-100"
+                       data-name="{{ subject.name|lower }}" data-code="{{ subject.code|lower }}">
+                    <input type="checkbox" name="subject_ids" value="{{ subject.pk }}"
+                        onchange="updateSelectedCount()"
+                        class="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer subject-checkbox flex-shrink-0">
+                    <div class="flex items-center space-x-3 flex-1 min-w-0">
+                        <div class="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="bi bi-journal-text text-indigo-500"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="font-semibold text-gray-800 text-sm truncate">{{ subject.name }}</p>
+                            <span class="text-xs font-mono bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{{ subject.code }}</span>
+                        </div>
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+
+            <!-- No results message -->
+            <p id="noResultsMsg" class="hidden text-center text-gray-400 text-sm py-6 px-6">
+                <i class="bi bi-search mr-1"></i> No subjects match your search.
+            </p>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                <span class="text-sm text-gray-500">
+                    <span id="footerCountNum">0</span> subject(s) selected
+                </span>
+                <div class="flex items-center space-x-3">
+                    <button type="button" onclick="closeModal()"
+                        class="px-5 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium text-sm">
+                        Cancel
+                    </button>
+                    <button type="submit" id="addSelectedBtn" disabled
+                        class="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-2.5 rounded-xl transition-all shadow-md font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:from-blue-600 hover:to-blue-700">
+                        <i class="bi bi-plus-circle"></i>
+                        <span>Add Selected (<span id="addBtnCount">0</span>)</span>
+                    </button>
+                </div>
+            </div>
+        </form>
 
     </div>
+    </div>
 </div>
+
+
+<script>
+function openAddSubjectsModal() {
+    document.getElementById('subjectSearch').value = '';
+    document.getElementById('selectAllCheckbox').checked = false;
+    document.querySelectorAll('.subject-checkbox').forEach(cb => cb.checked = false);
+    filterSubjects('');
+    updateSelectedCount();
+
+    document.getElementById('modalBackdrop').classList.remove('hidden');
+    const modal   = document.getElementById('addSubjectsModal');
+    const content = document.getElementById('addSubjectsModalContent');
+    modal.classList.remove('hidden');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        content.classList.remove('scale-95', 'opacity-0');
+        content.classList.add('scale-100', 'opacity-100');
+    }));
+}
+
+function closeModal() {
+    const content = document.getElementById('addSubjectsModalContent');
+    content.classList.remove('scale-100', 'opacity-100');
+    content.classList.add('scale-95', 'opacity-0');
+    setTimeout(() => {
+        document.getElementById('addSubjectsModal').classList.add('hidden');
+        document.getElementById('modalBackdrop').classList.add('hidden');
+    }, 200);
+}
+
+function filterSubjects(query) {
+    const q = query.toLowerCase().trim();
+    const items = document.querySelectorAll('.subject-item');
+    let visible = 0;
+    items.forEach(item => {
+        const match = !q || item.dataset.name.includes(q) || item.dataset.code.includes(q);
+        item.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+    document.getElementById('noResultsMsg').classList.toggle('hidden', visible > 0);
+    syncSelectAll();
+}
+
+function toggleSelectAll(cb) {
+    document.querySelectorAll('.subject-item:not([style*="display: none"]) .subject-checkbox').forEach(c => {
+        c.checked = cb.checked;
+    });
+    updateSelectedCount();
+}
+
+function syncSelectAll() {
+    const visibleCbs = document.querySelectorAll('.subject-item:not([style*="display: none"]) .subject-checkbox');
+    const allChecked = visibleCbs.length > 0 && Array.from(visibleCbs).every(c => c.checked);
+    document.getElementById('selectAllCheckbox').checked = allChecked;
+}
+
+function updateSelectedCount() {
+    const count = document.querySelectorAll('.subject-checkbox:checked').length;
+    const badge = document.getElementById('selectedCountBadge');
+
+    document.getElementById('footerCountNum').textContent = count;
+    document.getElementById('addBtnCount').textContent    = count;
+    document.getElementById('addSelectedBtn').disabled    = count === 0;
+
+    if (count > 0) {
+        badge.textContent = count + ' selected';
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+    syncSelectAll();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.getElementById('modalBackdrop').addEventListener('click', closeModal);
+</script>
 {% endblock %}
