@@ -17,7 +17,19 @@ from .forms import QuestionnaireUploadForm, QuestionnaireEditForm, Questionnaire
 from accounts.models import TeacherProfile, Department, Subject, ActivityLog
 from .services import QuestionnaireExtractor
 from django.conf import settings
+from django.utils import timezone
 import json as _json
+
+
+def get_current_school_year():
+    """Returns the current Philippine academic school year, e.g. '2025-2026'.
+    The school year starts in June; Jan-May still belongs to the previous year's cycle.
+    """
+    now = timezone.localtime(timezone.now())
+    year, month = now.year, now.month
+    if month >= 6:
+        return f"{year}-{year + 1}"
+    return f"{year - 1}-{year}"
 
 
 def get_client_ip(request):
@@ -138,10 +150,12 @@ def upload_questionnaire(request):
         form = QuestionnaireUploadForm(request.POST, request.FILES, user=request.user)
 
         if form.is_valid():
-            questionnaire            = form.save(commit=False)
-            questionnaire.uploader   = teacher
-            questionnaire.department = teacher.department
-            questionnaire.exam_type  = form.cleaned_data['exam_type']
+            questionnaire             = form.save(commit=False)
+            questionnaire.uploader    = teacher
+            questionnaire.department  = teacher.department
+            questionnaire.exam_type   = form.cleaned_data['exam_type']
+            questionnaire.semester    = form.cleaned_data['semester']
+            questionnaire.school_year = get_current_school_year()
             questionnaire.extraction_status = 'processing'
             questionnaire.save()
 
@@ -166,7 +180,7 @@ def upload_questionnaire(request):
                     return render(
                         request,
                         'teacher_dashboard/upload_questionnaire.html',
-                        {'form': form},
+                        {'form': form, 'current_school_year': get_current_school_year()},
                     )
 
                 # ── Answer-key check ────────────────────────────────────────
@@ -191,7 +205,7 @@ def upload_questionnaire(request):
                     return render(
                         request,
                         'teacher_dashboard/upload_questionnaire.html',
-                        {'form': form, 'no_answer_key': True},
+                        {'form': form, 'no_answer_key': True, 'current_school_year': get_current_school_year()},
                     )
 
                 # Keep the file and questionnaire — store only PK in session
@@ -244,7 +258,7 @@ def upload_questionnaire(request):
                 return render(
                     request,
                     'teacher_dashboard/upload_questionnaire.html',
-                    {'form': form},
+                    {'form': form, 'current_school_year': get_current_school_year()},
                 )
         else:
             messages.error(request, 'Please correct the errors below.')
@@ -255,7 +269,7 @@ def upload_questionnaire(request):
     return render(
         request,
         'teacher_dashboard/upload_questionnaire.html',
-        {'form': form},
+        {'form': form, 'current_school_year': get_current_school_year()},
     )
 
 

@@ -29,6 +29,19 @@ class QuestionnaireUploadForm(forms.ModelForm):
         }),
     )
 
+    semester = forms.ChoiceField(
+        choices=[('', '-- Select Semester --')] + Questionnaire.SEMESTER_CHOICES,
+        required=True,
+        label="Semester",
+        widget=forms.Select(attrs={
+            'id': 'id_semester',
+            'class': (
+                'w-full px-4 py-3 border-2 border-gray-300 rounded-lg '
+                'focus:outline-none focus:border-blue-500 transition-colors'
+            ),
+        }),
+    )
+
     question_types = forms.ModelMultipleChoiceField(
         queryset=QuestionType.objects.filter(is_active=True),
         widget=forms.CheckboxSelectMultiple,
@@ -45,7 +58,7 @@ class QuestionnaireUploadForm(forms.ModelForm):
 
     class Meta:
         model  = Questionnaire
-        fields = ['title', 'description', 'subject', 'exam_type', 'file']
+        fields = ['title', 'description', 'subject', 'exam_type', 'semester', 'file']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
@@ -67,6 +80,15 @@ class QuestionnaireUploadForm(forms.ModelForm):
         valid = [k for k, _ in Questionnaire.EXAM_TYPE_CHOICES]
         if value not in valid:
             raise forms.ValidationError('Invalid term selected.')
+        return value
+
+    def clean_semester(self):
+        value = self.cleaned_data.get('semester')
+        if not value:
+            raise forms.ValidationError('Please select a semester.')
+        valid = [k for k, _ in Questionnaire.SEMESTER_CHOICES]
+        if value not in valid:
+            raise forms.ValidationError('Invalid semester selected.')
         return value
 
     def clean_file(self):
@@ -95,9 +117,21 @@ class QuestionnaireEditForm(forms.ModelForm):
         }),
     )
 
+    semester = forms.ChoiceField(
+        choices=[('', '-- Select Semester --')] + Questionnaire.SEMESTER_CHOICES,
+        required=False,
+        label="Semester",
+        widget=forms.Select(attrs={
+            'class': (
+                'w-full px-4 py-3 border-2 border-gray-300 rounded-lg '
+                'focus:outline-none focus:border-blue-500 transition-colors'
+            ),
+        }),
+    )
+
     class Meta:
         model  = Questionnaire
-        fields = ['title', 'description', 'exam_type']
+        fields = ['title', 'description', 'exam_type', 'semester']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }

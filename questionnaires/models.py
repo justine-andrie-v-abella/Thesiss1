@@ -29,6 +29,11 @@ class Questionnaire(models.Model):
         ('others',     'Others'),
     ]
 
+    SEMESTER_CHOICES = [
+        ('1st', '1st Semester'),
+        ('2nd', '2nd Semester'),
+    ]
+
     title       = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     department  = models.ForeignKey(Department,      on_delete=models.CASCADE, related_name='questionnaires')
@@ -45,6 +50,20 @@ class Questionnaire(models.Model):
         choices=EXAM_TYPE_CHOICES,
         default='others',
         help_text='Academic term this questionnaire is intended for',
+    )
+
+    semester = models.CharField(
+        max_length=10,
+        choices=SEMESTER_CHOICES,
+        blank=True,
+        default='',
+        help_text='Semester when this questionnaire was uploaded',
+    )
+    school_year = models.CharField(
+        max_length=9,
+        blank=True,
+        default='',
+        help_text='School year (e.g. 2025-2026), auto-set on upload',
     )
 
     is_extracted      = models.BooleanField(default=False, help_text='Whether questions have been extracted')

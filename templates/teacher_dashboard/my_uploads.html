@@ -168,7 +168,9 @@
                         '{{ quest.file_type|upper }}',
                         '{{ quest.get_file_size_display }}',
                         '{{ uploaded }}',
-                        '{{ quest.exam_type }}'
+                        '{{ quest.exam_type }}',
+                        '{{ quest.semester }}',
+                        '{{ quest.school_year }}'
                     )">
                     <i class="bi bi-pencil-square"></i>
                 </button>
@@ -290,6 +292,30 @@
                             class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-yellow-500 transition-colors resize-none"></textarea>
                     </div>
 
+
+                    <!-- School Year + Semester row -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="bi bi-calendar2-check text-teal-500 mr-1"></i> School Year
+                            </label>
+                            <div class="flex items-center gap-2 px-4 py-3 bg-teal-50 border-2 border-teal-200 rounded-lg">
+                                <i class="bi bi-mortarboard text-teal-600"></i>
+                                <span id="editSchoolYear" class="font-bold text-teal-800 tracking-wide"></span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="bi bi-calendar3 text-blue-500 mr-1"></i> Semester *
+                            </label>
+                            <select id="editSemester" name="semester" required
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-yellow-500 transition-colors">
+                                <option value="">-- Select --</option>
+                                <option value="1st">1st Semester</option>
+                                <option value="2nd">2nd Semester</option>
+                            </select>
+                        </div>
+                    </div>
 
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
@@ -618,16 +644,18 @@
     /* ══════════════════════════════════════════
        EDIT MODAL
     ══════════════════════════════════════════ */
-    window.openEditModal = function (pk, title, description, subject, dept, fileType, fileSize, date, examType) {
-        document.getElementById('editForm').action           = editUrl(pk);
-        document.getElementById('editTitle').value           = title;
-        document.getElementById('editDescription').value     = description;
-        document.getElementById('editInfoDept').textContent     = dept;
-        document.getElementById('editInfoSubject').textContent  = subject;
-        document.getElementById('editInfoFileType').textContent = fileType;
-        document.getElementById('editInfoFileSize').textContent = fileSize;
-        document.getElementById('editInfoDate').textContent     = date;
+    window.openEditModal = function (pk, title, description, subject, dept, fileType, fileSize, date, examType, semester, schoolYear) {
+        document.getElementById('editForm').action               = editUrl(pk);
+        document.getElementById('editTitle').value               = title;
+        document.getElementById('editDescription').value         = description;
+        document.getElementById('editInfoDept').textContent      = dept;
+        document.getElementById('editInfoSubject').textContent   = subject;
+        document.getElementById('editInfoFileType').textContent  = fileType;
+        document.getElementById('editInfoFileSize').textContent  = fileSize;
+        document.getElementById('editInfoDate').textContent      = date;
         document.getElementById('editExamType').value            = examType;
+        document.getElementById('editSemester').value            = semester || '';
+        document.getElementById('editSchoolYear').textContent    = schoolYear || '—';
 
         document.getElementById('editModal').style.display = 'flex';
         document.body.style.overflow = 'hidden';
