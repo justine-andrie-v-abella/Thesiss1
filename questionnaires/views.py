@@ -979,12 +979,19 @@ def my_uploads(request):
     )
 
     search_query = request.GET.get('search', '')
+    selected_semester   = request.GET.get('semester', '')
+    selected_school_year = request.GET.get('school_year', '')
+
     if search_query:
         questionnaires = questionnaires.filter(
             Q(title__icontains=search_query) |
             Q(description__icontains=search_query) |
             Q(subject__name__icontains=search_query)
         )
+    if selected_semester:
+        questionnaires = questionnaires.filter(semester=selected_semester)
+    if selected_school_year:
+        questionnaires = questionnaires.filter(school_year=selected_school_year)
 
     archived_questionnaires = (
         Questionnaire.objects
@@ -1001,6 +1008,10 @@ def my_uploads(request):
         'page_obj':               page_obj,
         'search_query':           search_query,
         'archived_questionnaires': archived_questionnaires,
+        'semester_choices':       Questionnaire.SEMESTER_CHOICES,
+        'selected_semester':      selected_semester,
+        'selected_school_year':   selected_school_year,
+        'school_year_options':    list(Questionnaire.objects.filter(uploader=teacher, is_archived=False, school_year__gt='').values_list('school_year', flat=True).distinct().order_by('-school_year')),
     })
 
 
@@ -1167,14 +1178,20 @@ def browse_questionnaires(request):
         extraction_status='completed',
     )
 
-    subject_id   = request.GET.get('subject', '')
-    exam_type    = request.GET.get('exam_type', '')
-    search_query = request.GET.get('search', '')
+    subject_id           = request.GET.get('subject', '')
+    exam_type            = request.GET.get('exam_type', '')
+    search_query         = request.GET.get('search', '')
+    selected_semester    = request.GET.get('semester', '')
+    selected_school_year = request.GET.get('school_year', '')
 
     if subject_id:
         questionnaires = questionnaires.filter(subject_id=subject_id)
     if exam_type:
         questionnaires = questionnaires.filter(exam_type=exam_type)
+    if selected_semester:
+        questionnaires = questionnaires.filter(semester=selected_semester)
+    if selected_school_year:
+        questionnaires = questionnaires.filter(school_year=selected_school_year)
     if search_query:
         questionnaires = questionnaires.filter(
             Q(title__icontains=search_query)         |
@@ -1184,17 +1201,27 @@ def browse_questionnaires(request):
         )
 
     subjects    = Subject.objects.filter(departments=teacher.department)
+    school_year_options = list(
+        Questionnaire.objects.filter(
+            subject__departments=teacher.department,
+            is_extracted=True, extraction_status='completed', school_year__gt=''
+        ).values_list('school_year', flat=True).distinct().order_by('-school_year')
+    )
     paginator   = Paginator(questionnaires, 12)
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)
 
     return render(request, 'teacher_dashboard/browse_questionnaires.html', {
-        'page_obj':          page_obj,
-        'subjects':          subjects,
-        'selected_subject':  subject_id,
-        'search_query':      search_query,
-        'exam_type':         exam_type,
-        'exam_type_choices': Questionnaire.EXAM_TYPE_CHOICES,
+        'page_obj':            page_obj,
+        'subjects':            subjects,
+        'selected_subject':    subject_id,
+        'search_query':        search_query,
+        'exam_type':           exam_type,
+        'exam_type_choices':   Questionnaire.EXAM_TYPE_CHOICES,
+        'semester_choices':    Questionnaire.SEMESTER_CHOICES,
+        'selected_semester':   selected_semester,
+        'selected_school_year': selected_school_year,
+        'school_year_options': school_year_options,
     })
 
 
@@ -1211,10 +1238,12 @@ def all_questionnaires(request):
         'department', 'subject', 'uploader__user'
     ).filter(is_extracted=True, extraction_status='completed')
 
-    selected_department = request.GET.get('department', '')
-    selected_subject    = request.GET.get('subject', '')
-    exam_type           = request.GET.get('exam_type', '')
-    search_query        = request.GET.get('search', '')
+    selected_department  = request.GET.get('department', '')
+    selected_subject     = request.GET.get('subject', '')
+    exam_type            = request.GET.get('exam_type', '')
+    search_query         = request.GET.get('search', '')
+    selected_semester    = request.GET.get('semester', '')
+    selected_school_year = request.GET.get('school_year', '')
 
     if selected_department:
         questionnaires = questionnaires.filter(department_id=selected_department)
@@ -1222,6 +1251,10 @@ def all_questionnaires(request):
         questionnaires = questionnaires.filter(subject_id=selected_subject)
     if exam_type:
         questionnaires = questionnaires.filter(exam_type=exam_type)
+    if selected_semester:
+        questionnaires = questionnaires.filter(semester=selected_semester)
+    if selected_school_year:
+        questionnaires = questionnaires.filter(school_year=selected_school_year)
     if search_query:
         questionnaires = questionnaires.filter(
             Q(title__icontains=search_query)         |
@@ -1232,6 +1265,11 @@ def all_questionnaires(request):
 
     departments = Department.objects.all()
     subjects    = Subject.objects.all()
+    school_year_options = list(
+        Questionnaire.objects.filter(
+            is_extracted=True, extraction_status='completed', school_year__gt=''
+        ).values_list('school_year', flat=True).distinct().order_by('-school_year')
+    )
     paginator   = Paginator(questionnaires, 12)
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)
@@ -1245,6 +1283,10 @@ def all_questionnaires(request):
         'search_query':        search_query,
         'exam_type':           exam_type,
         'exam_type_choices':   Questionnaire.EXAM_TYPE_CHOICES,
+        'semester_choices':    Questionnaire.SEMESTER_CHOICES,
+        'selected_semester':   selected_semester,
+        'selected_school_year': selected_school_year,
+        'school_year_options': school_year_options,
     })
 
 

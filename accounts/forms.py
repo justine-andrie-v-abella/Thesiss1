@@ -244,7 +244,7 @@ class TeacherEditForm(forms.ModelForm):
 
     class Meta:
         model  = TeacherProfile
-        fields = ['employee_id', 'department', 'phone', 'is_active']
+        fields = ['employee_id', 'department', 'phone']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -305,7 +305,7 @@ class SubAdminTeacherEditForm(forms.ModelForm):
 
     class Meta:
         model  = TeacherProfile
-        fields = ['employee_id', 'phone', 'is_active']
+        fields = ['employee_id', 'phone']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

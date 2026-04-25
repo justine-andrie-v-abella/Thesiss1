@@ -568,6 +568,8 @@ def archive_teacher(request, pk):
     if request.method == 'POST':
         teacher.is_archived = True
         teacher.save()
+        teacher.user.is_active = False
+        teacher.user.save()
         ActivityLog.objects.create(
             activity_type='teacher_updated',
             user=request.user,
@@ -586,6 +588,8 @@ def unarchive_teacher(request, pk):
     if request.method == 'POST':
         teacher.is_archived = False
         teacher.save()
+        teacher.user.is_active = True
+        teacher.user.save()
         ActivityLog.objects.create(
             activity_type='teacher_updated',
             user=request.user,
@@ -1044,7 +1048,6 @@ def edit_subadmin(request, pk):
         username     = request.POST.get('username', '').strip()
         new_password = request.POST.get('new_password', '').strip()
         dept_pk      = request.POST.get('department', '').strip()
-        is_active    = request.POST.get('is_active') == 'on'
 
         errors = []
 
@@ -1095,7 +1098,6 @@ def edit_subadmin(request, pk):
             messages.error(request, 'Selected department does not exist.')
             return redirect('accounts:manage_subadmins')
 
-        subadmin.is_active = is_active
         subadmin.save()
 
         if username_changed or password_changed:
@@ -1139,6 +1141,8 @@ def archive_subadmin(request, pk):
         subadmin.is_archived = True
         subadmin.is_active = False
         subadmin.save()
+        subadmin.user.is_active = False
+        subadmin.user.save()
         ActivityLog.objects.create(
             activity_type='subadmin_updated',
             user=request.user,
@@ -1158,6 +1162,8 @@ def unarchive_subadmin(request, pk):
         subadmin.is_archived = False
         subadmin.is_active = True
         subadmin.save()
+        subadmin.user.is_active = True
+        subadmin.user.save()
         ActivityLog.objects.create(
             activity_type='subadmin_updated',
             user=request.user,
@@ -1868,10 +1874,12 @@ def subadmin_browse_questionnaires(request):
         department=department, is_active=True
     ).select_related('user').order_by('user__last_name')
 
-    selected_subject = request.GET.get('subject', '')
-    selected_teacher = request.GET.get('teacher', '')
-    exam_type        = request.GET.get('exam_type', '')
-    search_query     = request.GET.get('search', '')
+    selected_subject     = request.GET.get('subject', '')
+    selected_teacher     = request.GET.get('teacher', '')
+    exam_type            = request.GET.get('exam_type', '')
+    search_query         = request.GET.get('search', '')
+    selected_semester    = request.GET.get('semester', '')
+    selected_school_year = request.GET.get('school_year', '')
 
     if selected_subject:
         questionnaires = questionnaires.filter(subject_id=selected_subject)
@@ -1879,6 +1887,10 @@ def subadmin_browse_questionnaires(request):
         questionnaires = questionnaires.filter(uploader_id=selected_teacher)
     if exam_type:
         questionnaires = questionnaires.filter(exam_type=exam_type)
+    if selected_semester:
+        questionnaires = questionnaires.filter(semester=selected_semester)
+    if selected_school_year:
+        questionnaires = questionnaires.filter(school_year=selected_school_year)
     if search_query:
         questionnaires = questionnaires.filter(
             Q(title__icontains=search_query) |
@@ -1887,20 +1899,30 @@ def subadmin_browse_questionnaires(request):
             Q(subject__code__icontains=search_query)
         )
 
+    school_year_options = list(
+        Questionnaire.objects.filter(
+            uploader__department=department,
+            school_year__gt=''
+        ).values_list('school_year', flat=True).distinct().order_by('-school_year')
+    )
     paginator   = Paginator(questionnaires, 9)
     page_number = request.GET.get('page', 1)
     page_obj    = paginator.get_page(page_number)
 
     context = {
-        'page_obj':          page_obj,
-        'department':        department,
-        'subjects':          subjects,
-        'teachers':          teachers,
-        'selected_subject':  selected_subject,
-        'selected_teacher':  selected_teacher,
-        'exam_type':         exam_type,
-        'search_query':      search_query,
-        'exam_type_choices': Questionnaire.EXAM_TYPE_CHOICES,
+        'page_obj':            page_obj,
+        'department':          department,
+        'subjects':            subjects,
+        'teachers':            teachers,
+        'selected_subject':    selected_subject,
+        'selected_teacher':    selected_teacher,
+        'exam_type':           exam_type,
+        'search_query':        search_query,
+        'exam_type_choices':   Questionnaire.EXAM_TYPE_CHOICES,
+        'semester_choices':    Questionnaire.SEMESTER_CHOICES,
+        'selected_semester':   selected_semester,
+        'selected_school_year': selected_school_year,
+        'school_year_options': school_year_options,
     }
     return render(request, 'subadmin_dashboard/browse_questionnaires.html', context)
 

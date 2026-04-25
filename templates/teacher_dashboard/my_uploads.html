@@ -41,17 +41,43 @@
     </div>
 </div>
 
-<!-- Search Bar -->
+<!-- Filter Bar -->
 <div class="bg-white rounded-xl shadow-lg p-4 mb-8">
-    <form method="get" class="flex gap-3">
-        <div class="flex-1">
+    <form method="get" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1"><i class="bi bi-calendar2-check text-teal-500 mr-1"></i> School Year</label>
+            <select name="school_year" class="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 transition-colors text-sm">
+                <option value="">All School Years</option>
+                {% for sy in school_year_options %}
+                <option value="{{ sy }}" {% if selected_school_year == sy %}selected{% endif %}>{{ sy }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1"><i class="bi bi-calendar3 text-blue-500 mr-1"></i> Semester</label>
+            <select name="semester" class="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors text-sm">
+                <option value="">All Semesters</option>
+                {% for val, label in semester_choices %}
+                <option value="{{ val }}" {% if selected_semester == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1"><i class="bi bi-search text-green-500 mr-1"></i> Search</label>
             <input type="text" name="search" value="{{ search_query }}"
                 placeholder="Search your uploads..."
-                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors">
+                class="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 transition-colors text-sm">
         </div>
-        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg transition-all shadow-lg">
-            <i class="bi bi-search mr-2"></i> Search
-        </button>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2.5 rounded-lg transition-all shadow flex items-center justify-center text-sm">
+                <i class="bi bi-funnel mr-1"></i> Filter
+            </button>
+            {% if selected_school_year or selected_semester or search_query %}
+            <a href="{% url 'questionnaires:my_uploads' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-3 py-2.5 rounded-lg transition-all text-sm flex items-center justify-center" title="Clear filters">
+                <i class="bi bi-x-circle"></i>
+            </a>
+            {% endif %}
+        </div>
     </form>
 </div>
 
@@ -110,6 +136,20 @@
                     </div>
                     <span class="text-gray-600">{{ quest.get_file_size_display }}</span>
                 </div>
+                {% if quest.school_year or quest.semester %}
+                <div class="flex flex-wrap gap-1.5 pt-1">
+                    {% if quest.school_year %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-800">
+                        <i class="bi bi-calendar2-check mr-1"></i> {{ quest.school_year }}
+                    </span>
+                    {% endif %}
+                    {% if quest.semester %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                        <i class="bi bi-calendar3 mr-1"></i> {{ quest.get_semester_display }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% endif %}
                 <div class="flex items-center text-sm">
                     <i class="bi bi-calendar text-gray-400 mr-2"></i>
                     <span class="text-gray-600">{{ quest.uploaded_at|date:"M d, Y" }}</span>
