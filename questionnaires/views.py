@@ -1236,7 +1236,11 @@ def all_questionnaires(request):
 
     questionnaires = Questionnaire.objects.select_related(
         'department', 'subject', 'uploader__user'
-    ).filter(is_extracted=True, extraction_status='completed')
+    ).filter(is_extracted=True, extraction_status='completed', is_archived=False)
+
+    archived_questionnaires = Questionnaire.objects.select_related(
+        'department', 'subject', 'uploader__user'
+    ).filter(is_archived=True)
 
     selected_department  = request.GET.get('department', '')
     selected_subject     = request.GET.get('subject', '')
@@ -1267,7 +1271,7 @@ def all_questionnaires(request):
     subjects    = Subject.objects.all()
     school_year_options = list(
         Questionnaire.objects.filter(
-            is_extracted=True, extraction_status='completed', school_year__gt=''
+            is_extracted=True, extraction_status='completed', is_archived=False, school_year__gt=''
         ).values_list('school_year', flat=True).distinct().order_by('-school_year')
     )
     paginator   = Paginator(questionnaires, 12)
@@ -1275,18 +1279,19 @@ def all_questionnaires(request):
     page_obj    = paginator.get_page(page_number)
 
     return render(request, 'admin_dashboard/all_questionnaires.html', {
-        'page_obj':            page_obj,
-        'departments':         departments,
-        'subjects':            subjects,
-        'selected_department': selected_department,
-        'selected_subject':    selected_subject,
-        'search_query':        search_query,
-        'exam_type':           exam_type,
-        'exam_type_choices':   Questionnaire.EXAM_TYPE_CHOICES,
-        'semester_choices':    Questionnaire.SEMESTER_CHOICES,
-        'selected_semester':   selected_semester,
-        'selected_school_year': selected_school_year,
-        'school_year_options': school_year_options,
+        'page_obj':               page_obj,
+        'departments':            departments,
+        'subjects':               subjects,
+        'selected_department':    selected_department,
+        'selected_subject':       selected_subject,
+        'search_query':           search_query,
+        'exam_type':              exam_type,
+        'exam_type_choices':      Questionnaire.EXAM_TYPE_CHOICES,
+        'semester_choices':       Questionnaire.SEMESTER_CHOICES,
+        'selected_semester':      selected_semester,
+        'selected_school_year':   selected_school_year,
+        'school_year_options':    school_year_options,
+        'archived_questionnaires': archived_questionnaires,
     })
 
 
