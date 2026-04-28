@@ -5,26 +5,16 @@
 {% block header_subtitle %}Assign and manage department sub-administrators{% endblock %}
 
 {% block content %}
-
-<!-- ── Django Messages (validation errors / success from redirects) ── -->
-{% if messages %}
-<div id="messagesContainer" class="mb-6 space-y-2">
-    {% for message in messages %}
-    <div class="flex items-start justify-between px-5 py-4 rounded-xl shadow-sm border
-        {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
-        {% elif message.tags == 'success' %}bg-green-50 border-green-200 text-green-800
-        {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
-        <div class="flex items-center space-x-3">
-            <i class="bi {% if message.tags == 'error' %}bi-exclamation-circle-fill text-red-500
-                         {% elif message.tags == 'success' %}bi-check-circle-fill text-green-500
-                         {% else %}bi-info-circle-fill text-blue-500{% endif %} text-lg"></i>
-            <span class="text-sm font-medium">{{ message }}</span>
-        </div>
-        <button onclick="this.parentElement.remove()" class="ml-4 opacity-50 hover:opacity-100 transition-opacity text-xl leading-none">&times;</button>
+<!-- Flash message from AJAX -->
+<div id="ajaxFlash" class="hidden mb-4 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded-xl flex items-center justify-between">
+    <div class="flex items-center">
+        <i class="bi bi-check-circle-fill text-green-500 text-lg mr-2"></i>
+        <span id="ajaxFlashMessage"></span>
     </div>
-    {% endfor %}
+    <button onclick="document.getElementById('ajaxFlash').classList.add('hidden')" class="text-green-600 hover:text-green-800">
+        <i class="bi bi-x-lg"></i>
+    </button>
 </div>
-{% endif %}
 
 <!-- Header Actions -->
 <div class="flex items-center justify-between mb-6">
@@ -191,8 +181,14 @@
             </div>
         </div>
 
-        <form method="post" action="{% url 'accounts:add_subadmin' %}" class="p-6 space-y-5">
+        <form id="addForm" action="{% url 'accounts:add_subadmin' %}" class="p-6 space-y-5">
             {% csrf_token %}
+
+            <!-- General error -->
+            <div id="add_general_error" class="hidden bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+                <i class="bi bi-exclamation-circle-fill text-red-500 mt-0.5 flex-shrink-0"></i>
+                <p id="add_general_error_text" class="text-sm text-red-700"></p>
+            </div>
 
             <!-- Personal Info -->
             <div>
@@ -202,25 +198,28 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">First Name <span class="text-red-500">*</span></label>
-                        <input type="text" name="first_name" value="{{ form.first_name.value|default:'' }}"
+                        <input type="text" name="first_name" id="add_first_name"
+                               data-req oninput="vBtn('add')"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
                                placeholder="Juan">
-                        {% if form.first_name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.first_name.errors.0 }}</p>{% endif %}
+                        <p id="add_first_name_error" class="text-red-500 text-xs mt-1 hidden"></p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Last Name <span class="text-red-500">*</span></label>
-                        <input type="text" name="last_name" value="{{ form.last_name.value|default:'' }}"
+                        <input type="text" name="last_name" id="add_last_name"
+                               data-req oninput="vBtn('add')"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
                                placeholder="Dela Cruz">
-                        {% if form.last_name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.last_name.errors.0 }}</p>{% endif %}
+                        <p id="add_last_name_error" class="text-red-500 text-xs mt-1 hidden"></p>
                     </div>
                 </div>
                 <div class="mt-3">
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">Email Address <span class="text-red-500">*</span></label>
-                    <input type="email" name="email" value="{{ form.email.value|default:'' }}"
+                    <input type="email" name="email" id="add_email"
+                           data-req oninput="vBtn('add')"
                            class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
                            placeholder="juan@example.com">
-                    {% if form.email.errors %}<p class="text-red-500 text-xs mt-1">{{ form.email.errors.0 }}</p>{% endif %}
+                    <p id="add_email_error" class="text-red-500 text-xs mt-1 hidden"></p>
                 </div>
             </div>
 
@@ -234,17 +233,19 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Username <span class="text-red-500">*</span></label>
-                        <input type="text" name="username" value="{{ form.username.value|default:'' }}"
+                        <input type="text" name="username" id="add_username"
+                               data-req oninput="vBtn('add')"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors font-mono"
                                placeholder="jdelacruz">
-                        {% if form.username.errors %}<p class="text-red-500 text-xs mt-1">{{ form.username.errors.0 }}</p>{% endif %}
+                        <p id="add_username_error" class="text-red-500 text-xs mt-1 hidden"></p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Password <span class="text-red-500">*</span></label>
-                        <input type="password" name="password"
+                        <input type="password" name="password" id="add_password"
+                               data-req oninput="vBtn('add')"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
                                placeholder="••••••••">
-                        {% if form.password.errors %}<p class="text-red-500 text-xs mt-1">{{ form.password.errors.0 }}</p>{% endif %}
+                        <p id="add_password_error" class="text-red-500 text-xs mt-1 hidden"></p>
                     </div>
                 </div>
             </div>
@@ -257,19 +258,18 @@
                     <i class="bi bi-building text-indigo-500 mr-2"></i>Department Assignment
                 </h3>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">Assign to Department <span class="text-red-500">*</span></label>
-                <select name="department"
+                <select name="department" id="add_department"
+                        data-req onchange="vBtn('add')"
                         class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors bg-white">
                     <option value="">— Select a Department —</option>
                     {% for dept in form.department.field.queryset %}
-                    <option value="{{ dept.pk }}" {% if form.department.value == dept.pk|stringformat:"s" %}selected{% endif %}>
-                        {{ dept.code }} — {{ dept.name }}
-                    </option>
+                    <option value="{{ dept.pk }}">{{ dept.code }} — {{ dept.name }}</option>
                     {% endfor %}
                 </select>
                 <p class="text-xs text-gray-400 mt-1.5">
                     <i class="bi bi-info-circle mr-1"></i>Only departments without an existing sub-admin are shown.
                 </p>
-                {% if form.department.errors %}<p class="text-red-500 text-xs mt-1">{{ form.department.errors.0 }}</p>{% endif %}
+                <p id="add_department_error" class="text-red-500 text-xs mt-1 hidden"></p>
             </div>
 
             <div class="flex items-center justify-end space-x-3 pt-2 border-t border-gray-200">
@@ -277,8 +277,8 @@
                         class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
                     Cancel
                 </button>
-                <button type="submit"
-                        class="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-8 py-2.5 rounded-xl hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-md font-medium">
+                <button type="button" onclick="submitAddSubAdmin()" id="addSubmitBtn" disabled
+                        class="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-8 py-2.5 rounded-xl hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-md font-medium opacity-50 cursor-not-allowed">
                     <i class="bi bi-person-plus"></i>
                     <span>Create Sub-Admin</span>
                 </button>
@@ -314,6 +314,12 @@
         <form id="editForm" method="post" action="" class="p-6 space-y-5">
             {% csrf_token %}
 
+            <!-- General error -->
+            <div id="edit_general_error" class="hidden bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+                <i class="bi bi-exclamation-circle-fill text-red-500 mt-0.5 flex-shrink-0"></i>
+                <p id="edit_general_error_text" class="text-sm text-red-700"></p>
+            </div>
+
             <!-- Personal Info -->
             <div>
                 <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
@@ -323,24 +329,30 @@
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">First Name <span class="text-red-500">*</span></label>
                         <input type="text" name="first_name" id="edit_first_name"
+                               data-req oninput="vBtn('edit')"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                        <p id="edit_first_name_error" class="text-red-500 text-xs mt-1 hidden"></p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Last Name <span class="text-red-500">*</span></label>
                         <input type="text" name="last_name" id="edit_last_name"
+                               data-req oninput="vBtn('edit')"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                        <p id="edit_last_name_error" class="text-red-500 text-xs mt-1 hidden"></p>
                     </div>
                 </div>
                 <div class="mt-3">
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">Email Address <span class="text-red-500">*</span></label>
                     <input type="email" name="email" id="edit_email"
+                           data-req oninput="vBtn('edit')"
                            class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                    <p id="edit_email_error" class="text-red-500 text-xs mt-1 hidden"></p>
                 </div>
             </div>
 
             <hr class="border-gray-200">
 
-            <!-- ========== NEW: LOGIN CREDENTIALS SECTION ========== -->
+            <!-- Login Credentials -->
             <div>
                 <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
                     <i class="bi bi-shield-lock text-blue-500 mr-2"></i>Login Credentials
@@ -349,8 +361,10 @@
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Username <span class="text-red-500">*</span></label>
                         <input type="text" name="username" id="edit_username"
+                               data-req oninput="vBtn('edit')"
                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors font-mono"
                                placeholder="Username for login">
+                        <p id="edit_username_error" class="text-red-500 text-xs mt-1 hidden"></p>
                         <p class="text-xs text-gray-500 mt-1">Leave unchanged if you don't want to modify</p>
                     </div>
                     <div>
@@ -379,12 +393,14 @@
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">Department <span class="text-red-500">*</span></label>
                     <select name="department" id="edit_department"
+                            data-req onchange="vBtn('edit')"
                             class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors bg-white">
                         <option value="">— Select a Department —</option>
                         {% for dept in all_departments %}
                         <option value="{{ dept.pk }}">{{ dept.code }} — {{ dept.name }}</option>
                         {% endfor %}
                     </select>
+                    <p id="edit_department_error" class="text-red-500 text-xs mt-1 hidden"></p>
                 </div>
             </div>
 
@@ -393,8 +409,8 @@
                         class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
                     Cancel
                 </button>
-                <button type="submit"
-                        class="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-2.5 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-md font-medium">
+                <button type="button" onclick="submitEditSubAdmin()" id="editSubmitBtn" disabled
+                        class="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-2.5 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-md font-medium opacity-50 cursor-not-allowed">
                     <i class="bi bi-check-lg"></i>
                     <span>Save Changes</span>
                 </button>
@@ -562,6 +578,131 @@
         return template.replace('/0/', '/' + pk + '/');
     }
 
+    /* ── Validate / loading state helpers ──────────────────────── */
+    function vBtn(prefix) {
+        const btn = document.getElementById(prefix + 'SubmitBtn');
+        if (!btn) return;
+        const form = btn.closest('form');
+        if (!form) return;
+        const required = [...form.querySelectorAll('[data-req]')];
+        const allFilled = required.every(f =>
+            f.tagName === 'SELECT' ? f.value !== '' : f.value.trim() !== ''
+        );
+        btn.disabled = !allFilled;
+        btn.classList.toggle('opacity-50', !allFilled);
+        btn.classList.toggle('cursor-not-allowed', !allFilled);
+    }
+
+    function setBtnLoading(btnId) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn._html = btn.innerHTML;
+        btn.disabled = true;
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+        btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg><span>Processing…</span>';
+    }
+
+    function resetBtn(btnId) {
+        const btn = document.getElementById(btnId);
+        if (!btn || !btn._html) return;
+        btn.innerHTML = btn._html;
+        btn.classList.remove('opacity-75', 'cursor-not-allowed');
+        vBtn(btnId.replace('SubmitBtn', ''));
+    }
+
+    /* ── AJAX helpers ───────────────────────────────────────────── */
+    function getCookie(name) {
+        let val = null;
+        if (document.cookie && document.cookie !== '') {
+            document.cookie.split(';').forEach(c => {
+                c = c.trim();
+                if (c.startsWith(name + '=')) val = decodeURIComponent(c.substring(name.length + 1));
+            });
+        }
+        return val;
+    }
+
+    const SA_ADD_FIELDS  = ['first_name', 'last_name', 'email', 'username', 'password', 'department'];
+    const SA_EDIT_FIELDS = ['first_name', 'last_name', 'email', 'username', 'department'];
+
+    function clearSAErrors(prefix, fields) {
+        fields.forEach(f => {
+            const errEl = document.getElementById(prefix + '_' + f + '_error');
+            const inpEl = document.getElementById(prefix + '_' + f);
+            if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
+            if (inpEl) { inpEl.classList.remove('border-red-500'); }
+        });
+        const gen = document.getElementById(prefix + '_general_error');
+        if (gen) gen.classList.add('hidden');
+    }
+
+    function showSAErrors(prefix, fields, errors) {
+        clearSAErrors(prefix, fields);
+        Object.entries(errors).forEach(([field, msgs]) => {
+            if (field === '__all__') {
+                const gen  = document.getElementById(prefix + '_general_error');
+                const text = document.getElementById(prefix + '_general_error_text');
+                if (gen && text) { text.textContent = msgs[0]; gen.classList.remove('hidden'); }
+                return;
+            }
+            const errEl = document.getElementById(prefix + '_' + field + '_error');
+            const inpEl = document.getElementById(prefix + '_' + field);
+            if (errEl) { errEl.textContent = msgs[0]; errEl.classList.remove('hidden'); }
+            if (inpEl) { inpEl.classList.add('border-red-500'); }
+        });
+    }
+
+    function submitAddSubAdmin() {
+        setBtnLoading('addSubmitBtn');
+        const form = document.getElementById('addForm');
+        const data = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            body: data,
+        })
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) {
+                sessionStorage.setItem('flashMessage', result.message);
+                window.location.reload();
+            } else {
+                resetBtn('addSubmitBtn');
+                showSAErrors('add', SA_ADD_FIELDS, result.errors || {});
+            }
+        })
+        .catch(() => {
+            resetBtn('addSubmitBtn');
+            showSAErrors('add', SA_ADD_FIELDS, { '__all__': ['An unexpected error occurred. Please try again.'] });
+        });
+    }
+
+    function submitEditSubAdmin() {
+        setBtnLoading('editSubmitBtn');
+        const form = document.getElementById('editForm');
+        const data = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            body: data,
+        })
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) {
+                sessionStorage.setItem('flashMessage', result.message);
+                window.location.reload();
+            } else {
+                resetBtn('editSubmitBtn');
+                showSAErrors('edit', SA_EDIT_FIELDS, result.errors || {});
+            }
+        })
+        .catch(() => {
+            resetBtn('editSubmitBtn');
+            showSAErrors('edit', SA_EDIT_FIELDS, { '__all__': ['An unexpected error occurred. Please try again.'] });
+        });
+    }
+
+    /* ── Modal helpers ───────────────────────────────────────────── */
     function openModal(modalId) {
         document.getElementById('modalBackdrop').classList.remove('hidden');
         MODAL_IDS.forEach(id => {
@@ -591,13 +732,19 @@
         }, 200);
     }
 
-    function openAddModal() { openModal('addModal'); }
+    function openAddModal() {
+        clearSAErrors('add', SA_ADD_FIELDS);
+        document.getElementById('addForm').reset();
+        openModal('addModal');
+        vBtn('add');
+    }
 
     function openEditModal(pk, firstName, lastName, email, username, deptPk, deptName) {
-        document.getElementById('edit_first_name').value  = firstName;
-        document.getElementById('edit_last_name').value   = lastName;
-        document.getElementById('edit_email').value       = email;
-        document.getElementById('edit_username').value    = username;
+        clearSAErrors('edit', SA_EDIT_FIELDS);
+        document.getElementById('edit_first_name').value   = firstName;
+        document.getElementById('edit_last_name').value    = lastName;
+        document.getElementById('edit_email').value        = email;
+        document.getElementById('edit_username').value     = username;
         document.getElementById('edit_new_password').value = '';
 
         const deptSelect = document.getElementById('edit_department');
@@ -612,13 +759,14 @@
         document.getElementById('editForm').action              = makeUrl(EDIT_URL_TEMPLATE, pk);
 
         openModal('editModal');
+        vBtn('edit');
     }
 
     function openArchiveModal(pk, fullName, email, deptName) {
         const parts    = fullName.trim().split(' ');
         const initials = ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase();
         document.getElementById('archiveAvatar').textContent = initials;
-        document.getElementById('archiveSubAdminName').textContent = fullName;
+        document.getElementById('archiveSubAdminName').textContent  = fullName;
         document.getElementById('archiveSubAdminEmail').textContent = email;
         document.getElementById('archiveSubAdminDept').querySelector('span').textContent = deptName || 'Unassigned';
         document.getElementById('archiveForm').action = makeUrl(ARCHIVE_URL_TEMPLATE, pk);
@@ -651,9 +799,20 @@
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAllModals(); closePermDeleteModal(); } });
 
-    {% if form and form.errors %}
-    window.addEventListener('DOMContentLoaded', () => openAddModal());
-    {% endif %}
+    /* Flash message on reload */
+    window.addEventListener('load', function () {
+        const msg = sessionStorage.getItem('flashMessage');
+        if (msg) {
+            const flash    = document.getElementById('ajaxFlash');
+            const flashMsg = document.getElementById('ajaxFlashMessage');
+            if (flash && flashMsg) {
+                flashMsg.textContent = msg;
+                flash.classList.remove('hidden');
+                sessionStorage.removeItem('flashMessage');
+                setTimeout(() => flash.classList.add('hidden'), 4000);
+            }
+        }
+    });
 </script>
 
 {% endblock %}

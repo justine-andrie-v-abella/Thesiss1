@@ -150,6 +150,19 @@ def upload_questionnaire(request):
         form = QuestionnaireUploadForm(request.POST, request.FILES, user=request.user)
 
         if form.is_valid():
+            # Server-side guard: ensure the chosen subject is actually assigned to
+            # this teacher (or, if no subjects assigned, belongs to their department).
+            chosen_subject = form.cleaned_data.get('subject')
+            assigned_subjects = teacher.subjects.all()
+            if assigned_subjects.exists():
+                if chosen_subject not in assigned_subjects:
+                    form.add_error('subject', 'You are not assigned to teach that subject.')
+                    return render(
+                        request,
+                        'teacher_dashboard/upload_questionnaire.html',
+                        {'form': form, 'current_school_year': get_current_school_year()},
+                    )
+
             questionnaire             = form.save(commit=False)
             questionnaire.uploader    = teacher
             questionnaire.department  = teacher.department

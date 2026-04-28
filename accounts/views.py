@@ -533,21 +533,13 @@ def edit_teacher(request, pk):
                     + (" [password changed]" if password_changed else "")
                 )
             )
-            messages.success(request, 'Teacher updated successfully.')
-            return redirect('accounts:manage_teachers')
+            bust_dashboard_cache()
+            return JsonResponse({'success': True, 'message': 'Teacher updated successfully.'})
 
         else:
-            messages.error(request, 'Please correct the errors in the form.')
-            return render(request, 'admin_dashboard/edit_teacher.html', {
-                'form': form, 'teacher': teacher
-            })
+            return JsonResponse({'success': False, 'errors': form.errors})
 
-    else:
-        form = TeacherEditForm(instance=teacher)
-
-    return render(request, 'admin_dashboard/edit_teacher.html', {
-        'form': form, 'teacher': teacher
-    })
+    return redirect('accounts:manage_teachers')
 
 
 @login_required
@@ -822,24 +814,15 @@ def add_subject(request):
         form = SubjectForm(request.POST)
         if form.is_valid():
             subject = form.save()
-            bust_dashboard_cache()  # ✅
+            bust_dashboard_cache()
             ActivityLog.objects.create(
                 activity_type='subject_created',
                 user=request.user,
                 description=f"Subject {subject.name} ({subject.code}) was created"
             )
-            messages.success(request, f'Subject "{subject.name}" ({subject.code}) has been added successfully!')
-            return redirect('accounts:manage_subjects')
+            return JsonResponse({'success': True, 'message': f'Subject "{subject.name}" ({subject.code}) has been added successfully!'})
         else:
-            messages.error(request, 'Please correct the errors in the form.')
-            subjects        = Subject.objects.prefetch_related('departments').all()
-            all_departments = list(Department.objects.all().order_by('name'))
-            form.fields['departments'].queryset = Department.objects.all().order_by('name')
-            return render(request, 'admin_dashboard/manage_subjects.html', {
-                'subjects':        subjects,
-                'all_departments': all_departments,
-                'form':            form,
-            })
+            return JsonResponse({'success': False, 'errors': form.errors})
     return redirect('accounts:manage_subjects')
 
 
@@ -854,20 +837,17 @@ def edit_subject(request, pk):
         form = SubjectForm(request.POST, instance=subject)
         if form.is_valid():
             updated_subject = form.save()
-            bust_dashboard_cache()  # ✅
+            bust_dashboard_cache()
             ActivityLog.objects.create(
                 activity_type='subject_updated',
                 user=request.user,
                 description=f"Subject {old_name} ({old_code}) was updated to {updated_subject.name} ({updated_subject.code})"
             )
-            messages.success(request, f'Subject "{updated_subject.name}" ({updated_subject.code}) has been updated successfully!')
-            return redirect('accounts:manage_subjects')
+            return JsonResponse({'success': True, 'message': f'Subject "{updated_subject.name}" ({updated_subject.code}) has been updated successfully!'})
         else:
-            messages.error(request, 'Please correct the errors in the form.')
-    else:
-        form = SubjectForm(instance=subject)
+            return JsonResponse({'success': False, 'errors': form.errors})
 
-    return render(request, 'admin_dashboard/edit_subject.html', {'form': form, 'subject': subject})
+    return redirect('accounts:manage_subjects')
 
 
 @login_required
@@ -979,20 +959,16 @@ def add_subadmin(request):
                 connection = get_connection()
                 connection.open()
                 connection.close()
-                logger.info(f"Email connection test successful for {test_email}")
             except Exception as e:
                 logger.error(f"Email connection failed: {e}")
-                messages.error(
-                    request,
-                    "Cannot add sub-admin: the email server is unreachable or credentials are invalid. "
-                    "Please check your email settings before adding a sub-admin."
-                )
-                subadmins = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
-                all_departments = Department.objects.all().order_by('name')
-                return render(request, 'admin_dashboard/manage_subadmins.html', {
-                    'subadmins': subadmins,
-                    'all_departments': all_departments,
-                    'form': form,
+                return JsonResponse({
+                    'success': False,
+                    'errors': {
+                        '__all__': [
+                            "Cannot add sub-admin: the email server is unreachable or credentials are invalid. "
+                            "Please check your email settings before adding a sub-admin."
+                        ]
+                    }
                 })
 
             subadmin = form.save(assigned_by=request.user)
@@ -1012,35 +988,27 @@ def add_subadmin(request):
                 user = subadmin.user
                 subadmin.delete()
                 user.delete()
-                messages.error(
-                    request,
-                    f"Sub-Admin was NOT added. The welcome email to {test_email} could not be sent. "
-                    f"Please verify your email server settings."
-                )
-                subadmins = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
-                all_departments = Department.objects.all().order_by('name')
-                return render(request, 'admin_dashboard/manage_subadmins.html', {
-                    'subadmins': subadmins,
-                    'all_departments': all_departments,
-                    'form': form,
+                return JsonResponse({
+                    'success': False,
+                    'errors': {
+                        '__all__': [
+                            f"Sub-Admin was NOT added. The welcome email to {test_email} could not be sent. "
+                            f"Please verify your email server settings."
+                        ]
+                    }
                 })
 
-            bust_dashboard_cache()  # ✅ only after successful save + email
-            messages.success(
-                request,
-                f"Sub-Admin added successfully. A welcome email with login credentials "
-                f"has been sent to {subadmin.user.email}."
-            )
-            return redirect('accounts:manage_subadmins')
+            bust_dashboard_cache()
+            return JsonResponse({
+                'success': True,
+                'message': (
+                    f"Sub-Admin added successfully. A welcome email with login credentials "
+                    f"has been sent to {subadmin.user.email}."
+                )
+            })
 
         else:
-            subadmins = SubAdminProfile.objects.select_related('user', 'department', 'assigned_by').all()
-            all_departments = Department.objects.all().order_by('name')
-            return render(request, 'admin_dashboard/manage_subadmins.html', {
-                'subadmins': subadmins,
-                'all_departments': all_departments,
-                'form': form,
-            })
+            return JsonResponse({'success': False, 'errors': form.errors})
 
     return redirect('accounts:manage_subadmins')
 
@@ -1082,9 +1050,7 @@ def edit_subadmin(request, pk):
             errors.append('That email address is already in use by another account.')
 
         if errors:
-            for error in errors:
-                messages.error(request, error)
-            return redirect('accounts:manage_subadmins')
+            return JsonResponse({'success': False, 'errors': {'__all__': errors}})
 
         user = subadmin.user
         old_username     = user.username
@@ -1104,8 +1070,7 @@ def edit_subadmin(request, pk):
         try:
             subadmin.department = Department.objects.get(pk=dept_pk)
         except Department.DoesNotExist:
-            messages.error(request, 'Selected department does not exist.')
-            return redirect('accounts:manage_subadmins')
+            return JsonResponse({'success': False, 'errors': {'__all__': ['Selected department does not exist.']}})
 
         subadmin.save()
 
@@ -1126,7 +1091,7 @@ def edit_subadmin(request, pk):
             )
         )
 
-        messages.success(request, f'{user.get_full_name()} has been updated successfully.')
+        return JsonResponse({'success': True, 'message': f'{user.get_full_name()} has been updated successfully.'})
 
     return redirect('accounts:manage_subadmins')
 

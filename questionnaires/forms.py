@@ -69,9 +69,15 @@ class QuestionnaireUploadForm(forms.ModelForm):
 
         if self.user and hasattr(self.user, 'teacher_profile'):
             teacher = self.user.teacher_profile
-            self.fields['subject'].queryset = Subject.objects.filter(
-                departments=teacher.department
-            )
+            assigned = teacher.subjects.all()
+            if assigned.exists():
+                # Only show the subjects explicitly assigned to this teacher
+                self.fields['subject'].queryset = assigned
+            else:
+                # Fall back to all subjects in their department if none are assigned yet
+                self.fields['subject'].queryset = Subject.objects.filter(
+                    departments=teacher.department
+                )
 
     def clean_exam_type(self):
         value = self.cleaned_data.get('exam_type')

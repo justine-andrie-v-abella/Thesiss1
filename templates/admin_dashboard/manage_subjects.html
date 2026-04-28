@@ -5,6 +5,17 @@
 {% block header_subtitle %}Add and manage subjects across departments{% endblock %}
 
 {% block content %}
+<!-- Flash message from AJAX -->
+<div id="ajaxFlash" class="hidden mb-4 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded-xl flex items-center justify-between">
+    <div class="flex items-center">
+        <i class="bi bi-check-circle-fill text-green-500 text-lg mr-2"></i>
+        <span id="ajaxFlashMessage"></span>
+    </div>
+    <button onclick="document.getElementById('ajaxFlash').classList.add('hidden')" class="text-green-600 hover:text-green-800">
+        <i class="bi bi-x-lg"></i>
+    </button>
+</div>
+
 <div class="max-w-7xl mx-auto">
 
     <!-- Header -->
@@ -252,18 +263,24 @@
             </div>
         </div>
 
-        <form method="post" action="{% url 'accounts:add_subject' %}" class="p-6 space-y-4">
+        <form id="addForm" action="{% url 'accounts:add_subject' %}" class="p-6 space-y-4">
             {% csrf_token %}
+
+            <!-- General error -->
+            <div id="add_general_error" class="hidden bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+                <i class="bi bi-exclamation-circle-fill text-red-500 mt-0.5 flex-shrink-0"></i>
+                <p id="add_general_error_text" class="text-sm text-red-700"></p>
+            </div>
 
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">
                     Departments <span class="text-red-500">*</span>
                 </label>
                 <p class="text-xs text-gray-400 mb-2">Select all departments that offer this subject</p>
-                <div class="border-2 border-gray-200 rounded-xl p-3 bg-gray-50 max-h-40 overflow-y-auto space-y-1">
+                <div id="add_dept_checkboxes" class="border-2 border-gray-200 rounded-xl p-3 bg-gray-50 max-h-40 overflow-y-auto space-y-1">
                     {{ form.departments }}
                 </div>
-                {% if form.departments.errors %}<p class="text-red-500 text-xs mt-1">{{ form.departments.errors.0 }}</p>{% endif %}
+                <p id="add_departments_error" class="text-red-500 text-xs mt-1 hidden"></p>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
@@ -271,28 +288,29 @@
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">
                         Subject Code <span class="text-red-500">*</span>
                     </label>
-                    <input type="text" name="code" value="{{ form.code.value|default:'' }}"
+                    <input type="text" name="code" id="add_code"
+                           data-req oninput="vBtn('add')"
                            class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 transition-colors font-mono uppercase"
                            placeholder="e.g., CS101">
-                    {% if form.code.errors %}<p class="text-red-500 text-xs mt-1">{{ form.code.errors.0 }}</p>{% endif %}
+                    <p id="add_code_error" class="text-red-500 text-xs mt-1 hidden"></p>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">
                         Subject Name <span class="text-red-500">*</span>
                     </label>
-                    <input type="text" name="name" value="{{ form.name.value|default:'' }}"
+                    <input type="text" name="name" id="add_name"
+                           data-req oninput="vBtn('add')"
                            class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 transition-colors"
                            placeholder="e.g., Introduction to CS">
-                    {% if form.name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.name.errors.0 }}</p>{% endif %}
+                    <p id="add_name_error" class="text-red-500 text-xs mt-1 hidden"></p>
                 </div>
             </div>
 
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
-                <textarea name="description" rows="3"
+                <textarea name="description" id="add_description" rows="3"
                           class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 transition-colors resize-none"
-                          placeholder="Brief description of the subject...">{{ form.description.value|default:'' }}</textarea>
-                {% if form.description.errors %}<p class="text-red-500 text-xs mt-1">{{ form.description.errors.0 }}</p>{% endif %}
+                          placeholder="Brief description of the subject..."></textarea>
             </div>
 
             <div class="flex items-center justify-end space-x-3 pt-2 border-t border-gray-200">
@@ -300,8 +318,8 @@
                         class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
                     Cancel
                 </button>
-                <button type="submit"
-                        class="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white px-8 py-2.5 rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all shadow-md font-medium">
+                <button type="button" onclick="submitAddSubject()" id="addSubmitBtn" disabled
+                        class="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white px-8 py-2.5 rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all shadow-md font-medium opacity-50 cursor-not-allowed">
                     <i class="bi bi-plus-circle"></i>
                     <span>Add Subject</span>
                 </button>
@@ -338,6 +356,12 @@
         <form id="editForm" method="post" action="" class="p-6 space-y-4">
             {% csrf_token %}
 
+            <!-- General error -->
+            <div id="edit_general_error" class="hidden bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+                <i class="bi bi-exclamation-circle-fill text-red-500 mt-0.5 flex-shrink-0"></i>
+                <p id="edit_general_error_text" class="text-sm text-red-700"></p>
+            </div>
+
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">
                     Departments <span class="text-red-500">*</span>
@@ -354,14 +378,18 @@
                         Subject Code <span class="text-red-500">*</span>
                     </label>
                     <input type="text" name="code" id="edit_code"
+                           data-req oninput="vBtn('edit')"
                            class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors font-mono uppercase">
+                    <p id="edit_code_error" class="text-red-500 text-xs mt-1 hidden"></p>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">
                         Subject Name <span class="text-red-500">*</span>
                     </label>
                     <input type="text" name="name" id="edit_name"
+                           data-req oninput="vBtn('edit')"
                            class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors">
+                    <p id="edit_name_error" class="text-red-500 text-xs mt-1 hidden"></p>
                 </div>
             </div>
 
@@ -376,8 +404,8 @@
                         class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
                     Cancel
                 </button>
-                <button type="submit"
-                        class="flex items-center space-x-2 bg-gradient-to-r from-yellow-500 to-amber-500 text-white px-8 py-2.5 rounded-xl hover:from-yellow-600 hover:to-amber-600 transition-all shadow-md font-medium">
+                <button type="button" onclick="submitEditSubject()" id="editSubmitBtn" disabled
+                        class="flex items-center space-x-2 bg-gradient-to-r from-yellow-500 to-amber-500 text-white px-8 py-2.5 rounded-xl hover:from-yellow-600 hover:to-amber-600 transition-all shadow-md font-medium opacity-50 cursor-not-allowed">
                     <i class="bi bi-check-lg"></i>
                     <span>Save Changes</span>
                 </button>
@@ -593,9 +621,139 @@ var ALL_DEPARTMENTS = [
         }, 200);
     };
 
-    window.openAddModal = function () { openModal('addModal'); };
+    /* ── Validate / loading state helpers ──────────────────────── */
+    function vBtn(prefix) {
+        var btn = document.getElementById(prefix + 'SubmitBtn');
+        if (!btn) return;
+        var form = btn.closest('form');
+        if (!form) return;
+        var required = Array.from(form.querySelectorAll('[data-req]'));
+        var allFilled = required.every(function (f) {
+            return f.tagName === 'SELECT' ? f.value !== '' : f.value.trim() !== '';
+        });
+        btn.disabled = !allFilled;
+        btn.classList.toggle('opacity-50', !allFilled);
+        btn.classList.toggle('cursor-not-allowed', !allFilled);
+    }
+
+    function setBtnLoading(btnId) {
+        var btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn._html = btn.innerHTML;
+        btn.disabled = true;
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+        btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg><span>Processing…</span>';
+    }
+
+    function resetBtn(btnId) {
+        var btn = document.getElementById(btnId);
+        if (!btn || !btn._html) return;
+        btn.innerHTML = btn._html;
+        btn.classList.remove('opacity-75', 'cursor-not-allowed');
+        vBtn(btnId.replace('SubmitBtn', ''));
+    }
+
+    function getCookie(name) {
+        var val = null;
+        if (document.cookie && document.cookie !== '') {
+            document.cookie.split(';').forEach(function (c) {
+                c = c.trim();
+                if (c.startsWith(name + '=')) val = decodeURIComponent(c.substring(name.length + 1));
+            });
+        }
+        return val;
+    }
+
+    var SUBJ_ADD_FIELDS  = ['code', 'name', 'departments'];
+    var SUBJ_EDIT_FIELDS = ['code', 'name'];
+
+    function clearSubjectErrors(prefix, fields) {
+        fields.forEach(function (f) {
+            var errEl = document.getElementById(prefix + '_' + f + '_error');
+            var inpEl = document.getElementById(prefix + '_' + f);
+            if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
+            if (inpEl) { inpEl.classList.remove('border-red-500'); }
+        });
+        var gen = document.getElementById(prefix + '_general_error');
+        if (gen) gen.classList.add('hidden');
+    }
+
+    function showSubjectErrors(prefix, fields, errors) {
+        clearSubjectErrors(prefix, fields);
+        Object.entries(errors).forEach(function ([field, msgs]) {
+            if (field === '__all__') {
+                var gen  = document.getElementById(prefix + '_general_error');
+                var text = document.getElementById(prefix + '_general_error_text');
+                if (gen && text) { text.textContent = msgs[0]; gen.classList.remove('hidden'); }
+                return;
+            }
+            var errEl = document.getElementById(prefix + '_' + field + '_error');
+            var inpEl = document.getElementById(prefix + '_' + field);
+            if (errEl) { errEl.textContent = msgs[0]; errEl.classList.remove('hidden'); }
+            if (inpEl) { inpEl.classList.add('border-red-500'); }
+        });
+    }
+
+    window.submitAddSubject = function () {
+        setBtnLoading('addSubmitBtn');
+        var form = document.getElementById('addForm');
+        var data = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            body: data,
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (result) {
+            if (result.success) {
+                sessionStorage.setItem('flashMessage', result.message);
+                window.location.reload();
+            } else {
+                resetBtn('addSubmitBtn');
+                showSubjectErrors('add', SUBJ_ADD_FIELDS, result.errors || {});
+            }
+        })
+        .catch(function () {
+            resetBtn('addSubmitBtn');
+            showSubjectErrors('add', SUBJ_ADD_FIELDS, { '__all__': ['An unexpected error occurred. Please try again.'] });
+        });
+    };
+
+    window.submitEditSubject = function () {
+        setBtnLoading('editSubmitBtn');
+        var form = document.getElementById('editForm');
+        var data = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            body: data,
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (result) {
+            if (result.success) {
+                sessionStorage.setItem('flashMessage', result.message);
+                window.location.reload();
+            } else {
+                resetBtn('editSubmitBtn');
+                showSubjectErrors('edit', SUBJ_EDIT_FIELDS, result.errors || {});
+            }
+        })
+        .catch(function () {
+            resetBtn('editSubmitBtn');
+            showSubjectErrors('edit', SUBJ_EDIT_FIELDS, { '__all__': ['An unexpected error occurred. Please try again.'] });
+        });
+    };
+
+    window.openAddModal = function () {
+        clearSubjectErrors('add', SUBJ_ADD_FIELDS);
+        var f = document.getElementById('addForm');
+        if (f) f.reset();
+        openModal('addModal');
+        vBtn('add');
+    };
 
     window.openEditModal = function (pk, code, name, description, selectedPks) {
+        clearSubjectErrors('edit', SUBJ_EDIT_FIELDS);
         document.getElementById('edit_code').value        = code;
         document.getElementById('edit_name').value        = name;
         document.getElementById('edit_description').value = description;
@@ -619,6 +777,7 @@ var ALL_DEPARTMENTS = [
         });
 
         openModal('editModal');
+        vBtn('edit');
     };
 
     window.openArchiveModal = function (pk, name, code) {
@@ -653,9 +812,20 @@ var ALL_DEPARTMENTS = [
         if (e.key === 'Escape') { window.closeAllModals(); window.closePermDeleteModal(); }
     });
 
-    {% if form and form.errors %}
-    window.addEventListener('DOMContentLoaded', function () { window.openAddModal(); });
-    {% endif %}
+    // ── Flash message on reload ───────────────────────────────────────────
+    window.addEventListener('load', function () {
+        var msg = sessionStorage.getItem('flashMessage');
+        if (msg) {
+            var flash    = document.getElementById('ajaxFlash');
+            var flashMsg = document.getElementById('ajaxFlashMessage');
+            if (flash && flashMsg) {
+                flashMsg.textContent = msg;
+                flash.classList.remove('hidden');
+                sessionStorage.removeItem('flashMessage');
+                setTimeout(function () { flash.classList.add('hidden'); }, 4000);
+            }
+        }
+    });
 
     // ── Department filter tabs ─────────────────────────────────────────────
     var deptCount = {};
