@@ -432,18 +432,14 @@ def add_teacher(request):
                 connection.close()
             except Exception as e:
                 logger.error(f"Email connection failed: {e}")
-                messages.error(
-                    request,
-                    "Cannot add teacher: the email server is unreachable or credentials are invalid. "
-                    "Please check your email settings before adding a teacher."
-                )
-                teachers    = TeacherProfile.objects.select_related('user', 'department').all()
-                departments = Department.objects.all().order_by('name')
-                return render(request, 'admin_dashboard/manage_teachers.html', {
-                    'teachers':     teachers,
-                    'search_query': '',
-                    'departments':  departments,
-                    'form':         form,
+                return JsonResponse({
+                    'success': False,
+                    'errors': {
+                        '__all__': [
+                            "Cannot add teacher: the email server is unreachable or credentials are invalid. "
+                            "Please check your email settings before adding a teacher."
+                        ]
+                    }
                 })
 
             teacher = form.save()
@@ -465,37 +461,27 @@ def add_teacher(request):
                 user = teacher.user
                 teacher.delete()
                 user.delete()
-                messages.error(
-                    request,
-                    f"Teacher was NOT added. The welcome email to {test_email} could not be sent. "
-                    f"Please verify your email server settings."
-                )
-                teachers    = TeacherProfile.objects.select_related('user', 'department').all()
-                departments = Department.objects.all().order_by('name')
-                return render(request, 'admin_dashboard/manage_teachers.html', {
-                    'teachers':     teachers,
-                    'search_query': '',
-                    'departments':  departments,
-                    'form':         form,
+                return JsonResponse({
+                    'success': False,
+                    'errors': {
+                        '__all__': [
+                            f"Teacher was NOT added. The welcome email to {test_email} could not be sent. "
+                            f"Please verify your email server settings."
+                        ]
+                    }
                 })
 
-            bust_dashboard_cache()  # ✅ only after successful save + email
-            messages.success(
-                request,
-                f"Teacher added successfully. A welcome email with login credentials "
-                f"has been sent to {teacher.user.email}."
-            )
-            return redirect('accounts:manage_teachers')
+            bust_dashboard_cache()
+            return JsonResponse({
+                'success': True,
+                'message': (
+                    f"Teacher added successfully. A welcome email with login credentials "
+                    f"has been sent to {teacher.user.email}."
+                )
+            })
 
         else:
-            teachers    = TeacherProfile.objects.select_related('user', 'department').all()
-            departments = Department.objects.all().order_by('name')
-            return render(request, 'admin_dashboard/manage_teachers.html', {
-                'teachers':     teachers,
-                'search_query': '',
-                'departments':  departments,
-                'form':         form,
-            })
+            return JsonResponse({'success': False, 'errors': form.errors})
 
     return redirect('accounts:manage_teachers')
 
