@@ -105,4 +105,7 @@ urlpatterns = [
 
     path('profile/update/', views.update_profile, name='update_profile'),
     path('profile/change-password/', views.change_credentials, name='change_credentials'),
+
+    # ── AJAX helpers ─────────────────────────────────────────────────────────
+    path('ajax/subjects-by-dept/', views.get_subjects_by_department, name='get_subjects_by_department'),
 ]

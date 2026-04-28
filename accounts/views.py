@@ -389,15 +389,29 @@ def manage_teachers(request):
         )
 
     archived_teachers = TeacherProfile.objects.select_related('user', 'department').filter(is_archived=True)
-    departments = Department.objects.all().order_by('name')
+    departments = Department.objects.filter(is_archived=False).order_by('name')
     form = TeacherCreationForm()
 
+    # Prefetch subjects for each teacher (for display in table/edit modal)
+    teachers = teachers.prefetch_related('subjects')
+
+    # Build a JSON-safe dict of teacher_pk → [subjects] for the edit modal
+    import json
+    teacher_subjects_map = {}
+    for t in teachers:
+        teacher_subjects_map[str(t.pk)] = [
+            {'id': s.pk, 'code': s.code, 'name': s.name}
+            for s in t.subjects.all()
+        ]
+
     context = {
-        'teachers':          teachers,
-        'archived_teachers': archived_teachers,
-        'search_query':      search_query,
-        'departments':       departments,
-        'form':              form,
+        'teachers':             teachers,
+        'archived_teachers':    archived_teachers,
+        'search_query':         search_query,
+        'departments':          departments,
+        'form':                 form,
+        'teacher_subjects_json': json.dumps(teacher_subjects_map),
+        'ajax_subjects_url':    'accounts:get_subjects_by_department',
     }
     return render(request, 'admin_dashboard/manage_teachers.html', context)
 
@@ -433,6 +447,11 @@ def add_teacher(request):
                 })
 
             teacher = form.save()
+
+            # Assign subjects
+            subject_ids = request.POST.getlist('subjects[]')
+            if subject_ids:
+                teacher.subjects.set(Subject.objects.filter(pk__in=subject_ids))
 
             ActivityLog.objects.create(
                 activity_type='teacher_created',
@@ -507,6 +526,10 @@ def edit_teacher(request, pk):
                 teacher.user.set_password(plain_new_password)
 
             teacher.user.save()
+
+            # Update assigned subjects
+            subject_ids = request.POST.getlist('subjects[]')
+            teacher.subjects.set(Subject.objects.filter(pk__in=subject_ids))
 
             send_credentials_updated_email(
                 user         = teacher.user,
@@ -1245,11 +1268,27 @@ def subadmin_manage_teachers(request):
         department=department, is_archived=True
     )
 
+    teachers = teachers.prefetch_related('subjects')
+
+    import json
+    teacher_subjects_map = {}
+    for t in teachers:
+        teacher_subjects_map[str(t.pk)] = [
+            {'id': s.pk, 'code': s.code, 'name': s.name}
+            for s in t.subjects.all()
+        ]
+
+    dept_subjects = list(
+        Subject.objects.filter(departments=department, is_archived=False).order_by('code').values('id', 'code', 'name')
+    )
+
     context = {
-        'teachers':          teachers,
-        'archived_teachers': archived_teachers,
-        'search_query':      search_query,
-        'department':        department,
+        'teachers':             teachers,
+        'archived_teachers':    archived_teachers,
+        'search_query':         search_query,
+        'department':           department,
+        'teacher_subjects_json': json.dumps(teacher_subjects_map),
+        'dept_subjects_json':   json.dumps(dept_subjects),
     }
     return render(request, 'subadmin_dashboard/manage_teachers.html', context)
 
@@ -1283,6 +1322,11 @@ def subadmin_add_teacher(request):
                 })
 
             teacher = form.save()
+
+            # Assign subjects
+            subject_ids = request.POST.getlist('subjects[]')
+            if subject_ids:
+                teacher.subjects.set(Subject.objects.filter(pk__in=subject_ids))
 
             ActivityLog.objects.create(
                 activity_type='teacher_created',
@@ -1347,6 +1391,10 @@ def subadmin_edit_teacher(request, pk):
                 teacher.user.set_password(plain_new_password)
 
             teacher.user.save()
+
+            # Update assigned subjects
+            subject_ids = request.POST.getlist('subjects[]')
+            teacher.subjects.set(Subject.objects.filter(pk__in=subject_ids))
 
             send_credentials_updated_email(
                 user         = teacher.user,
@@ -1586,7 +1634,18 @@ def get_teacher_recent_activities(teacher):
 # ============================================================================
 
 @login_required
-@require_POST
+def get_subjects_by_department(request):
+    """AJAX: Return subjects belonging to a department (for dynamic subject picker)."""
+    dept_id = request.GET.get('department_id', '').strip()
+    if not dept_id:
+        return JsonResponse({'subjects': []})
+    subjects = Subject.objects.filter(
+        departments__id=dept_id, is_archived=False
+    ).order_by('code').values('id', 'code', 'name')
+    return JsonResponse({'subjects': list(subjects)})
+
+
+@login_required
 def mark_all_notifications_read(request):
     try:
         if request.user.is_staff:

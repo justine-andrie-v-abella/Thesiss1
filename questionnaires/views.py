@@ -1168,15 +1168,26 @@ def browse_questionnaires(request):
 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
 
-    # Use is_extracted + extraction_status instead of .exclude(file='')
-    # so session-saved questionnaires (file='') are also visible.
-    questionnaires = Questionnaire.objects.select_related(
-        'department', 'subject', 'uploader__user'
-    ).filter(
-        subject__departments=teacher.department,
-        is_extracted=True,
-        extraction_status='completed',
-    )
+    # Filter by assigned subjects; fall back to whole department if none assigned yet
+    assigned_subjects = teacher.subjects.all()
+    if assigned_subjects.exists():
+        questionnaires = Questionnaire.objects.select_related(
+            'department', 'subject', 'uploader__user'
+        ).filter(
+            subject__in=assigned_subjects,
+            is_extracted=True,
+            extraction_status='completed',
+            is_archived=False,
+        )
+    else:
+        questionnaires = Questionnaire.objects.select_related(
+            'department', 'subject', 'uploader__user'
+        ).filter(
+            subject__departments=teacher.department,
+            is_extracted=True,
+            extraction_status='completed',
+            is_archived=False,
+        )
 
     subject_id           = request.GET.get('subject', '')
     exam_type            = request.GET.get('exam_type', '')
@@ -1200,13 +1211,22 @@ def browse_questionnaires(request):
             Q(subject__code__icontains=search_query)
         )
 
-    subjects    = Subject.objects.filter(departments=teacher.department)
-    school_year_options = list(
-        Questionnaire.objects.filter(
-            subject__departments=teacher.department,
-            is_extracted=True, extraction_status='completed', school_year__gt=''
-        ).values_list('school_year', flat=True).distinct().order_by('-school_year')
-    )
+    if assigned_subjects.exists():
+        subjects = assigned_subjects.order_by('code')
+        school_year_options = list(
+            Questionnaire.objects.filter(
+                subject__in=assigned_subjects,
+                is_extracted=True, extraction_status='completed', is_archived=False, school_year__gt=''
+            ).values_list('school_year', flat=True).distinct().order_by('-school_year')
+        )
+    else:
+        subjects = Subject.objects.filter(departments=teacher.department)
+        school_year_options = list(
+            Questionnaire.objects.filter(
+                subject__departments=teacher.department,
+                is_extracted=True, extraction_status='completed', is_archived=False, school_year__gt=''
+            ).values_list('school_year', flat=True).distinct().order_by('-school_year')
+        )
     paginator   = Paginator(questionnaires, 12)
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)

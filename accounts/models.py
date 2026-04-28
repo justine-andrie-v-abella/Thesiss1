@@ -46,6 +46,7 @@ class Subject(models.Model):
 class TeacherProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='teacher_profile')
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, related_name='teachers')
+    subjects = models.ManyToManyField(Subject, blank=True, related_name='assigned_teachers')
     employee_id = models.CharField(max_length=50, unique=True)
     phone = models.CharField(max_length=20, blank=True)
     is_active = models.BooleanField(default=True)

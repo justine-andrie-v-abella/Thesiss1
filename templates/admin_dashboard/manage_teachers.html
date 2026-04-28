@@ -72,6 +72,7 @@
                             <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Name</th>
                             <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
                             <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Department</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Subjects</th>
                             <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
@@ -102,6 +103,15 @@
                                     <i class="bi bi-building mr-1"></i>
                                     {{ teacher.department.name }}
                                 </span>
+                            </td>
+                            <td class="px-4 py-4">
+                                <div class="flex flex-wrap gap-1">
+                                    {% for subj in teacher.subjects.all %}
+                                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 font-mono">{{ subj.code }}</span>
+                                    {% empty %}
+                                    <span class="text-xs text-gray-400 italic">None</span>
+                                    {% endfor %}
+                                </div>
                             </td>
                             <td class="px-4 py-4">
                                 <div class="flex items-center justify-center space-x-2">
@@ -323,9 +333,14 @@
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Department <span class="text-red-500">*</span></label>
-                        <div class="relative">
-                            {{ form.department }}
-                        </div>
+                        <select name="department" id="add_department"
+                                onchange="onAddDeptChange(this.value)"
+                                class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 transition-colors bg-white">
+                            <option value="">-- Select Department --</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept.pk }}">{{ dept.name }}</option>
+                            {% endfor %}
+                        </select>
                         {% if form.department.errors %}<p class="text-red-500 text-xs mt-1">{{ form.department.errors.0 }}</p>{% endif %}
                     </div>
                 </div>
@@ -335,6 +350,51 @@
                            class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 transition-colors"
                            placeholder="e.g., +1234567890">
                     {% if form.phone.errors %}<p class="text-red-500 text-xs mt-1">{{ form.phone.errors.0 }}</p>{% endif %}
+                </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- Subject Assignment -->
+            <div>
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                    <i class="bi bi-journal-bookmark text-green-500 mr-2"></i>Assigned Subjects
+                </h3>
+                <!-- Placeholder when no department is selected -->
+                <div id="add_no_dept_msg" class="flex items-center gap-2 text-sm text-gray-400 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl px-4 py-3">
+                    <i class="bi bi-arrow-up-circle text-gray-300 text-lg"></i>
+                    Select a department first to assign subjects
+                </div>
+                <!-- Subject picker (shown after dept selected) -->
+                <div id="add_subject_picker" class="hidden space-y-2">
+                    <!-- Dropdown trigger -->
+                    <div class="relative" id="add_subj_wrap">
+                        <button type="button" onclick="toggleSubjDropdown('add')"
+                                class="w-full flex items-center justify-between px-4 py-2.5 border-2 border-gray-200 rounded-xl bg-white text-sm hover:border-green-400 focus:outline-none focus:border-green-400 transition-colors">
+                            <span id="add_subj_trigger_text" class="text-gray-400">Select subjects…</span>
+                            <i class="bi bi-chevron-down text-gray-400 text-xs transition-transform duration-200" id="add_subj_chevron"></i>
+                        </button>
+                        <!-- Dropdown panel -->
+                        <div id="add_subj_dropdown" class="hidden absolute z-50 w-full bg-white border-2 border-gray-200 rounded-xl shadow-xl mt-1 overflow-hidden" onclick="event.stopPropagation()">
+                            <div class="p-2 border-b border-gray-100 bg-white sticky top-0">
+                                <div class="relative">
+                                    <i class="bi bi-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                    <input id="add_subj_search" type="text" placeholder="Search subjects…"
+                                           oninput="filterSubjectList('add')"
+                                           class="w-full pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-green-400 bg-gray-50">
+                                </div>
+                            </div>
+                            <div id="add_subj_list" class="overflow-y-auto max-h-48 divide-y divide-gray-100 text-sm"></div>
+                        </div>
+                    </div>
+                    <!-- Selected pills -->
+                    <div>
+                        <p class="text-xs text-gray-500 mb-1.5">Selected subjects:</p>
+                        <div id="add_selected_pills" class="flex flex-wrap gap-1.5 min-h-[28px]">
+                            <span id="add_none_pill" class="text-xs text-gray-400 italic">None selected</span>
+                        </div>
+                        <div id="add_hidden_inputs"></div>
+                    </div>
                 </div>
             </div>
 
@@ -460,6 +520,43 @@
                     <label class="block text-sm font-semibold text-gray-700 mb-1.5">Phone Number</label>
                     <input type="text" name="phone" id="edit_phone"
                            class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors">
+                </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- Subject Assignment (Edit) -->
+            <div>
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                    <i class="bi bi-journal-bookmark text-yellow-500 mr-2"></i>Assigned Subjects
+                </h3>
+                <!-- Dropdown trigger -->
+                <div class="relative" id="edit_subj_wrap">
+                    <button type="button" onclick="toggleSubjDropdown('edit')"
+                            class="w-full flex items-center justify-between px-4 py-2.5 border-2 border-gray-200 rounded-xl bg-white text-sm hover:border-yellow-400 focus:outline-none focus:border-yellow-400 transition-colors">
+                        <span id="edit_subj_trigger_text" class="text-gray-400">Select subjects…</span>
+                        <i class="bi bi-chevron-down text-gray-400 text-xs transition-transform duration-200" id="edit_subj_chevron"></i>
+                    </button>
+                    <!-- Dropdown panel -->
+                    <div id="edit_subj_dropdown" class="hidden absolute z-50 w-full bg-white border-2 border-gray-200 rounded-xl shadow-xl mt-1 overflow-hidden" onclick="event.stopPropagation()">
+                        <div class="p-2 border-b border-gray-100 bg-white sticky top-0">
+                            <div class="relative">
+                                <i class="bi bi-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                <input id="edit_subj_search" type="text" placeholder="Search subjects…"
+                                       oninput="filterSubjectList('edit')"
+                                       class="w-full pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-yellow-400 bg-gray-50">
+                            </div>
+                        </div>
+                        <div id="edit_subj_list" class="overflow-y-auto max-h-48 divide-y divide-gray-100 text-sm"></div>
+                    </div>
+                </div>
+                <!-- Selected pills -->
+                <div class="mt-2">
+                    <p class="text-xs text-gray-500 mb-1.5">Selected subjects:</p>
+                    <div id="edit_selected_pills" class="flex flex-wrap gap-1.5 min-h-[28px]">
+                        <span id="edit_none_pill" class="text-xs text-gray-400 italic">None selected</span>
+                    </div>
+                    <div id="edit_hidden_inputs"></div>
                 </div>
             </div>
 
@@ -686,21 +783,205 @@
         }, 200);
     }
 
-    function openAddModal() { openModal('addModal'); }
+    /* ── Subject picker ─────────────────────────────────────────── */
+    const SUBJECTS_AJAX_URL = "{% url 'accounts:get_subjects_by_department' %}";
+    const TEACHER_SUBJECTS  = {{ teacher_subjects_json|safe }};
+
+    const subjectState = { add: new Map(), edit: new Map() };
+    const allSubjects  = { add: [], edit: [] };
+
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* ── Dropdown open / close ───────────────────────────────────── */
+    function openSubjDropdown(prefix) {
+        document.getElementById(prefix + '_subj_dropdown').classList.remove('hidden');
+        document.getElementById(prefix + '_subj_chevron').style.transform = 'rotate(180deg)';
+        document.getElementById(prefix + '_subj_search').focus();
+    }
+
+    function closeSubjDropdown(prefix) {
+        document.getElementById(prefix + '_subj_dropdown').classList.add('hidden');
+        document.getElementById(prefix + '_subj_chevron').style.transform = '';
+    }
+
+    function toggleSubjDropdown(prefix) {
+        const dd = document.getElementById(prefix + '_subj_dropdown');
+        if (dd.classList.contains('hidden')) { openSubjDropdown(prefix); }
+        else { closeSubjDropdown(prefix); }
+    }
+
+    /* Click outside → close dropdown */
+    document.addEventListener('click', function(e) {
+        ['add', 'edit'].forEach(prefix => {
+            const wrap = document.getElementById(prefix + '_subj_wrap');
+            if (wrap && !wrap.contains(e.target)) {
+                closeSubjDropdown(prefix);
+            }
+        });
+    });
+
+    /* ── Fetch subjects for a department ────────────────────────── */
+    function loadSubjectsForPicker(prefix, deptId, preselected) {
+        allSubjects[prefix] = [];
+        subjectState[prefix] = new Map();
+        renderSubjectList(prefix);
+        renderPills(prefix);
+        updateTriggerText(prefix);
+
+        if (!deptId) return;
+
+        fetch(SUBJECTS_AJAX_URL + '?department_id=' + encodeURIComponent(deptId))
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(data => {
+                allSubjects[prefix] = data.subjects || [];
+                if (preselected) {
+                    preselected.forEach(s => {
+                        if (data.subjects.find(x => x.id == s.id)) {
+                            subjectState[prefix].set(s.id, s);
+                        }
+                    });
+                }
+                renderSubjectList(prefix);
+                renderPills(prefix);
+                updateTriggerText(prefix);
+            })
+            .catch(() => {
+                document.getElementById(prefix + '_subj_list').innerHTML =
+                    '<p class="text-xs text-red-400 px-4 py-3 italic">Could not load subjects. Please try again.</p>';
+            });
+
+        if (prefix === 'add') {
+            document.getElementById('add_no_dept_msg').classList.add('hidden');
+            document.getElementById('add_subject_picker').classList.remove('hidden');
+        }
+    }
+
+    /* ── Render dropdown list ────────────────────────────────────── */
+    function renderSubjectList(prefix) {
+        const search = (document.getElementById(prefix + '_subj_search')?.value || '').toLowerCase();
+        const listEl = document.getElementById(prefix + '_subj_list');
+        if (!listEl) return;
+        const items = allSubjects[prefix].filter(s =>
+            s.code.toLowerCase().includes(search) || s.name.toLowerCase().includes(search)
+        );
+
+        if (!allSubjects[prefix].length) {
+            listEl.innerHTML = '<p class="text-xs text-gray-400 px-4 py-3 italic">No subjects available for this department</p>';
+            return;
+        }
+        if (!items.length) {
+            listEl.innerHTML = '<p class="text-xs text-gray-400 px-4 py-3 italic">No subjects match your search</p>';
+            return;
+        }
+
+        listEl.innerHTML = items.map(s => {
+            const sel = subjectState[prefix].has(s.id);
+            return `<div class="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors ${sel ? 'bg-green-50' : ''}"
+                        onclick="toggleSubject('${prefix}',${s.id},'${escHtml(s.code)}','${escHtml(s.name)}')">
+                      <i class="bi ${sel ? 'bi-check-square-fill text-green-500' : 'bi-square text-gray-300'} text-base flex-shrink-0"></i>
+                      <span class="font-mono text-xs text-gray-500 flex-shrink-0">${escHtml(s.code)}</span>
+                      <span class="text-sm ${sel ? 'text-green-700 font-medium' : 'text-gray-700'} truncate">${escHtml(s.name)}</span>
+                    </div>`;
+        }).join('');
+    }
+
+    /* ── Toggle subject selected state ──────────────────────────── */
+    function toggleSubject(prefix, id, code, name) {
+        id = parseInt(id, 10);
+        if (subjectState[prefix].has(id)) {
+            subjectState[prefix].delete(id);
+        } else {
+            subjectState[prefix].set(id, { id, code, name });
+        }
+        renderSubjectList(prefix);
+        renderPills(prefix);
+        updateTriggerText(prefix);
+    }
+
+    /* ── Update the dropdown trigger button text ─────────────────── */
+    function updateTriggerText(prefix) {
+        const triggerEl = document.getElementById(prefix + '_subj_trigger_text');
+        if (!triggerEl) return;
+        const count = subjectState[prefix].size;
+        if (count === 0) {
+            triggerEl.textContent = 'Select subjects…';
+            triggerEl.className = 'text-gray-400 text-sm';
+        } else {
+            triggerEl.textContent = count === 1 ? '1 subject selected' : count + ' subjects selected';
+            triggerEl.className = 'text-gray-700 text-sm font-medium';
+        }
+    }
+
+    /* ── Render selected pills + hidden inputs ───────────────────── */
+    function renderPills(prefix) {
+        const pillsEl  = document.getElementById(prefix + '_selected_pills');
+        const hiddenEl = document.getElementById(prefix + '_hidden_inputs');
+        const noneEl   = document.getElementById(prefix + '_none_pill');
+        if (!pillsEl) return;
+        const entries = [...subjectState[prefix].values()];
+
+        noneEl.style.display = entries.length ? 'none' : '';
+        pillsEl.querySelectorAll('.subj-pill').forEach(el => el.remove());
+        hiddenEl.innerHTML = '';
+
+        entries.forEach(s => {
+            const pill = document.createElement('span');
+            pill.className = 'subj-pill inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800';
+            pill.innerHTML = `<span class="font-mono">${escHtml(s.code)}</span>
+                <button type="button" onclick="toggleSubject('${prefix}',${s.id},'${escHtml(s.code)}','${escHtml(s.name)}')" class="ml-0.5 text-green-600 hover:text-red-500 leading-none font-bold">×</button>`;
+            pillsEl.insertBefore(pill, noneEl);
+
+            const inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'subjects[]'; inp.value = s.id;
+            hiddenEl.appendChild(inp);
+        });
+    }
+
+    function filterSubjectList(prefix) { renderSubjectList(prefix); }
+
+    /* ── Add modal: dept change handler ─────────────────────────── */
+    function onAddDeptChange(deptId) {
+        closeSubjDropdown('add');
+        if (!deptId) {
+            document.getElementById('add_no_dept_msg').classList.remove('hidden');
+            document.getElementById('add_subject_picker').classList.add('hidden');
+            return;
+        }
+        loadSubjectsForPicker('add', deptId, null);
+    }
+
+    /* ── Reset add modal subject picker ─────────────────────────── */
+    function resetAddSubjectPicker() {
+        subjectState.add = new Map();
+        allSubjects.add = [];
+        closeSubjDropdown('add');
+        const search = document.getElementById('add_subj_search');
+        if (search) search.value = '';
+        document.getElementById('add_no_dept_msg').classList.remove('hidden');
+        document.getElementById('add_subject_picker').classList.add('hidden');
+        document.getElementById('add_department').value = '';
+        renderPills('add');
+        updateTriggerText('add');
+    }
+
+    function openAddModal() {
+        resetAddSubjectPicker();
+        openModal('addModal');
+    }
 
     function openEditModal(pk, firstName, lastName, email, employeeId, deptPk, phone, username) {
-        document.getElementById('edit_first_name').value  = firstName;
-        document.getElementById('edit_last_name').value   = lastName;
-        document.getElementById('edit_email').value       = email;
-        document.getElementById('edit_username').value    = username;
-        document.getElementById('edit_employee_id').value = employeeId;
-        document.getElementById('edit_phone').value       = phone;
+        document.getElementById('edit_first_name').value   = firstName;
+        document.getElementById('edit_last_name').value    = lastName;
+        document.getElementById('edit_email').value        = email;
+        document.getElementById('edit_username').value     = username;
+        document.getElementById('edit_employee_id').value  = employeeId;
+        document.getElementById('edit_phone').value        = phone;
         document.getElementById('edit_new_password').value = '';
 
         const deptSelect = document.getElementById('edit_department');
-        for (let opt of deptSelect.options) {
-            opt.selected = (opt.value == deptPk);
-        }
+        for (let opt of deptSelect.options) { opt.selected = (opt.value == deptPk); }
         const deptName = deptSelect.options[deptSelect.selectedIndex]?.text || '';
 
         const initials = (firstName[0] || '').toUpperCase() + (lastName[0] || '').toUpperCase();
@@ -709,8 +990,21 @@
         document.getElementById('editTeacherDept').textContent = employeeId + ' — ' + deptName;
         document.getElementById('editForm').action             = makeUrl(EDIT_URL_TEMPLATE, pk);
 
+        closeSubjDropdown('edit');
+        const search = document.getElementById('edit_subj_search');
+        if (search) search.value = '';
+        const preselected = TEACHER_SUBJECTS[pk] || [];
+        loadSubjectsForPicker('edit', deptPk, preselected);
+
         openModal('editModal');
     }
+
+    /* When edit dept changes, reload subjects keeping still-valid selections */
+    document.getElementById('edit_department').addEventListener('change', function() {
+        const preselected = [...subjectState.edit.values()];
+        closeSubjDropdown('edit');
+        loadSubjectsForPicker('edit', this.value, preselected);
+    });
 
     function openArchiveModal(pk, fullName, employeeId, email, deptName) {
         const parts    = fullName.trim().split(' ');

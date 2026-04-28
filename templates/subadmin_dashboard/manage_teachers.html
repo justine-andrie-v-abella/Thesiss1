@@ -86,6 +86,7 @@
                     <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Employee ID</th>
                     <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
                     <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Phone</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Subjects</th>
                     <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
@@ -111,6 +112,15 @@
                     </td>
                     <td class="px-6 py-4">
                         <span class="text-sm text-gray-600">{{ teacher.phone|default:"—" }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex flex-wrap gap-1 max-w-[180px]">
+                            {% for subj in teacher.subjects.all %}
+                            <span class="inline-block bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full" title="{{ subj.name }}">{{ subj.code }}</span>
+                            {% empty %}
+                            <span class="text-xs text-gray-400 italic">None</span>
+                            {% endfor %}
+                        </div>
                     </td>
                     <td class="px-6 py-4">
                         <div class="flex items-center justify-center space-x-2">
@@ -297,6 +307,43 @@
                 </div>
             </div>
 
+            <hr class="border-gray-200">
+
+            <!-- Subject Assignment (Add) -->
+            <div>
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                    <i class="bi bi-journal-bookmark text-green-500 mr-2"></i>Assigned Subjects
+                </h3>
+                <!-- Dropdown trigger -->
+                <div class="relative" id="add_subj_wrap">
+                    <button type="button" onclick="toggleSubjDropdown('add')"
+                            class="w-full flex items-center justify-between px-4 py-2.5 border-2 border-gray-200 rounded-xl bg-white text-sm hover:border-green-400 focus:outline-none focus:border-green-400 transition-colors">
+                        <span id="add_subj_trigger_text" class="text-gray-400">Select subjects…</span>
+                        <i class="bi bi-chevron-down text-gray-400 text-xs transition-transform duration-200" id="add_subj_chevron"></i>
+                    </button>
+                    <!-- Dropdown panel -->
+                    <div id="add_subj_dropdown" class="hidden absolute z-50 w-full bg-white border-2 border-gray-200 rounded-xl shadow-xl mt-1 overflow-hidden" onclick="event.stopPropagation()">
+                        <div class="p-2 border-b border-gray-100 bg-white sticky top-0">
+                            <div class="relative">
+                                <i class="bi bi-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                <input id="add_subj_search" type="text" placeholder="Search subjects…"
+                                       oninput="filterSubjectList('add')"
+                                       class="w-full pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-green-400 bg-gray-50">
+                            </div>
+                        </div>
+                        <div id="add_subj_list" class="overflow-y-auto max-h-48 divide-y divide-gray-100 text-sm"></div>
+                    </div>
+                </div>
+                <!-- Selected pills -->
+                <div class="mt-2">
+                    <p class="text-xs text-gray-500 mb-1.5">Selected subjects:</p>
+                    <div id="add_selected_pills" class="flex flex-wrap gap-1.5 min-h-[28px]">
+                        <span id="add_none_pill" class="text-xs text-gray-400 italic">None selected</span>
+                    </div>
+                    <div id="add_hidden_inputs"></div>
+                </div>
+            </div>
+
             <div class="flex items-center justify-end space-x-4 pt-2 border-t border-gray-200">
                 <button type="button" onclick="closeAllModals()"
                         class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium">
@@ -437,7 +484,43 @@
                         <span class="text-xs text-gray-400">(locked)</span>
                     </div>
                 </div>
+            </div>
 
+            <hr class="border-gray-200">
+
+            <!-- Subject Assignment (Edit) -->
+            <div>
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                    <i class="bi bi-journal-bookmark text-blue-500 mr-2"></i>Assigned Subjects
+                </h3>
+                <!-- Dropdown trigger -->
+                <div class="relative" id="edit_subj_wrap">
+                    <button type="button" onclick="toggleSubjDropdown('edit')"
+                            class="w-full flex items-center justify-between px-4 py-2.5 border-2 border-gray-200 rounded-xl bg-white text-sm hover:border-blue-400 focus:outline-none focus:border-blue-400 transition-colors">
+                        <span id="edit_subj_trigger_text" class="text-gray-400">Select subjects…</span>
+                        <i class="bi bi-chevron-down text-gray-400 text-xs transition-transform duration-200" id="edit_subj_chevron"></i>
+                    </button>
+                    <!-- Dropdown panel -->
+                    <div id="edit_subj_dropdown" class="hidden absolute z-50 w-full bg-white border-2 border-gray-200 rounded-xl shadow-xl mt-1 overflow-hidden" onclick="event.stopPropagation()">
+                        <div class="p-2 border-b border-gray-100 bg-white sticky top-0">
+                            <div class="relative">
+                                <i class="bi bi-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                <input id="edit_subj_search" type="text" placeholder="Search subjects…"
+                                       oninput="filterSubjectList('edit')"
+                                       class="w-full pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-400 bg-gray-50">
+                            </div>
+                        </div>
+                        <div id="edit_subj_list" class="overflow-y-auto max-h-48 divide-y divide-gray-100 text-sm"></div>
+                    </div>
+                </div>
+                <!-- Selected pills -->
+                <div class="mt-2">
+                    <p class="text-xs text-gray-500 mb-1.5">Selected subjects:</p>
+                    <div id="edit_selected_pills" class="flex flex-wrap gap-1.5 min-h-[28px]">
+                        <span id="edit_none_pill" class="text-xs text-gray-400 italic">None selected</span>
+                    </div>
+                    <div id="edit_hidden_inputs"></div>
+                </div>
             </div>
 
             <div class="flex items-center justify-end space-x-4 pt-2 border-t border-gray-200">
@@ -616,6 +699,123 @@
     const PERM_DELETE_URL_TEMPLATE = "{% url 'accounts:subadmin_permanent_delete_teacher' pk=0 %}";
     const MODAL_IDS = ['addModal', 'editModal', 'archiveModal', 'archivedModal'];
 
+    // ── Subject picker ────────────────────────────────────────────────────────
+    const TEACHER_SUBJECTS = {{ teacher_subjects_json|safe }};
+    const DEPT_SUBJECTS    = {{ dept_subjects_json|safe }};
+    const subjectState = { add: new Map(), edit: new Map() };
+    const allSubjects  = { add: [], edit: [] };
+
+    function escHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* ── Dropdown open / close ─────────────────────────────────────── */
+    function openSubjDropdown(prefix) {
+        document.getElementById(prefix + '_subj_dropdown').classList.remove('hidden');
+        document.getElementById(prefix + '_subj_chevron').style.transform = 'rotate(180deg)';
+        document.getElementById(prefix + '_subj_search').focus();
+    }
+
+    function closeSubjDropdown(prefix) {
+        document.getElementById(prefix + '_subj_dropdown').classList.add('hidden');
+        document.getElementById(prefix + '_subj_chevron').style.transform = '';
+    }
+
+    function toggleSubjDropdown(prefix) {
+        const dd = document.getElementById(prefix + '_subj_dropdown');
+        if (dd.classList.contains('hidden')) { openSubjDropdown(prefix); }
+        else { closeSubjDropdown(prefix); }
+    }
+
+    /* Click outside → close dropdown */
+    document.addEventListener('click', function(e) {
+        ['add', 'edit'].forEach(prefix => {
+            const wrap = document.getElementById(prefix + '_subj_wrap');
+            if (wrap && !wrap.contains(e.target)) {
+                closeSubjDropdown(prefix);
+            }
+        });
+    });
+
+    /* ── Render dropdown list ──────────────────────────────────────── */
+    function renderSubjectList(prefix) {
+        const query = (document.getElementById(`${prefix}_subj_search`)?.value || '').toLowerCase();
+        const el = document.getElementById(`${prefix}_subj_list`);
+        if (!el) return;
+        const items = allSubjects[prefix].filter(s =>
+            s.code.toLowerCase().includes(query) || s.name.toLowerCase().includes(query)
+        );
+
+        if (!allSubjects[prefix].length) {
+            el.innerHTML = '<p class="text-xs text-gray-400 px-4 py-3 italic">No subjects available</p>';
+            return;
+        }
+        if (!items.length) {
+            el.innerHTML = '<p class="text-xs text-gray-400 px-4 py-3 italic">No subjects match your search</p>';
+            return;
+        }
+
+        el.innerHTML = items.map(s => {
+            const sel = subjectState[prefix].has(s.id);
+            return `<div onclick="toggleSubject('${prefix}',${s.id},'${escHtml(s.code)}','${escHtml(s.name)}')"
+                        class="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors ${sel ? 'bg-green-50' : ''}">
+                      <i class="bi ${sel ? 'bi-check-square-fill text-green-500' : 'bi-square text-gray-300'} text-base flex-shrink-0"></i>
+                      <span class="font-mono text-xs text-gray-500 flex-shrink-0">${escHtml(s.code)}</span>
+                      <span class="text-sm ${sel ? 'text-green-700 font-medium' : 'text-gray-700'} truncate">${escHtml(s.name)}</span>
+                    </div>`;
+        }).join('');
+    }
+
+    function toggleSubject(prefix, id, code, name) {
+        id = parseInt(id, 10);
+        if (subjectState[prefix].has(id)) {
+            subjectState[prefix].delete(id);
+        } else {
+            subjectState[prefix].set(id, { id, code, name });
+        }
+        renderSubjectList(prefix);
+        renderPills(prefix);
+        updateTriggerText(prefix);
+    }
+
+    function updateTriggerText(prefix) {
+        const el = document.getElementById(prefix + '_subj_trigger_text');
+        if (!el) return;
+        const count = subjectState[prefix].size;
+        if (count === 0) {
+            el.textContent = 'Select subjects…';
+            el.className = 'text-gray-400 text-sm';
+        } else {
+            el.textContent = count === 1 ? '1 subject selected' : count + ' subjects selected';
+            el.className = 'text-gray-700 text-sm font-medium';
+        }
+    }
+
+    function renderPills(prefix) {
+        const pills  = document.getElementById(`${prefix}_selected_pills`);
+        const hidden = document.getElementById(`${prefix}_hidden_inputs`);
+        const none   = document.getElementById(`${prefix}_none_pill`);
+        if (!pills) return;
+        const selected = [...subjectState[prefix].values()];
+
+        if (none) none.style.display = selected.length ? 'none' : '';
+        pills.querySelectorAll('.subj-pill').forEach(p => p.remove());
+        hidden.innerHTML = '';
+
+        selected.forEach(s => {
+            const span = document.createElement('span');
+            span.className = 'subj-pill inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-1 rounded-full';
+            span.innerHTML = `<span class="font-mono">${escHtml(s.code)}</span>
+                <button type="button" onclick="toggleSubject('${prefix}',${s.id},'${escHtml(s.code)}','${escHtml(s.name)}')" class="ml-0.5 text-green-600 hover:text-red-500 font-bold leading-none">×</button>`;
+            pills.insertBefore(span, none);
+            const inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'subjects[]'; inp.value = s.id;
+            hidden.appendChild(inp);
+        });
+    }
+
+    function filterSubjectList(prefix) { renderSubjectList(prefix); }
+
     function makeUrl(template, pk) {
         return template.replace('/0/', '/' + pk + '/');
     }
@@ -727,6 +927,15 @@
     function openAddModal() {
         clearFormErrors('add');
         document.getElementById('addForm').reset();
+        // Subject picker — dept is locked so use pre-loaded subjects
+        subjectState.add = new Map();
+        allSubjects.add = DEPT_SUBJECTS;
+        closeSubjDropdown('add');
+        const addSearch = document.getElementById('add_subj_search');
+        if (addSearch) addSearch.value = '';
+        renderSubjectList('add');
+        renderPills('add');
+        updateTriggerText('add');
         openModal('addModal');
     }
 
@@ -745,6 +954,23 @@
         document.getElementById('editTeacherName').textContent = firstName + ' ' + lastName;
         document.getElementById('editTeacherMeta').textContent = employeeId + ' — {{ department.name }}';
         document.getElementById('editForm').action             = makeUrl(EDIT_URL_TEMPLATE, pk);
+
+        // Subject picker — load dept subjects, pre-select teacher's assigned subjects
+        closeSubjDropdown('edit');
+        const editSearch = document.getElementById('edit_subj_search');
+        if (editSearch) editSearch.value = '';
+        allSubjects.edit = DEPT_SUBJECTS;
+        subjectState.edit = new Map();
+        const preselected = TEACHER_SUBJECTS[pk] || [];
+        preselected.forEach(s => {
+            if (DEPT_SUBJECTS.find(x => x.id === s.id)) {
+                subjectState.edit.set(s.id, s);
+            }
+        });
+        renderSubjectList('edit');
+        renderPills('edit');
+        updateTriggerText('edit');
+
         openModal('editModal');
     }
 
