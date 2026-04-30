@@ -8,7 +8,7 @@
 
 <!-- Filter Card -->
 <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
-    <form method="get" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+    <form method="get" id="filterForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <div>
             <label class="block text-sm font-semibold text-gray-700 mb-2">
                 <i class="bi bi-book text-purple-500 mr-1"></i> Subject
@@ -75,13 +75,78 @@
                 class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 transition-colors">
         </div>
         <div class="flex items-end">
-            <button type="submit"
+            <button type="submit" id="filterSubmitBtn"
                 class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-2.5 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg flex items-center justify-center">
                 <i class="bi bi-funnel text-lg mr-2"></i> Filter
             </button>
         </div>
     </form>
 </div>
+
+<script>
+(function () {
+    var form = document.getElementById('filterForm');
+    var btn  = document.getElementById('filterSubmitBtn');
+    var btnHTML = btn ? btn.innerHTML : '';
+    if (!form) return;
+
+    function ajaxFilter(qs) {
+        var container = document.getElementById('results-container');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Filtering…';
+        }
+        if (container) { container.style.opacity = '0.4'; container.style.pointerEvents = 'none'; }
+        fetch(window.location.pathname + '?' + qs, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                if (container) { container.innerHTML = html; container.style.opacity = ''; container.style.pointerEvents = ''; }
+                history.pushState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+                if (btn) { btn.disabled = false; btn.innerHTML = btnHTML; }
+                if (window.initBrowseCards) window.initBrowseCards();
+                if (window.initDocPreviewBtns) window.initDocPreviewBtns();
+            })
+            .catch(function () {
+                if (container) { container.style.opacity = ''; container.style.pointerEvents = ''; }
+                if (btn) { btn.disabled = false; btn.innerHTML = btnHTML; }
+            });
+    }
+
+    function submitFilter() {
+        ajaxFilter(new URLSearchParams(new FormData(form)).toString());
+    }
+
+    form.querySelectorAll('select').forEach(function (sel) {
+        sel.addEventListener('change', submitFilter);
+    });
+    var searchInput = form.querySelector('input[name="search"]');
+    var debounceTimer;
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(submitFilter, 500);
+        });
+    }
+
+    /* Intercept all links inside the results container (chips, pagination, reset) */
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest('#results-container a');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || href === '#') return;
+        e.preventDefault();
+        var qs = href.indexOf('?') !== -1 ? href.slice(href.indexOf('?') + 1) : '';
+        /* Sync filter form selects with the chip/pagination link params */
+        var params = new URLSearchParams(qs);
+        form.querySelectorAll('select[name]').forEach(function (sel) {
+            sel.value = params.get(sel.name) || '';
+        });
+        var si = form.querySelector('input[name="search"]');
+        if (si) si.value = params.get('search') || '';
+        ajaxFilter(qs);
+    });
+})();
+</script>
 
 <!-- Workspace mini banner -->
 <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg p-4 mb-6 flex items-center gap-4">
@@ -102,256 +167,10 @@
     </a>
 </div>
 
-<!-- Active filter chips -->
-{% if exam_type or selected_subject or search_query or selected_semester or selected_school_year %}
-<div class="flex flex-wrap items-center gap-2 mb-4">
-    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Active filters:</span>
-    {% if exam_type %}
-    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-white
-        {% if exam_type == 'final' %}bg-red-600
-        {% elif exam_type == 'midterm' %}bg-orange-500
-        {% elif exam_type == 'prelim' %}bg-amber-500
-        {% elif exam_type == 'semi_final' %}bg-yellow-500
-        {% else %}bg-purple-600
-        {% endif %}">
-        <i class="bi bi-tag-fill"></i>
-        {% for val, label in exam_type_choices %}{% if val == exam_type %}{{ label }}{% endif %}{% endfor %}
-        <a href="?{% if selected_subject %}subject={{ selected_subject }}&{% endif %}{% if search_query %}search={{ search_query }}{% endif %}"
-           class="ml-1 hover:opacity-75">
-            <i class="bi bi-x-lg text-xs"></i>
-        </a>
-    </span>
-    {% endif %}
-    {% if selected_subject %}
-    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">
-        <i class="bi bi-book"></i>
-        {% for sub in subjects %}{% if sub.id|stringformat:"s" == selected_subject %}{{ sub.code }}{% endif %}{% endfor %}
-        <a href="?{% if exam_type %}exam_type={{ exam_type }}&{% endif %}{% if search_query %}search={{ search_query }}{% endif %}"
-           class="ml-1 hover:opacity-75">
-            <i class="bi bi-x-lg text-xs"></i>
-        </a>
-    </span>
-    {% endif %}
-    {% if search_query %}
-    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">
-        <i class="bi bi-search"></i> "{{ search_query }}"
-        <a href="?{% if selected_subject %}subject={{ selected_subject }}&{% endif %}{% if exam_type %}exam_type={{ exam_type }}&{% endif %}{% if selected_semester %}semester={{ selected_semester }}&{% endif %}{% if selected_school_year %}school_year={{ selected_school_year }}{% endif %}"
-           class="ml-1 hover:opacity-75">
-            <i class="bi bi-x-lg text-xs"></i>
-        </a>
-    </span>
-    {% endif %}
-    {% if selected_school_year %}
-    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-teal-600 text-white">
-        <i class="bi bi-calendar2-check"></i> {{ selected_school_year }}
-        <a href="?{% if selected_subject %}subject={{ selected_subject }}&{% endif %}{% if exam_type %}exam_type={{ exam_type }}&{% endif %}{% if selected_semester %}semester={{ selected_semester }}&{% endif %}{% if search_query %}search={{ search_query }}{% endif %}"
-           class="ml-1 hover:opacity-75"><i class="bi bi-x-lg text-xs"></i></a>
-    </span>
-    {% endif %}
-    {% if selected_semester %}
-    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-600 text-white">
-        <i class="bi bi-calendar3"></i>
-        {% for val, label in semester_choices %}{% if val == selected_semester %}{{ label }}{% endif %}{% endfor %}
-        <a href="?{% if selected_subject %}subject={{ selected_subject }}&{% endif %}{% if exam_type %}exam_type={{ exam_type }}&{% endif %}{% if selected_school_year %}school_year={{ selected_school_year }}&{% endif %}{% if search_query %}search={{ search_query }}{% endif %}"
-           class="ml-1 hover:opacity-75"><i class="bi bi-x-lg text-xs"></i></a>
-    </span>
-    {% endif %}
-    <a href="{% url 'questionnaires:browse_questionnaires' %}"
-       class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors">
-        <i class="bi bi-x-circle"></i> Clear all
-    </a>
+<!-- Results Container (swapped by AJAX filter) -->
+<div id="results-container">
+{% include 'teacher_dashboard/browse_questionnaires_partial.html' %}
 </div>
-{% endif %}
-
-<!-- Questionnaires Grid -->
-{% if page_obj %}
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-    {% for quest in page_obj %}
-    <div class="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1">
-
-        <!-- Card Header — color-coded by exam type -->
-        <div class="
-            {% if quest.exam_type == 'final' %}bg-gradient-to-r from-red-600 to-rose-700
-            {% elif quest.exam_type == 'midterm' %}bg-gradient-to-r from-orange-500 to-red-600
-            {% elif quest.exam_type == 'prelim' %}bg-gradient-to-r from-amber-500 to-orange-600
-            {% elif quest.exam_type == 'semi_final' %}bg-gradient-to-r from-yellow-500 to-amber-600
-            {% else %}bg-gradient-to-r from-purple-500 to-pink-600
-            {% endif %}
-            px-5 py-4 rounded-t-xl">
-
-            <h3 class="text-white font-bold text-lg line-clamp-2">{{ quest.title }}</h3>
-
-            <div class="flex flex-wrap gap-1.5 mt-2">
-                {% if quest.is_extracted %}
-                <span class="inline-flex items-center px-3 py-1 bg-white/20 text-white text-xs font-semibold rounded-full">
-                    <i class="bi bi-check-circle mr-1"></i> {{ quest.extracted_questions.count }} Questions Available
-                </span>
-                {% endif %}
-
-                {% if quest.exam_type %}
-                <span class="inline-flex items-center px-3 py-1 text-white text-xs font-semibold rounded-full
-                    {% if quest.exam_type == 'final' %}bg-red-800/40
-                    {% elif quest.exam_type == 'midterm' %}bg-red-700/40
-                    {% elif quest.exam_type == 'prelim' %}bg-orange-700/40
-                    {% elif quest.exam_type == 'prefinal' %}bg-amber-700/40
-                    {% elif quest.exam_type == 'long_quiz' %}bg-blue-800/40
-                    {% elif quest.exam_type == 'short_quiz' %}bg-cyan-700/40
-                    {% elif quest.exam_type == 'activity' %}bg-green-700/40
-                    {% else %}bg-white/20
-                    {% endif %}">
-                    <i class="bi bi-tag-fill mr-1"></i> {{ quest.get_exam_type_display }}
-                </span>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Card Body -->
-        <div class="p-5">
-            <p class="text-gray-600 text-sm mb-4 line-clamp-3">
-                {{ quest.description|default:"No description provided"|truncatewords:20 }}
-            </p>
-            <div class="space-y-2.5">
-                <div class="flex items-center text-sm">
-                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                        <i class="bi bi-building text-blue-600"></i>
-                    </div>
-                    <div>
-                        <span class="text-gray-500 text-xs">Department</span>
-                        <p class="font-semibold text-gray-800">{{ quest.department.code }}</p>
-                    </div>
-                </div>
-                <div class="flex items-center text-sm">
-                    <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
-                        <i class="bi bi-book text-purple-600"></i>
-                    </div>
-                    <div>
-                        <span class="text-gray-500 text-xs">Subject</span>
-                        <p class="font-semibold text-gray-800">{{ quest.subject.code }}</p>
-                    </div>
-                </div>
-                <div class="flex items-center text-sm">
-                    <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                        <i class="bi bi-person text-green-600"></i>
-                    </div>
-                    <div>
-                        <span class="text-gray-500 text-xs">Uploaded by</span>
-                        <p class="font-semibold text-gray-800">{{ quest.uploader.user.get_full_name }}</p>
-                    </div>
-                </div>
-                <div class="flex items-center justify-between text-sm pt-2 border-t border-gray-200">
-                    <div class="flex items-center">
-                        <i class="bi bi-file-earmark text-orange-500 mr-2"></i>
-                        <span class="text-gray-600">{{ quest.file_type|upper }}</span>
-                    </div>
-                    <span class="text-gray-600">{{ quest.get_file_size_display }}</span>
-                </div>
-                {% if quest.school_year or quest.semester %}
-                <div class="flex flex-wrap gap-1.5 pt-1">
-                    {% if quest.school_year %}
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-800">
-                        <i class="bi bi-calendar2-check mr-1"></i> {{ quest.school_year }}
-                    </span>
-                    {% endif %}
-                    {% if quest.semester %}
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                        <i class="bi bi-calendar3 mr-1"></i> {{ quest.get_semester_display }}
-                    </span>
-                    {% endif %}
-                </div>
-                {% endif %}
-                <div class="flex items-center text-sm">
-                    <i class="bi bi-calendar text-gray-400 mr-2"></i>
-                    <span class="text-gray-600">{{ quest.uploaded_at|date:"M d, Y" }}</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card Footer -->
-        <div class="bg-gray-50 px-5 py-4 rounded-b-xl space-y-2">
-            <button type="button"
-                data-quest-id="{{ quest.pk }}"
-                data-file-type="{{ quest.file_type|upper }}"
-                data-is-extracted="{{ quest.is_extracted|yesno:'true,false' }}"
-                data-url-original="{% url 'questionnaires:download_questionnaire' quest.pk %}?type=original"
-                data-url-docx="{% url 'questionnaires:download_questionnaire' quest.pk %}?type=generated&format=docx"
-                data-url-pdf="{% url 'questionnaires:download_questionnaire' quest.pk %}?type=generated&format=pdf"
-                class="download-btn w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all flex items-center justify-center shadow-lg">
-                <i class="bi bi-download mr-2"></i> Download
-                <i class="bi bi-chevron-down ml-auto"></i>
-            </button>
-
-            {% if quest.is_extracted %}
-            <div class="grid grid-cols-2 gap-2">
-                <button type="button"
-                    data-quest-id="{{ quest.pk }}"
-                    data-quest-title="{{ quest.title|escapejs }}"
-                    data-quest-subject="{{ quest.subject.code|escapejs }} — {{ quest.subject.name|escapejs }}"
-                    data-quest-exam-type-display="{{ quest.get_exam_type_display|escapejs }}"
-                    class="doc-preview-btn bg-gradient-to-r from-teal-500 to-cyan-600
-                           hover:from-teal-600 hover:to-cyan-700 text-white font-semibold py-2 px-3
-                           rounded-lg transition-all flex items-center justify-center text-sm shadow">
-                    <i class="bi bi-file-earmark-text mr-1.5"></i> Preview
-                </button>
-                <button type="button"
-                    data-quest-id="{{ quest.pk }}"
-                    data-quest-title="{{ quest.title }}"
-                    data-quest-subject-code="{{ quest.subject.code }}"
-                    data-quest-subject-name="{{ quest.subject.name }}"
-                    class="review-btn bg-gradient-to-r from-indigo-500 to-purple-600
-                           hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-2 px-3
-                           rounded-lg transition-all flex items-center justify-center text-sm shadow">
-                    <i class="bi bi-folder-plus mr-1.5"></i> Save
-                </button>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endfor %}
-</div>
-
-{% else %}
-<div class="bg-white rounded-xl shadow-lg p-16 text-center">
-    <div class="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-        <i class="bi bi-inbox text-6xl text-gray-400"></i>
-    </div>
-    <h3 class="text-2xl font-bold text-gray-700 mb-3">No Questionnaires Found</h3>
-    <p class="text-gray-500 mb-6">Try adjusting your filters or search query</p>
-    <a href="{% url 'questionnaires:browse_questionnaires' %}"
-        class="inline-flex items-center px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors">
-        <i class="bi bi-arrow-clockwise mr-2"></i> Reset Filters
-    </a>
-</div>
-{% endif %}
-
-<!-- Pagination -->
-{% if page_obj.has_other_pages %}
-<div class="flex justify-center mt-2">
-    <nav class="flex items-center space-x-2">
-        {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if exam_type %}&exam_type={{ exam_type }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
-                class="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors font-semibold text-gray-700">
-                <i class="bi bi-chevron-left"></i> Previous
-            </a>
-        {% endif %}
-        {% for num in page_obj.paginator.page_range %}
-            {% if page_obj.number == num %}
-                <span class="px-4 py-2 bg-blue-500 text-white font-bold rounded-lg">{{ num }}</span>
-            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                <a href="?page={{ num }}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if exam_type %}&exam_type={{ exam_type }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
-                    class="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors font-semibold text-gray-700">
-                    {{ num }}
-                </a>
-            {% endif %}
-        {% endfor %}
-        {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if selected_subject and selected_subject != 'None' %}&subject={{ selected_subject }}{% endif %}{% if exam_type %}&exam_type={{ exam_type }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}"
-                class="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors font-semibold text-gray-700">
-                Next <i class="bi bi-chevron-right"></i>
-            </a>
-        {% endif %}
-    </nav>
-</div>
-{% endif %}
 
 <!-- Download Dropdown Portal -->
 <div id="download-dropdown-portal"
@@ -670,9 +489,13 @@ function openDropdown(btn) {
     activeBtn = btn;
 }
 function closeDropdown() { portal.style.display='none'; portal.innerHTML=''; activeBtn=null; }
-document.querySelectorAll('.download-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) { e.stopPropagation(); activeBtn===btn ? closeDropdown() : openDropdown(btn); });
-});
+function initBrowseCards() {
+    document.querySelectorAll('.download-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) { e.stopPropagation(); activeBtn===btn ? closeDropdown() : openDropdown(btn); });
+    });
+}
+window.initBrowseCards = initBrowseCards;
+initBrowseCards();
 document.addEventListener('click', function(e){ if (!portal.contains(e.target)) closeDropdown(); });
 window.addEventListener('scroll', closeDropdown, true);
 window.addEventListener('resize', closeDropdown);
@@ -689,21 +512,29 @@ var currentQuestId   = null;
 var currentSubjectCode = null;
 var currentSubjectName = null;
 
-document.querySelectorAll('.review-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        currentQuestId     = btn.getAttribute('data-quest-id');
-        currentSubjectCode = btn.getAttribute('data-quest-subject-code');
-        currentSubjectName = btn.getAttribute('data-quest-subject-name');
-        document.getElementById('modalTitle').textContent = btn.getAttribute('data-quest-title');
-        document.getElementById('modalDownloadDocx').href     = '/questionnaires/' + currentQuestId + '/download/?type=generated&format=docx';
-        document.getElementById('modalDownloadPdf').href      = '/questionnaires/' + currentQuestId + '/download/?type=generated&format=pdf';
-        document.getElementById('modalDownloadOriginal').href = '/questionnaires/' + currentQuestId + '/download/?type=original';
-        reviewModal.classList.remove('hidden');
-        reviewModal.classList.add('flex');
-        document.body.style.overflow = 'hidden';
-        loadQuestions(currentQuestId);
+function initReviewBtns() {
+    document.querySelectorAll('.review-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            currentQuestId     = btn.getAttribute('data-quest-id');
+            currentSubjectCode = btn.getAttribute('data-quest-subject-code');
+            currentSubjectName = btn.getAttribute('data-quest-subject-name');
+            document.getElementById('modalTitle').textContent = btn.getAttribute('data-quest-title');
+            document.getElementById('modalDownloadDocx').href     = '/questionnaires/' + currentQuestId + '/download/?type=generated&format=docx';
+            document.getElementById('modalDownloadPdf').href      = '/questionnaires/' + currentQuestId + '/download/?type=generated&format=pdf';
+            document.getElementById('modalDownloadOriginal').href = '/questionnaires/' + currentQuestId + '/download/?type=original';
+            reviewModal.classList.remove('hidden');
+            reviewModal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+            loadQuestions(currentQuestId);
+        });
     });
-});
+}
+/* merge initBrowseCards to also init review buttons */
+(function() {
+    var _origInit = window.initBrowseCards;
+    window.initBrowseCards = function() { _origInit(); initReviewBtns(); };
+})();
+initReviewBtns();
 
 function closeReviewModal() {
     reviewModal.classList.add('hidden');
@@ -1152,28 +983,32 @@ var DP_ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX','X'];
 
 function dpEsc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-document.querySelectorAll('.doc-preview-btn').forEach(function(btn){
-    btn.addEventListener('click',function(){
-        var qid=btn.getAttribute('data-quest-id');
-        var title=btn.getAttribute('data-quest-title')||'';
-        var subject=btn.getAttribute('data-quest-subject')||'';
-        var examType=btn.getAttribute('data-quest-exam-type-display')||'';
-        document.getElementById('dpTitle').textContent=title||'Document Preview';
-        document.getElementById('dpSubtitle').textContent=subject+(examType?' \u2014 '+examType:'');
-        dpPaper.innerHTML='<div style="text-align:center;padding:48px 0;color:#9CA3AF;"><div style="width:36px;height:36px;border:4px solid #E0E7FF;border-top-color:#6366F1;border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite;"></div><p style="font-size:13px;font-family:Arial,sans-serif;">Building document preview...</p></div>';
-        dpOverlay.classList.add('dp-open');
-        document.body.style.overflow='hidden';
-        fetch('/questionnaires/get-questions/'+qid+'/')
-            .then(function(r){return r.json();})
-            .then(function(data){
-                if(data.error)throw new Error(data.error);
-                renderDP(data,title,subject,examType);
-            })
-            .catch(function(err){
-                dpPaper.innerHTML='<div style="text-align:center;padding:48px 0;color:#EF4444;"><i class="bi bi-exclamation-circle" style="font-size:32px;display:block;margin-bottom:12px;"></i><p style="font-size:14px;font-weight:600;font-family:Arial,sans-serif;">Failed to load questions.</p><p style="font-size:12px;color:#9CA3AF;margin-top:4px;font-family:Arial,sans-serif;">'+(err.message?dpEsc(err.message):'')+'</p></div>';
-            });
+function initDocPreviewBtns(){
+    document.querySelectorAll('.doc-preview-btn').forEach(function(btn){
+        btn.addEventListener('click',function(){
+            var qid=btn.getAttribute('data-quest-id');
+            var title=btn.getAttribute('data-quest-title')||'';
+            var subject=btn.getAttribute('data-quest-subject')||'';
+            var examType=btn.getAttribute('data-quest-exam-type-display')||'';
+            document.getElementById('dpTitle').textContent=title||'Document Preview';
+            document.getElementById('dpSubtitle').textContent=subject+(examType?' \u2014 '+examType:'');
+            dpPaper.innerHTML='<div style="text-align:center;padding:48px 0;color:#9CA3AF;"><div style="width:36px;height:36px;border:4px solid #E0E7FF;border-top-color:#6366F1;border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite;"></div><p style="font-size:13px;font-family:Arial,sans-serif;">Building document preview...</p></div>';
+            dpOverlay.classList.add('dp-open');
+            document.body.style.overflow='hidden';
+            fetch('/questionnaires/get-questions/'+qid+'/')
+                .then(function(r){return r.json();})
+                .then(function(data){
+                    if(data.error)throw new Error(data.error);
+                    renderDP(data,title,subject,examType);
+                })
+                .catch(function(err){
+                    dpPaper.innerHTML='<div style="text-align:center;padding:48px 0;color:#EF4444;"><i class="bi bi-exclamation-circle" style="font-size:32px;display:block;margin-bottom:12px;"></i><p style="font-size:14px;font-weight:600;font-family:Arial,sans-serif;">Failed to load questions.</p><p style="font-size:12px;color:#9CA3AF;margin-top:4px;font-family:Arial,sans-serif;">'+(err.message?dpEsc(err.message):'')+'</p></div>';
+                });
+        });
     });
-});
+}
+window.initDocPreviewBtns=initDocPreviewBtns;
+initDocPreviewBtns();
 
 function closeDocPreview(){dpOverlay.classList.remove('dp-open');document.body.style.overflow='';dpPaper.innerHTML='';}
 window.closeDocPreview=closeDocPreview;

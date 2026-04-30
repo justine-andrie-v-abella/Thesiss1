@@ -1244,7 +1244,7 @@ def browse_questionnaires(request):
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)
 
-    return render(request, 'teacher_dashboard/browse_questionnaires.html', {
+    ctx = {
         'page_obj':            page_obj,
         'subjects':            subjects,
         'selected_subject':    subject_id,
@@ -1255,7 +1255,10 @@ def browse_questionnaires(request):
         'selected_semester':   selected_semester,
         'selected_school_year': selected_school_year,
         'school_year_options': school_year_options,
-    })
+    }
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'teacher_dashboard/browse_questionnaires_partial.html', ctx)
+    return render(request, 'teacher_dashboard/browse_questionnaires.html', ctx)
 
 
 # ============================================================================
@@ -1311,7 +1314,7 @@ def all_questionnaires(request):
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)
 
-    return render(request, 'admin_dashboard/all_questionnaires.html', {
+    ctx = {
         'page_obj':               page_obj,
         'departments':            departments,
         'subjects':               subjects,
@@ -1325,7 +1328,10 @@ def all_questionnaires(request):
         'selected_school_year':   selected_school_year,
         'school_year_options':    school_year_options,
         'archived_questionnaires': archived_questionnaires,
-    })
+    }
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'admin_dashboard/all_questionnaires_partial.html', ctx)
+    return render(request, 'admin_dashboard/all_questionnaires.html', ctx)
 
 
 # ============================================================================

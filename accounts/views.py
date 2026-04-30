@@ -1934,6 +1934,8 @@ def subadmin_browse_questionnaires(request):
         'selected_school_year': selected_school_year,
         'school_year_options': school_year_options,
     }
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'subadmin_dashboard/browse_questionnaires_partial.html', context)
     return render(request, 'subadmin_dashboard/browse_questionnaires.html', context)
 
 
