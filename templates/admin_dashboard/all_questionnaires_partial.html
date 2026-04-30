@@ -144,12 +144,6 @@
             {% endif %}
 
             <button type="button"
-                onclick="openEditModal('{{ quest.pk }}','{{ quest.title|escapejs }}','{{ quest.description|default:''|escapejs }}','{{ quest.exam_type }}','{{ quest.department.name|escapejs }}','{{ quest.subject.code|escapejs }}','{{ quest.file_type|upper }}','{{ quest.get_file_size_display|escapejs }}','{{ quest.uploaded_at|date:"M d, Y" }}')"
-                class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-lg transition-all" title="Edit">
-                <i class="bi bi-pencil-square"></i>
-            </button>
-
-            <button type="button"
                 onclick="openArchiveModal('{{ quest.pk }}','{{ quest.title|escapejs }}','{{ quest.department.name|escapejs }}','{{ quest.subject.code|escapejs }} - {{ quest.subject.name|escapejs }}','{{ quest.file_type|upper }}','{{ quest.get_file_size_display|escapejs }}','{{ quest.uploaded_at|date:"M d, Y" }}')"
                 class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-3 rounded-lg transition-all" title="Archive">
                 <i class="bi bi-archive-fill"></i>
