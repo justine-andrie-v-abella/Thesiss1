@@ -16,8 +16,6 @@
     </button>
 </div>
 
-<div class="max-w-7xl mx-auto">
-
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
@@ -118,7 +116,12 @@
                             <td class="px-4 py-4">
                                 <div class="flex flex-wrap gap-1">
                                     {% for subj in teacher.subjects.all %}
-                                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 font-mono">{{ subj.code }}</span>
+                                        {% if forloop.counter <= 3 %}
+                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 font-mono" title="{{ subj.name }}">{{ subj.code }}</span>
+                                        {% elif forloop.counter == 4 %}
+                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-600 cursor-default"
+                                              title="{% for s in teacher.subjects.all %}{% if forloop.counter > 3 %}{{ s.code }}{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}">+{{ teacher.subjects.count|add:"-3" }} more</span>
+                                        {% endif %}
                                     {% empty %}
                                     <span class="text-xs text-gray-400 italic">None</span>
                                     {% endfor %}
@@ -251,7 +254,6 @@
         </div>
     </div>
     {% endif %}
-</div>
 
 
 <!-- ===================== MODAL BACKDROP ===================== -->
