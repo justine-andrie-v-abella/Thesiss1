@@ -29,12 +29,14 @@ FILE: templates/teacher_dashboard/edit_questionnaire.html
                             <i class="bi bi-card-heading text-yellow-500 mr-1"></i>
                             Title *
                         </label>
-                        <input 
-                            type="text" 
-                            name="title" 
+                        <input
+                            type="text"
+                            name="title"
+                            id="editTitle"
                             value="{{ form.title.value }}"
                             class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-yellow-500 transition-colors"
                             required
+                            oninput="checkEditBtn()"
                         >
                         {% if form.title.errors %}
                             <p class="text-red-500 text-sm mt-1">{{ form.title.errors.0 }}</p>
@@ -70,9 +72,11 @@ FILE: templates/teacher_dashboard/edit_questionnaire.html
 
                     <!-- Buttons -->
                     <div class="flex space-x-3 pt-4">
-                        <button 
-                            type="submit" 
-                            class="flex-1 bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-bold py-3 px-6 rounded-lg hover:from-yellow-600 hover:to-orange-700 transition-all transform hover:scale-105 shadow-lg"
+                        <button
+                            type="submit"
+                            id="editSubmitBtn"
+                            disabled
+                            class="flex-1 bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-bold py-3 px-6 rounded-lg hover:from-yellow-600 hover:to-orange-700 transition-all shadow-lg opacity-50 cursor-not-allowed"
                         >
                             <i class="bi bi-check-circle mr-2"></i> Update Questionnaire
                         </button>
@@ -153,4 +157,34 @@ FILE: templates/teacher_dashboard/edit_questionnaire.html
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    function checkEditBtn() {
+        var btn   = document.getElementById('editSubmitBtn');
+        var title = document.getElementById('editTitle');
+        if (!btn || !title) return;
+        var ok = title.value.trim() !== '';
+        btn.disabled = !ok;
+        btn.classList.toggle('opacity-50',        !ok);
+        btn.classList.toggle('cursor-not-allowed', !ok);
+    }
+    window.checkEditBtn = checkEditBtn;
+
+    /* Loading state on submit */
+    var form = document.querySelector('form');
+    var btn  = document.getElementById('editSubmitBtn');
+    if (form && btn) {
+        form.addEventListener('submit', function () {
+            btn.disabled = true;
+            btn.classList.remove('opacity-50');
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Saving…';
+        });
+    }
+
+    /* Run on load — enables the button if title is already filled from DB */
+    checkEditBtn();
+})();
+</script>
 {% endblock %}

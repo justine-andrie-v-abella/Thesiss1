@@ -419,7 +419,7 @@
 
         <!-- Buttons -->
         <div class="flex gap-3 pt-2">
-          <button type="submit" class="btn-generate flex-1" id="gen-btn">
+          <button type="submit" class="btn-generate flex-1" id="gen-btn" disabled>
             <div class="btn-shimmer"></div>
             <i class="bi bi-stars text-lg"></i>
             <span id="gen-btn-label">Generate Questions with AI</span>
@@ -516,6 +516,26 @@
     }
   });
 
+  /* ── Button validation ── */
+  function checkGenBtn() {
+    var btn   = document.getElementById('gen-btn');
+    if (!btn) return;
+    var title = document.getElementById('id_title');
+    var dept  = document.getElementById('id_department');
+    var subj  = document.getElementById('id_subject');
+    var term  = document.getElementById('id_exam_type');
+    var file  = document.getElementById('id_file');
+    var types = document.querySelectorAll('input[name="question_types"]:checked');
+    var ok =
+      (title && title.value.trim() !== '') &&
+      (!dept  || dept.value  !== '') &&
+      (subj  && subj.value  !== '') &&
+      (term  && term.value  !== '') &&
+      (file  && file.files  && file.files.length > 0) &&
+      (types.length > 0);
+    btn.disabled = !ok;
+  }
+
   /* ── Department → Subject AJAX ── */
   var deptSel = document.getElementById('id_department');
   var subjSel = document.getElementById('id_subject');
@@ -523,7 +543,9 @@
     deptSel.addEventListener('change', function () {
       var deptId = this.value;
       subjSel.innerHTML = '<option value="">Loading…</option>';
-      if (!deptId) { subjSel.innerHTML = '<option value="">Select Subject</option>'; return; }
+      subjSel.value = '';
+      checkGenBtn();
+      if (!deptId) { subjSel.innerHTML = '<option value="">Select Subject</option>'; checkGenBtn(); return; }
       fetch('/questionnaires/get-subjects/?department=' + deptId)
         .then(function(r){ return r.json(); })
         .then(function(data){
@@ -534,10 +556,25 @@
             o.textContent = s.code + ' — ' + s.name;
             subjSel.appendChild(o);
           });
+          checkGenBtn();
         })
-        .catch(function(){ subjSel.innerHTML = '<option value="">Error loading subjects</option>'; });
+        .catch(function(){ subjSel.innerHTML = '<option value="">Error loading subjects</option>'; checkGenBtn(); });
     });
   }
+
+  /* Wire subject, term change → checkGenBtn */
+  if (subjSel) subjSel.addEventListener('change', checkGenBtn);
+  var termSel = document.getElementById('id_exam_type');
+  if (termSel) termSel.addEventListener('change', checkGenBtn);
+
+  /* Wire title → checkGenBtn */
+  var titleInput = document.getElementById('id_title');
+  if (titleInput) titleInput.addEventListener('input', checkGenBtn);
+
+  /* Wire question_type checkboxes → checkGenBtn */
+  document.querySelectorAll('input[name="question_types"]').forEach(function(cb) {
+    cb.addEventListener('change', checkGenBtn);
+  });
 
   /* ── File Upload UX ── */
   var fileInput = document.getElementById('id_file');
@@ -554,7 +591,7 @@
     sub.textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
   }
   if (fileInput) {
-    fileInput.addEventListener('change', function(){ updateFileDisplay(this.files[0]); });
+    fileInput.addEventListener('change', function(){ updateFileDisplay(this.files[0]); checkGenBtn(); });
   }
   if (zone) {
     zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('dragover'); });
@@ -564,6 +601,7 @@
       if (e.dataTransfer.files[0]) {
         fileInput.files = e.dataTransfer.files;
         updateFileDisplay(e.dataTransfer.files[0]);
+        checkGenBtn();
       }
     });
   }
@@ -618,6 +656,9 @@
       }
     });
   }
+
+  /* ── Initial button state ── */
+  checkGenBtn();
 
   /* ── Guidelines Modal ── */
   var modal     = document.getElementById('guidelinesModal');

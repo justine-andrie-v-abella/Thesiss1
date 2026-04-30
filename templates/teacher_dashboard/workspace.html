@@ -289,10 +289,10 @@
             <button id="folderModalCancel"
                 class="px-5 py-2.5 border-2 border-gray-200 text-gray-600 font-semibold
                        rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
-            <button id="folderModalOk"
+            <button id="folderModalOk" disabled
                 class="px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white
                        font-bold rounded-xl hover:from-indigo-600 hover:to-purple-700
-                       transition-all shadow flex items-center gap-2">
+                       transition-all shadow flex items-center gap-2 opacity-50 cursor-not-allowed">
                 <i class="bi bi-check-lg"></i>
                 <span id="folderModalOkLabel">Create</span>
             </button>
@@ -876,6 +876,29 @@ var folderNameInput  = document.getElementById('folderNameInput');
 var folderModalMode  = 'create';
 var folderModalTarget= null;
 
+var folderModalOkBtn = document.getElementById('folderModalOk');
+
+function checkFolderBtn() {
+    var ok = folderNameInput.value.trim() !== '';
+    folderModalOkBtn.disabled = !ok;
+    folderModalOkBtn.classList.toggle('opacity-50',        !ok);
+    folderModalOkBtn.classList.toggle('cursor-not-allowed', !ok);
+}
+
+function setFolderBtnLoading() {
+    folderModalOkBtn._html = folderModalOkBtn.innerHTML;
+    folderModalOkBtn.disabled = true;
+    folderModalOkBtn.classList.remove('opacity-50');
+    folderModalOkBtn.classList.add('opacity-75', 'cursor-not-allowed');
+    folderModalOkBtn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-1 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Processing…';
+}
+
+function resetFolderBtn() {
+    if (folderModalOkBtn._html) folderModalOkBtn.innerHTML = folderModalOkBtn._html;
+    folderModalOkBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+    checkFolderBtn();
+}
+
 function showFolderModal(mode, fid) {
     folderModalMode=mode; folderModalTarget=fid||null;
     if (mode==='rename') {
@@ -888,20 +911,26 @@ function showFolderModal(mode, fid) {
         document.getElementById('folderModalOkLabel').textContent='Create';
         folderNameInput.value='';
     }
+    checkFolderBtn();
     folderModal.classList.remove('hidden'); folderModal.classList.add('flex');
     setTimeout(function(){folderNameInput.focus();folderNameInput.select();},80);
 }
 function closeFolderModal(){ folderModal.classList.add('hidden'); folderModal.classList.remove('flex'); }
 
+/* Re-validate on every keystroke */
+folderNameInput.addEventListener('input', checkFolderBtn);
+
 document.getElementById('folderModalCancel').addEventListener('click',closeFolderModal);
-document.getElementById('folderModalOk').addEventListener('click',function(){
+folderModalOkBtn.addEventListener('click',function(){
     var name=folderNameInput.value.trim();
     if(!name){showToast('Please enter a folder name.','warning');folderNameInput.focus();return;}
+
+    setFolderBtnLoading();
 
     if (folderModalMode==='create') {
         postJSON(API.createFolder(),{name:name})
             .then(function(data){
-                if (data.error){showToast(data.error,'error');return;}
+                if (data.error){resetFolderBtn();showToast(data.error,'error');return;}
                 /* add to local state */
                 state.folders.unshift({id:data.id,name:data.name,created_at:new Date().toISOString(),questions:[]});
                 closeFolderModal();
@@ -909,11 +938,11 @@ document.getElementById('folderModalOk').addEventListener('click',function(){
                 refreshSidebarBadge();
                 showToast('Folder "'+data.name+'" created!','success');
             })
-            .catch(function(){showToast('Failed to create folder.','error');});
+            .catch(function(){resetFolderBtn();showToast('Failed to create folder.','error');});
     } else {
         postJSON(API.renameFolder(folderModalTarget),{name:name})
             .then(function(data){
-                if (data.error){showToast(data.error,'error');return;}
+                if (data.error){resetFolderBtn();showToast(data.error,'error');return;}
                 var f=state.folders.find(function(x){return String(x.id)===String(folderModalTarget);});
                 if(f) f.name=data.name;
                 closeFolderModal();
@@ -924,11 +953,11 @@ document.getElementById('folderModalOk').addEventListener('click',function(){
                 renderOverview();
                 showToast('Folder renamed.','success');
             })
-            .catch(function(){showToast('Failed to rename folder.','error');});
+            .catch(function(){resetFolderBtn();showToast('Failed to rename folder.','error');});
     }
 });
 folderNameInput.addEventListener('keydown',function(e){
-    if(e.key==='Enter') document.getElementById('folderModalOk').click();
+    if(e.key==='Enter' && !folderModalOkBtn.disabled) folderModalOkBtn.click();
     if(e.key==='Escape') closeFolderModal();
 });
 document.getElementById('btn-new-folder').addEventListener('click',function(){showFolderModal('create');});
