@@ -188,6 +188,14 @@
             <!-- Action Buttons -->
             <div class="flex items-center space-x-2">
                 {% if quest.is_extracted %}
+                <!-- Preview questions — opens modal -->
+                <button type="button"
+                    class="preview-btn bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg transition-all"
+                    title="Preview Questions"
+                    data-pk="{{ quest.pk }}"
+                    data-title="{{ quest.title|escapejs }}">
+                    <i class="bi bi-eye"></i>
+                </button>
                 <a href="{% url 'questionnaires:review_extracted_pk' quest.pk %}"
                     class="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
                     <i class="bi bi-list-check mr-1"></i> Review
@@ -639,6 +647,43 @@
 </div>
 
 
+<!-- ═══════════════════════════════════════════════════════════════
+     PREVIEW QUESTIONS MODAL
+════════════════════════════════════════════════════════════════ -->
+<div id="previewModal" style="display:none;"
+    class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-modal">
+
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-4 flex items-center justify-between rounded-t-xl flex-shrink-0">
+            <div class="min-w-0">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="bi bi-eye text-xl"></i>
+                    <span id="previewModalTitle" class="truncate"></span>
+                </h3>
+                <p id="previewModalCount" class="text-blue-100 text-xs mt-0.5"></p>
+            </div>
+            <button type="button" onclick="closePreviewModal()"
+                class="w-9 h-9 flex-shrink-0 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors ml-3">
+                <i class="bi bi-x-lg text-xl"></i>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div id="previewModalBody" class="overflow-y-auto flex-1 p-5 space-y-3">
+            <!-- filled by JS -->
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end flex-shrink-0 rounded-b-xl bg-gray-50">
+            <button type="button" onclick="closePreviewModal()"
+                class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-100 transition-colors">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
 <style>
 .line-clamp-2 {
     display: -webkit-box;
@@ -796,10 +841,110 @@
     document.getElementById('archivedModal').addEventListener('click', function (e) {
         if (e.target === this) closeArchivedModal();
     });
+    document.getElementById('previewModal').addEventListener('click', function (e) {
+        if (e.target === this) closePreviewModal();
+    });
 
     /* ── Close on Escape ── */
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') { closeEditModal(); closeArchiveModal(); closeArchivedModal(); closePermDeleteModal(); }
+        if (e.key === 'Escape') { closeEditModal(); closeArchiveModal(); closeArchivedModal(); closePermDeleteModal(); closePreviewModal(); }
+    });
+
+    /* ══════════════════════════════════════════
+       PREVIEW QUESTIONS MODAL
+    ══════════════════════════════════════════ */
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function renderQuestions(questions) {
+        if (!questions || !questions.length) {
+            return '<div class="text-center py-10 text-gray-400"><i class="bi bi-inbox text-4xl"></i><p class="mt-2">No questions found.</p></div>';
+        }
+        var letters = ['A','B','C','D'];
+        var html = '';
+        questions.forEach(function (q, idx) {
+            var diffColor = q.difficulty === 'easy'
+                ? 'border-green-400'
+                : q.difficulty === 'hard' ? 'border-red-400' : 'border-yellow-400';
+            var diffBadge = q.difficulty === 'easy'
+                ? 'bg-green-100 text-green-800'
+                : q.difficulty === 'hard' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800';
+
+            html += '<div class="bg-white rounded-lg border-l-4 ' + diffColor + ' shadow-sm p-4">' +
+                '<div class="flex flex-wrap gap-2 mb-2">' +
+                '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">' + esc(q.type_display || q.type) + '</span>' +
+                '<span class="px-2 py-0.5 ' + diffBadge + ' text-xs font-semibold rounded-full">' + esc(q.difficulty || 'medium') + '</span>' +
+                '<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">' + (q.points || 1) + ' pt</span>' +
+                '</div>' +
+                '<p class="text-gray-800 font-medium text-sm mb-3"><span class="text-gray-400 mr-1">' + (idx + 1) + '.</span>' + esc(q.question_text) + '</p>';
+
+            /* Multiple choice options */
+            if (q.type === 'multiple_choice' && q.options) {
+                html += '<div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-2">';
+                q.options.forEach(function (opt, i) {
+                    var letter = letters[i];
+                    var isCorrect = q.correct_answer && q.correct_answer.toUpperCase() === letter;
+                    html += '<div class="flex items-center gap-2 px-3 py-1.5 rounded text-xs ' +
+                        (isCorrect ? 'bg-green-50 border border-green-400 font-semibold text-green-800' : 'bg-gray-50 text-gray-700') + '">' +
+                        '<span class="font-bold">' + letter + '.</span>' + esc(opt || '') +
+                        (isCorrect ? ' <i class="bi bi-check-circle-fill text-green-600 ml-auto"></i>' : '') +
+                        '</div>';
+                });
+                html += '</div>';
+            } else if (q.correct_answer) {
+                html += '<div class="bg-green-50 border-l-4 border-green-400 px-3 py-2 rounded text-xs">' +
+                    '<span class="text-gray-500">Answer: </span>' +
+                    '<span class="text-green-800 font-semibold">' + esc(q.correct_answer) + '</span></div>';
+            } else {
+                html += '<div class="bg-amber-50 border-l-4 border-amber-400 px-3 py-2 rounded text-xs flex items-center gap-1">' +
+                    '<i class="bi bi-exclamation-triangle text-amber-500"></i>' +
+                    '<span class="text-amber-700">No answer recorded.</span></div>';
+            }
+
+            if (q.explanation) {
+                html += '<div class="mt-2 px-3 py-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300">' +
+                    '<i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>' + esc(q.explanation) + '</div>';
+            }
+
+            html += '</div>';
+        });
+        return html;
+    }
+
+    window.openPreviewModal = function (pk, title) {
+        var modal = document.getElementById('previewModal');
+        var body  = document.getElementById('previewModalBody');
+        document.getElementById('previewModalTitle').textContent = title;
+        document.getElementById('previewModalCount').textContent = '';
+        body.innerHTML = '<div class="flex items-center justify-center py-16 text-gray-400">' +
+            '<i class="bi bi-arrow-repeat animate-spin text-3xl mr-3"></i><span>Loading questions…</span></div>';
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        fetch('/questionnaires/get-questions/' + pk + '/')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var questions = data.questions || [];
+                document.getElementById('previewModalCount').textContent =
+                    questions.length + ' question' + (questions.length !== 1 ? 's' : '');
+                body.innerHTML = renderQuestions(questions);
+            })
+            .catch(function () {
+                body.innerHTML = '<div class="text-center py-10 text-red-400"><i class="bi bi-exclamation-triangle text-4xl"></i><p class="mt-2">Failed to load questions.</p></div>';
+            });
+    };
+
+    window.closePreviewModal = function () {
+        document.getElementById('previewModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    };
+
+    /* Bind preview buttons */
+    document.querySelectorAll('.preview-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            openPreviewModal(this.dataset.pk, this.dataset.title);
+        });
     });
 
     /* ══════════════════════════════════════════
