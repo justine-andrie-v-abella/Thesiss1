@@ -873,6 +873,12 @@ var ALL_DEPARTMENTS = [
             card.style.display = show ? '' : 'none';
         });
 
+        /* Show the Departments column only when viewing all departments */
+        var showDeptCol = (deptCode === 'all');
+        document.querySelectorAll('.dept-col').forEach(function (el) {
+            el.style.display = showDeptCol ? '' : 'none';
+        });
+
         document.getElementById('visibleCount').textContent = visible;
         var e1 = document.getElementById('emptyState');
         var e2 = document.getElementById('emptyStateMobile');
