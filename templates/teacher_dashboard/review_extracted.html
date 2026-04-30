@@ -309,10 +309,17 @@
                                 {% endfor %}
                             </div>
                             {% else %}
+                            {% if question.correct_answer %}
                             <div class="bg-green-50 border-l-4 border-green-400 p-3 rounded text-sm">
                                 <span class="text-gray-500 font-medium">Answer: </span>
                                 <span class="text-green-800 font-semibold">{{ question.correct_answer }}</span>
                             </div>
+                            {% else %}
+                            <div class="bg-amber-50 border-l-4 border-amber-400 p-3 rounded text-sm flex items-center gap-2">
+                                <i class="bi bi-exclamation-triangle text-amber-500 flex-shrink-0"></i>
+                                <span class="text-amber-700 text-xs">No answer found in the document — you can edit this manually after saving.</span>
+                            </div>
+                            {% endif %}
                             {% endif %}
 
                             {% if question.explanation %}

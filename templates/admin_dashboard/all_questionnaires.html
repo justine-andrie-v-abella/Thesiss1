@@ -667,6 +667,12 @@ function renderQuestions(questions) {
                     '<span class="text-gray-500">Answer: </span>' +
                     '<span class="text-green-800 font-semibold">' + esc(q.correct_answer) + '</span>' +
                 '</div>';
+        } else {
+            html +=
+                '<div class="bg-amber-50 border-l-4 border-amber-400 p-2 rounded text-xs mt-1 flex items-center gap-1">' +
+                    '<i class="bi bi-exclamation-triangle text-amber-500"></i>' +
+                    '<span class="text-amber-700">No answer found in the document.</span>' +
+                '</div>';
         }
 
         if (q.explanation) {

@@ -29,7 +29,7 @@ class AIQuestionExtractor:
     Supports: PDF, DOCX, TXT, XLSX, XLS
     """
 
-    CLAUDE_MODEL = 'claude-3-haiku-20240307'
+    CLAUDE_MODEL = 'claude-haiku-4-5'
 
     def __init__(self):
         api_key = getattr(settings, 'ANTHROPIC_API_KEY', None)
@@ -122,26 +122,51 @@ class AIQuestionExtractor:
         return '\n\n'.join(text)
 
     def _read_docx(self, file_path: str) -> str:
+        _WNS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+
+        def _list_number(block, counters):
+            """Return the auto-generated list counter for this paragraph, or None."""
+            pPr = block.find(f'{{{_WNS}}}pPr')
+            if pPr is None:
+                return None
+            numPr = pPr.find(f'{{{_WNS}}}numPr')
+            if numPr is None:
+                return None
+            numId_el = numPr.find(f'{{{_WNS}}}numId')
+            ilvl_el  = numPr.find(f'{{{_WNS}}}ilvl')
+            if numId_el is None or ilvl_el is None:
+                return None
+            num_id = numId_el.get(f'{{{_WNS}}}val', '0')
+            ilvl   = ilvl_el.get(f'{{{_WNS}}}val', '0')
+            if num_id == '0':
+                return None
+            key = (num_id, ilvl)
+            counters[key] = counters.get(key, 0) + 1
+            return counters[key]
+
         try:
             doc = Document(file_path)
             text = []
+            list_counters = {}
             # Read paragraphs AND table cells so no content is missed
             # (answer keys are sometimes placed inside tables in Word documents)
             for block in doc.element.body:
                 tag = block.tag.split('}')[-1] if '}' in block.tag else block.tag
                 if tag == 'p':
-                    # Plain paragraph
                     para_text = ''.join(
                         node.text for node in block.iter()
                         if node.tag.endswith('}t') and node.text
                     ).strip()
                     if para_text:
+                        num = _list_number(block, list_counters)
+                        if num is not None:
+                            para_text = f"{num}. {para_text}"
                         text.append(para_text)
                 elif tag == 'tbl':
                     # Table — read every cell row by row
-                    for row in block.iter('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tr'):
+                    for row in block.iter(f'{{{_WNS}}}tr'):
                         row_cells = []
-                        for cell in row.iter('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tc'):
+                        for cell in row.iter(f'{{{_WNS}}}tc'):
                             cell_text = ''.join(
                                 node.text for node in cell.iter()
                                 if node.tag.endswith('}t') and node.text
@@ -196,7 +221,9 @@ class AIQuestionExtractor:
                 max_tokens=8096,
                 temperature=temperature,
                 system=(
-                    "You are a precise document scanner that extracts exam questions. "
+                    "You are a document scanner that copies text exactly as written. "
+                    "You extract questions and copy answers verbatim from the answer key — "
+                    "you do NOT judge, evaluate, or skip any answer no matter what it says. "
                     "You always respond with valid JSON only — no explanation, no markdown."
                 ),
                 messages=[
@@ -233,39 +260,64 @@ class AIQuestionExtractor:
             f"- {type_descriptions.get(t, t)}" for t in type_names
         ])
 
-        prompt = f"""You are scanning a test questionnaire document. Do exactly two things: extract every question, and find the correct answer for each one.
+        prompt = f"""You are scanning a test questionnaire document. Your job is to:
+  1. Extract every question exactly as written.
+  2. Copy the answer for each question VERBATIM from the answer key — exactly as written, no judgment.
 
 QUESTION TYPES TO FIND:
 {types_list}
 
-RULES FOR EXTRACTING QUESTIONS:
+════════════════════════════════════════
+STEP 1 — LOCATE THE ANSWER KEY FIRST
+════════════════════════════════════════
+Before extracting questions, scan the ENTIRE document for an answer key section.
+It can appear anywhere — beginning, middle, or end — and may be labeled:
+  "Answer Key", "ANSWER KEY", "Answers", "Key", "Answer Sheet",
+  or just a numbered/lettered list after the questions.
+
+For each section (e.g. Part I, Part II, Section A, Section B), record the answers
+IN ORDER with their numbers so you can match them to questions by position.
+
+Example answer key formats you might see:
+  • "1. Subset   2. True   3. Cartesian Product"
+  • "Part I: 1. Haha   2. Hehe   3. Something"
+  • "Part II: 1-A  2-C  3-B  4-D"
+  • A plain list: "Haha / Hehe / Shader" (match by position: 1st item = question 1)
+
+════════════════════════════════════════
+STEP 2 — EXTRACT QUESTIONS
+════════════════════════════════════════
 - Copy every question text EXACTLY word for word — do NOT rephrase or invent anything.
 - Do NOT treat answer key entries as questions.
+- Number questions by position within their section (restart at 1 for each Part/Section).
 - If no questions are found at all, return [].
 
-RULES FOR FINDING ANSWERS:
-1. First, look for an answer key section anywhere in the document (usually at the end).
-   It may be labeled: "Answer Key", "ANSWER KEY", "Key", "Answers", or similar.
+════════════════════════════════════════
+STEP 3 — COPY ANSWERS VERBATIM
+════════════════════════════════════════
+CRITICAL RULE: Copy whatever text the answer key says for each question.
+Do NOT evaluate whether the answer is correct. Do NOT skip an answer because it
+seems wrong, unusual, or doesn't match the question topic.
+The answer key is the authority — copy it exactly, always.
 
-2. The answer key often restarts numbering per section. For example:
-     "Part I: 1. Subset   2. V   3. Cartesian Product ..."
-     "Part II: 1. C   2. A   3. B ..."
-   Here "Part II: 1. C" is the answer for the FIRST question under the Part II heading
-   in the document body, NOT for question number 1 overall.
-   Match answers by counting position within each section.
-
-3. If the answer is a letter (A/B/C/D), store only that letter in uppercase.
-   If the answer is text, store it exactly as written.
-   For True/False, store "True" or "False".
-
-4. If an answer is written inline next to a question (e.g. "Answer: X"), use that.
-
-5. If no answer can be found for a question anywhere in the document, use "".
+Matching rules:
+  • Answer key numbering RESTARTS per section:
+      Body "Part I: Q1, Q2, Q3..." → matched to Key "Part I: 1., 2., 3...."
+      Body "Part II: Q1, Q2..."    → matched to Key "Part II: 1., 2...."
+  • If the answer key has no numbers (plain list), match by position:
+      1st answer item → 1st question in that section
+      2nd answer item → 2nd question in that section, etc.
+  • Multiple choice → store only the letter: "A", "B", "C", or "D" (uppercase)
+  • All other types → copy the answer text EXACTLY as written in the answer key
+  • If truly no answer key entry exists for a question anywhere, use ""
 
 TEXT TO SCAN:
 {content}
 
-OUTPUT: Return ONLY a valid JSON array — no extra text, no markdown, no code fences.
+════════════════════════════════════════
+OUTPUT FORMAT
+════════════════════════════════════════
+Return ONLY a valid JSON array — no extra text, no markdown, no code fences.
 Each element must have these fields:
   "type"        - one of {type_names}
   "question"    - exact question text copied from the document
@@ -273,8 +325,8 @@ Each element must have these fields:
   "option_b"    - (multiple choice only, otherwise omit)
   "option_c"    - (multiple choice only, otherwise omit)
   "option_d"    - (multiple choice only, otherwise omit)
-  "answer"      - correct answer matched from the answer key, or ""
-  "explanation" - any explanation text found, or ""
+  "answer"      - answer text copied verbatim from the answer key, or ""
+  "explanation" - any explanation text found in the document, or ""
   "difficulty"  - "easy", "medium", or "hard"
   "points"      - point value if shown, otherwise 1
 
