@@ -748,10 +748,17 @@
                     <i class="bi bi-check-circle mr-2" id="saveBtnIcon"></i>
                     <span id="saveBtnText">Save Questions</span>
                 </button>
+                {% if from_my_uploads %}
+                <a href="{% url 'questionnaires:my_uploads' %}"
+                    class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center flex items-center justify-center">
+                    <i class="bi bi-arrow-left mr-2"></i> Back to My Uploads
+                </a>
+                {% else %}
                 <a href="{% url 'questionnaires:cancel_pending' %}"
                     class="flex-1 bg-gray-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-600 transition-all text-center flex items-center justify-center">
                     <i class="bi bi-x-circle mr-2"></i> Cancel &amp; Discard
                 </a>
+                {% endif %}
             </div>
         </div>
         {% endif %}

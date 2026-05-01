@@ -492,6 +492,7 @@ def review_extracted_questions(request):
                         'questions':      extracted_questions,
                         'question_types': question_types,
                         'source':         source,
+                        'from_my_uploads': False,
                     })
 
                 # Update title if changed
@@ -585,6 +586,7 @@ def review_extracted_questions(request):
             'questions':      extracted_questions,
             'question_types': question_types,
             'source':         source,
+            'from_my_uploads': False,
         })
 
     # ── LEGACY FLOW: session dict (pending_questionnaire key) ─────────────────
@@ -687,6 +689,7 @@ def review_extracted_questions(request):
                     'questions':      fake_questions,
                     'question_types': fake_types,
                     'source':         source,
+                    'from_my_uploads': False,
                 })
 
             teacher = get_object_or_404(TeacherProfile, user=request.user)
@@ -971,6 +974,7 @@ def review_extracted_questions_pk(request, pk):
         'question_types': question_types,
         'total_points':   sum(q.points for q in extracted_questions),
         'source':         source,
+        'from_my_uploads': True,
     })
 
 
