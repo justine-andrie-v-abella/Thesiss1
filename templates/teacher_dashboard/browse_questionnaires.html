@@ -85,30 +85,45 @@
 
 <script>
 (function () {
-    var form = document.getElementById('filterForm');
-    var btn  = document.getElementById('filterSubmitBtn');
+    var form    = document.getElementById('filterForm');
+    var btn     = document.getElementById('filterSubmitBtn');
     var btnHTML = btn ? btn.innerHTML : '';
     if (!form) return;
 
+    var _currentXHR = null;   // active AbortController for the in-flight request
+    var _syncing    = false;   // true while we programmatically sync selects from a chip/link click
+
     function ajaxFilter(qs) {
+        // Cancel any previous in-flight request to prevent race conditions
+        if (_currentXHR) { try { _currentXHR.abort(); } catch(e) {} }
+        _currentXHR = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+
         var container = document.getElementById('results-container');
         if (btn) {
             btn.disabled = true;
             btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Filtering…';
         }
         if (container) { container.style.opacity = '0.4'; container.style.pointerEvents = 'none'; }
-        fetch(window.location.pathname + '?' + qs, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+
+        var fetchOpts = { headers: { 'X-Requested-With': 'XMLHttpRequest' } };
+        if (_currentXHR) fetchOpts.signal = _currentXHR.signal;
+
+        fetch(window.location.pathname + '?' + qs, fetchOpts)
             .then(function (r) { return r.text(); })
             .then(function (html) {
                 if (container) { container.innerHTML = html; container.style.opacity = ''; container.style.pointerEvents = ''; }
                 history.pushState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
                 if (btn) { btn.disabled = false; btn.innerHTML = btnHTML; }
+                _currentXHR = null;
                 if (window.initBrowseCards) window.initBrowseCards();
                 if (window.initDocPreviewBtns) window.initDocPreviewBtns();
             })
-            .catch(function () {
+            .catch(function (err) {
+                // Ignore aborted requests — a newer request is already running
+                if (err && err.name === 'AbortError') return;
                 if (container) { container.style.opacity = ''; container.style.pointerEvents = ''; }
                 if (btn) { btn.disabled = false; btn.innerHTML = btnHTML; }
+                _currentXHR = null;
             });
     }
 
@@ -117,7 +132,10 @@
     }
 
     form.querySelectorAll('select').forEach(function (sel) {
-        sel.addEventListener('change', submitFilter);
+        sel.addEventListener('change', function () {
+            if (_syncing) return; // ignore programmatic value changes from chip/link sync
+            submitFilter();
+        });
     });
     var searchInput = form.querySelector('input[name="search"]');
     var debounceTimer;
@@ -136,13 +154,15 @@
         if (!href || href === '#') return;
         e.preventDefault();
         var qs = href.indexOf('?') !== -1 ? href.slice(href.indexOf('?') + 1) : '';
-        /* Sync filter form selects with the chip/pagination link params */
+        /* Sync filter form selects — use _syncing flag to suppress the change handlers */
         var params = new URLSearchParams(qs);
+        _syncing = true;
         form.querySelectorAll('select[name]').forEach(function (sel) {
             sel.value = params.get(sel.name) || '';
         });
         var si = form.querySelector('input[name="search"]');
         if (si) si.value = params.get('search') || '';
+        _syncing = false;
         ajaxFilter(qs);
     });
 })();

@@ -113,20 +113,20 @@
                 {% else %}border-yellow-500{% endif %}"
                 data-type="{{ question.question_type.name }}"
                 data-difficulty="{{ question.difficulty }}"
-                data-points="{{ question.points }}">
-            
+                data-points="{{ question.points }}"><script type="application/json" class="q-data">{"type":"{{ question.question_type.name }}","text":"{{ question.question_text|escapejs }}","answer":"{{ question.correct_answer|default:''|escapejs }}","options":[]{% if md and md.column_a %},"column_a":[{% for item in md.column_a %}"{{ item|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],"column_b":[{% for item in md.column_b %}"{{ item|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],"matching_pairs":[{% for pair in md.pairs %}{"item":"{{ pair.item|escapejs }}","match":"{{ pair.match|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]{% else %},"column_a":[],"column_b":[],"matching_pairs":[]{% endif %}}</script>
+
                 <div class="p-5">
                     <div class="flex items-start gap-4">
-            
+
                         <!-- Checkbox -->
                         <div class="flex-shrink-0 pt-1">
                             <input type="checkbox" name="selected_questions" value="{{ question.id }}"
                                 class="question-checkbox w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                                 {% if question.is_approved %}checked{% endif %}>
                         </div>
-            
+
                         <div class="flex-1 min-w-0">
-            
+
                             <!-- Badges -->
                             <div class="flex flex-wrap gap-2 mb-3">
                                 <span class="px-2.5 py-1 bg-teal-100 text-teal-800 text-xs font-bold rounded-full flex items-center gap-1">
@@ -269,7 +269,7 @@
                 {% else %}border-yellow-500{% endif %}"
                 data-type="{{ question.question_type.name }}"
                 data-difficulty="{{ question.difficulty }}"
-                data-points="{{ question.points }}">
+                data-points="{{ question.points }}"><script type="application/json" class="q-data">{"type":"{{ question.question_type.name }}","text":"{{ question.question_text|escapejs }}","answer":"{{ question.correct_answer|default:''|escapejs }}"{% if question.question_type.name == 'multiple_choice' %},"options":[{% for letter,opt in question.options_list %}"{{ opt|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}]{% else %},"options":[]{% endif %},"column_a":[],"column_b":[],"matching_pairs":[]}</script>
                 <div class="p-5">
                     <div class="flex items-start gap-4">
                         <div class="flex-shrink-0 pt-1">
@@ -743,6 +743,11 @@
                 </div>
             </div>
             <div class="flex gap-4">
+                <button type="button" id="previewDocBtn"
+                    class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-5 rounded-lg transition-all shadow flex items-center justify-center gap-2">
+                    <i class="bi bi-eye text-lg"></i>
+                    <span class="hidden sm:inline">Preview</span>
+                </button>
                 <button type="submit" id="saveBtn"
                     class="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-lg flex items-center justify-center">
                     <i class="bi bi-check-circle mr-2" id="saveBtnIcon"></i>
@@ -788,6 +793,34 @@
     </div>
 </div>
 
+<!-- DOCUMENT PREVIEW MODAL -->
+<div id="reviewDocPreviewModal" class="doc-preview-overlay" onclick="if(event.target===this)closeReviewDocPreview()">
+    <div class="doc-preview-wrapper">
+        <div class="doc-preview-toolbar">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:36px;height:36px;background:rgba(255,255,255,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-file-earmark-text text-white" style="font-size:16px;"></i>
+                </div>
+                <div>
+                    <p style="color:white;font-weight:700;font-size:14px;margin:0;font-family:Arial,sans-serif;" id="reviewDpTitle">Document Preview</p>
+                    <p style="color:rgba(255,255,255,0.55);font-size:11px;margin:0;font-family:Arial,sans-serif;" id="reviewDpSubtitle">Only checked questions are shown</p>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button onclick="printReviewDocPreview()" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:white;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:Arial,sans-serif;">
+                    <i class="bi bi-printer"></i> Print
+                </button>
+                <button onclick="closeReviewDocPreview()" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:white;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:14px;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
+        <div class="doc-preview-scroll">
+            <div id="reviewDpPaper" class="doc-preview-paper"></div>
+        </div>
+    </div>
+</div>
+
 <!-- LOADING MODAL -->
 <div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden items-center justify-center">
     <div class="bg-white rounded-2xl p-10 max-w-sm w-full mx-4 text-center shadow-2xl">
@@ -805,6 +838,41 @@
 <style>
 @keyframes spin { to { transform: rotate(360deg); } }
 #spinner { animation: spin 1s linear infinite; }
+
+/* ── Document Preview ── */
+.doc-preview-overlay{display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1.5rem;}.doc-preview-overlay.dp-open{display:flex;}
+.doc-preview-wrapper{max-width:860px;width:100%;max-height:90vh;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.5);animation:aqModalIn 0.25s cubic-bezier(0.34,1.56,0.64,1) both;}
+@keyframes aqModalIn{from{opacity:0;transform:scale(0.95) translateY(10px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.doc-preview-toolbar{background:rgba(17,24,39,.97);backdrop-filter:blur(8px);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.doc-preview-scroll{overflow-y:auto;flex:1;min-height:0;}
+.doc-preview-paper{background:#fff;padding:48px 60px;font-family:"Times New Roman",Times,serif;}
+.dp-school{text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#374151;margin-bottom:2px;font-family:Arial,sans-serif;}
+.dp-college{text-align:center;font-size:11px;text-transform:uppercase;color:#374151;margin-bottom:8px;font-family:Arial,sans-serif;}
+.dp-title{text-align:center;font-size:18px;font-weight:800;color:#111827;margin-bottom:2px;font-family:Arial,sans-serif;}
+.dp-subtitle{text-align:center;font-size:12px;color:#4B5563;margin-bottom:10px;font-family:Arial,sans-serif;}
+.dp-rule{border:none;border-top:2.5px solid #111827;margin:0 0 2px;}
+.dp-rule-thin{border:none;border-top:1px solid #374151;margin:0 0 12px;}
+.dp-fields{display:flex;gap:20px;font-size:12px;color:#374151;padding:7px 0 12px;border-bottom:1.5px solid #374151;margin-bottom:20px;font-family:Arial,sans-serif;}
+.dp-blank{display:inline-block;border-bottom:1px solid #374151;min-width:80px;vertical-align:middle;}
+.dp-section{margin-bottom:22px;}
+.dp-sec-head{display:flex;align-items:baseline;gap:5px;margin-bottom:1px;font-family:Arial,sans-serif;}
+.dp-roman{font-size:13px;font-weight:900;color:#111827;}
+.dp-sec-title{font-size:13px;font-weight:800;color:#111827;text-transform:uppercase;letter-spacing:.04em;}
+.dp-directions{font-size:11px;font-style:italic;color:#6B7280;margin-bottom:11px;padding-left:16px;font-family:Arial,sans-serif;}
+.dp-q{font-size:13px;margin-bottom:10px;color:#1F2937;line-height:1.6;}.dp-qn{font-weight:700;}
+.dp-mc-opts{display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;padding-left:20px;margin-top:5px;}
+.dp-opt{font-size:12px;color:#374151;display:flex;gap:4px;align-items:baseline;}
+.dp-blank-line{display:inline-block;border-bottom:1px solid #374151;width:150px;margin-left:6px;vertical-align:middle;}
+.dp-tf-line{display:inline-block;border-bottom:1px solid #374151;width:65px;margin-left:10px;vertical-align:middle;}
+.dp-match-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-left:20px;margin-top:7px;}
+.dp-match-col-hd{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6B7280;border-bottom:1px solid #E5E7EB;padding-bottom:3px;margin-bottom:4px;font-family:Arial,sans-serif;}
+.dp-match-item{font-size:12px;color:#374151;margin-bottom:3px;}
+.dp-essay-lines{padding-left:20px;margin-top:7px;}
+.dp-essay-line{border-bottom:1px solid #D1D5DB;height:20px;margin-bottom:7px;}
+.dp-ans-key{margin-top:26px;padding-top:10px;border-top:2px dashed #D1D5DB;page-break-before:always;}
+.dp-ak-hd{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#9CA3AF;margin-bottom:6px;font-family:Arial,sans-serif;}
+.dp-ak-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:3px;}
+.dp-ak-item{font-size:11px;color:#374151;font-family:Arial,sans-serif;}
 
 @keyframes badgePop {
     0%   { transform: scale(0.8); opacity: 0; }
@@ -1381,6 +1449,24 @@
                 '<button type="button" class="delete-btn flex-shrink-0 bg-red-100 text-red-600 hover:bg-red-500 hover:text-white px-3 py-2 rounded transition-colors text-sm" data-manual="true" title="Remove Question"><i class="bi bi-trash"></i></button>' +
             '</div></div>';
 
+        // Embed q-data for live preview
+        var qDataScriptEl = document.createElement('script');
+        qDataScriptEl.type = 'application/json';
+        qDataScriptEl.className = 'q-data';
+        var matchingData = (qType === 'matching') ? collectMatchingData() : null;
+        qDataScriptEl.textContent = JSON.stringify({
+            type:    qType,
+            text:    qText,
+            answer:  correct,
+            options: (qType === 'multiple_choice')
+                ? Array.from(document.querySelectorAll('#mcOptions .mc-option-row')).map(function(r){ return r.querySelector('.mc-option-input').value.trim(); })
+                : [],
+            column_a:       matchingData ? matchingData.colA : [],
+            column_b:       matchingData ? matchingData.colB : [],
+            matching_pairs: matchingData ? matchingData.pairs : []
+        });
+        card.appendChild(qDataScriptEl);
+
         document.getElementById('questionsList').prepend(card);
         card.querySelector('.question-checkbox').addEventListener('change', updateStats);
         bindDeleteBtn(card.querySelector('.delete-btn'));
@@ -1666,6 +1752,205 @@
     function capitalize(str) { return str.charAt(0).toUpperCase() + str.slice(1); }
 
     updateStats();
+
+    // ================================================================
+    // DOCUMENT PREVIEW (live, checkbox-filtered)
+    // ================================================================
+    var DP_TYPE_ORDER = ['multiple_choice','true_false','identification','fill_in_the_blank','matching','essay'];
+    var DP_TYPE_DISPLAY = {
+        multiple_choice:'Multiple Choice', true_false:'True or False',
+        identification:'Identification', fill_in_the_blank:'Fill in the Blanks',
+        matching:'Matching Type', essay:'Essay'
+    };
+    var DP_DIRECTIONS = {
+        multiple_choice:'Directions: Choose the letter of the best answer.',
+        true_false:'Directions: Write TRUE if the statement is correct, and FALSE if it is not.',
+        identification:'Directions: Identify what is being asked in each item. Write your answer on the blank provided.',
+        fill_in_the_blank:'Directions: Fill in each blank with the correct word or phrase.',
+        matching:'Directions: Match each item in Column A with the corresponding answer in Column B.',
+        essay:'Directions: Answer each question in complete sentences. Use additional paper if needed.'
+    };
+    var DP_ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+    function dpEsc(s){ if(!s)return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    var reviewDpOverlay = document.getElementById('reviewDocPreviewModal');
+    var reviewDpPaper   = document.getElementById('reviewDpPaper');
+
+    function collectCheckedQuestions() {
+        var questions = [];
+        document.querySelectorAll('.question-checkbox:checked').forEach(function(cb) {
+            var card = cb.closest('.question-card');
+            if (!card) return;
+            var scriptEl = card.querySelector('script.q-data');
+            if (scriptEl) {
+                try { questions.push(JSON.parse(scriptEl.textContent)); } catch(e) {}
+            } else if (card.dataset.manual === 'true') {
+                // Fallback for manually added cards without q-data script
+                var type    = card.dataset.type || 'essay';
+                var textInp = card.querySelector('input[name="manual_question_text[]"]');
+                var ansInp  = card.querySelector('input[name="manual_correct_answer[]"]');
+                var text    = textInp ? textInp.value : '';
+                var answer  = ansInp  ? ansInp.value  : '';
+                var options = [];
+                ['A','B','C','D'].forEach(function(l) {
+                    var inp = card.querySelector('input[name="manual_option_' + l.toLowerCase() + '[]"]');
+                    options.push(inp ? inp.value : '');
+                });
+                questions.push({ type:type, text:text, answer:answer, options:options, column_a:[], column_b:[], matching_pairs:[] });
+            }
+        });
+        return questions;
+    }
+
+    document.getElementById('previewDocBtn') && document.getElementById('previewDocBtn').addEventListener('click', function() {
+        var questions = collectCheckedQuestions();
+        if (questions.length === 0) { alert('Please check at least one question to preview.'); return; }
+
+        var titleEl = document.querySelector('[name=final_title]');
+        var title   = titleEl ? titleEl.value.trim() : '{{ questionnaire.title|escapejs }}';
+        document.getElementById('reviewDpTitle').textContent    = title || 'Document Preview';
+        document.getElementById('reviewDpSubtitle').textContent = questions.length + ' question(s) selected';
+
+        renderReviewDP(questions, title);
+        reviewDpOverlay.classList.add('dp-open');
+        document.body.style.overflow = 'hidden';
+    });
+
+    function closeReviewDocPreview() {
+        reviewDpOverlay && reviewDpOverlay.classList.remove('dp-open');
+        document.body.style.overflow = '';
+        reviewDpPaper && (reviewDpPaper.innerHTML = '');
+    }
+    window.closeReviewDocPreview = closeReviewDocPreview;
+
+    function printReviewDocPreview() {
+        var styles = '';
+        document.querySelectorAll('style').forEach(function(s){ styles += s.innerHTML + '\n'; });
+        var win = window.open('','_blank','width=900,height=700');
+        win.document.write('<html><head><title>' + dpEsc(document.getElementById('reviewDpTitle').textContent || 'Document Preview') + '</title>');
+        win.document.write('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">');
+        win.document.write('<style>' + styles + 'body{margin:0;padding:32px 48px;font-family:"Times New Roman",Times,serif;}@media print{@page{margin:18mm 15mm;}}</style>');
+        win.document.write('</head><body>');
+        win.document.write(reviewDpPaper.innerHTML);
+        win.document.write('</body></html>');
+        win.document.close(); win.focus();
+        setTimeout(function(){ win.print(); }, 600);
+    }
+    window.printReviewDocPreview = printReviewDocPreview;
+
+    function renderReviewDP(questions, title) {
+        var groups = {};
+        questions.forEach(function(q){ if(!groups[q.type]) groups[q.type]=[]; groups[q.type].push(q); });
+        var html = '';
+        html += '<div style="text-align:center;margin-bottom:16px;">';
+        html += '<div class="dp-school">Bohol Island State University</div>';
+        html += '<div class="dp-college">Magsija, Balilihan, Bohol</div>';
+        html += '<hr class="dp-rule"><hr class="dp-rule-thin">';
+        html += '<div class="dp-title">' + dpEsc(title) + '</div>';
+        html += '</div>';
+        html += '<div class="dp-fields">';
+        html += '<span>Name:&nbsp;<span class="dp-blank" style="min-width:180px;">&nbsp;</span></span>';
+        html += '<span>Score:&nbsp;<span class="dp-blank" style="min-width:65px;">&nbsp;</span></span>';
+        html += '<span>Date:&nbsp;<span class="dp-blank" style="min-width:100px;">&nbsp;</span></span>';
+        html += '</div>';
+        var secIdx = 0, globalN = 0, keyItems = [];
+        DP_TYPE_ORDER.forEach(function(type) {
+            if (!groups[type] || !groups[type].length) return;
+            var qs = groups[type];
+            html += '<div class="dp-section">';
+            html += '<div class="dp-sec-head"><span class="dp-roman">' + (DP_ROMAN[secIdx] || String(secIdx+1) + '.') + '.</span><span class="dp-sec-title">&nbsp;' + dpEsc(DP_TYPE_DISPLAY[type] || type) + '</span></div>';
+            html += '<div class="dp-directions">' + dpEsc(DP_DIRECTIONS[type] || '') + '</div>';
+            qs.forEach(function(q) {
+                globalN++;
+                html += renderReviewDPQ(q, globalN, type);
+                if (type !== 'essay') {
+                    if (type === 'matching' && q.matching_pairs && q.matching_pairs.length) {
+                        var pStr = q.matching_pairs.map(function(p) {
+                            var n = p.item ? (String(p.item).split('.')[0].trim()) : String(p.item || '');
+                            return n + '→' + p.match;
+                        }).join(', ');
+                        keyItems.push(globalN + '. ' + pStr);
+                    } else if (q.answer) {
+                        keyItems.push(globalN + '. ' + q.answer);
+                    }
+                }
+            });
+            html += '</div>';
+            secIdx++;
+        });
+        // Any ungrouped types (edge cases like fill_blank alias)
+        Object.keys(groups).forEach(function(type) {
+            if (DP_TYPE_ORDER.indexOf(type) !== -1) return; // already handled
+            var qs = groups[type];
+            if (!qs || !qs.length) return;
+            html += '<div class="dp-section">';
+            html += '<div class="dp-sec-head"><span class="dp-roman">' + (DP_ROMAN[secIdx] || String(secIdx+1) + '.') + '.</span><span class="dp-sec-title">&nbsp;' + dpEsc(DP_TYPE_DISPLAY[type] || type.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();})) + '</span></div>';
+            qs.forEach(function(q) {
+                globalN++;
+                html += renderReviewDPQ(q, globalN, type);
+                if (q.answer) keyItems.push(globalN + '. ' + q.answer);
+            });
+            html += '</div>';
+            secIdx++;
+        });
+        if (keyItems.length) {
+            html += '<div class="dp-ans-key"><div class="dp-ak-hd">&#9830; Answer Key</div>';
+            html += '<div class="dp-ak-grid">';
+            keyItems.forEach(function(k){ html += '<div class="dp-ak-item">' + dpEsc(k) + '</div>'; });
+            html += '</div></div>';
+        }
+        reviewDpPaper.innerHTML = html;
+    }
+
+    function renderReviewDPQ(q, num, type) {
+        var L = ['A','B','C','D'];
+        var html = '<div class="dp-q"><span class="dp-qn">' + num + '.</span>&nbsp;';
+        if (type === 'multiple_choice') {
+            html += dpEsc(q.text);
+            if (q.options && q.options.length) {
+                html += '<div class="dp-mc-opts">';
+                q.options.forEach(function(opt, i) {
+                    if (!opt) return;
+                    html += '<div class="dp-opt"><span style="font-weight:700;">' + L[i] + '.</span>&nbsp;' + dpEsc(opt) + '</div>';
+                });
+                html += '</div>';
+            }
+        } else if (type === 'true_false') {
+            html += dpEsc(q.text) + '&nbsp;<span class="dp-tf-line"></span>';
+        } else if (type === 'identification' || type === 'fill_blank' || type === 'fill_in_the_blank') {
+            html += '<span class="dp-blank-line"></span>&nbsp;' + dpEsc(q.text);
+        } else if (type === 'matching') {
+            html += dpEsc(q.text);
+            if (q.column_a && q.column_a.length && q.column_b && q.column_b.length) {
+                html += '<div class="dp-match-grid"><div><div class="dp-match-col-hd">Column A</div>';
+                q.column_a.forEach(function(item){ html += '<div class="dp-match-item">' + dpEsc(item) + '</div>'; });
+                html += '</div><div><div class="dp-match-col-hd">Column B</div>';
+                q.column_b.forEach(function(item){ html += '<div class="dp-match-item">' + dpEsc(item) + '</div>'; });
+                html += '</div></div>';
+            }
+        } else if (type === 'essay') {
+            html += dpEsc(q.text);
+            html += '<div class="dp-essay-lines">';
+            for (var i = 0; i < 4; i++) html += '<div class="dp-essay-line"></div>';
+            html += '</div>';
+        } else {
+            html += dpEsc(q.text);
+        }
+        html += '</div>';
+        return html;
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && reviewDpOverlay && reviewDpOverlay.classList.contains('dp-open'))
+            closeReviewDocPreview();
+    });
+
+    // Move preview modal to <body> to escape stacking context
+    (function() {
+        var el = document.getElementById('reviewDocPreviewModal');
+        if (el) document.body.appendChild(el);
+    })();
+
 })();
 </script>
 

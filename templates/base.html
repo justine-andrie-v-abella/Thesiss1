@@ -1253,6 +1253,9 @@ document.getElementById('new_password')?.addEventListener('input', function() {
 
     /* ── Intercept link clicks ── */
     document.addEventListener('click', function (e) {
+        // If another handler already called e.preventDefault() (e.g. AJAX filter chip links),
+        // skip the nav loader — no real navigation will occur.
+        if (e.defaultPrevented) return;
         var anchor = e.target.closest('a');
         if (!anchor) return;
         var href = anchor.getAttribute('href');

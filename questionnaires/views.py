@@ -1467,21 +1467,30 @@ def get_subjects_ajax(request):
 def get_questions_json(request, pk):
     questionnaire = get_object_or_404(Questionnaire, pk=pk)
 
-    # Uploader, staff, or a user from the same department may view questions
+    # Uploader, staff, same-department users, or teachers who teach this subject may view questions
     is_owner = (
         hasattr(questionnaire, 'uploader') and
         questionnaire.uploader is not None and
         questionnaire.uploader.user_id == request.user.pk
     )
-    is_same_dept = False
+    can_access = False
     try:
-        if hasattr(request.user, 'teacher'):
-            is_same_dept = (request.user.teacher.department_id == questionnaire.department_id)
+        if hasattr(request.user, 'teacher_profile'):
+            teacher = request.user.teacher_profile
+            # Allow if:
+            #   1. Same department as the uploader, OR
+            #   2. Teacher is explicitly assigned to this subject (e.g. GenEd across departments), OR
+            #   3. The subject belongs to the teacher's department (mirrors the browse fallback)
+            can_access = (
+                teacher.department_id == questionnaire.department_id or
+                teacher.subjects.filter(id=questionnaire.subject_id).exists() or
+                questionnaire.subject.departments.filter(id=teacher.department_id).exists()
+            )
         elif hasattr(request.user, 'subadmin_profile'):
-            is_same_dept = (request.user.subadmin_profile.department_id == questionnaire.department_id)
+            can_access = (request.user.subadmin_profile.department_id == questionnaire.department_id)
     except Exception:
         pass
-    if not request.user.is_staff and not is_owner and not is_same_dept:
+    if not request.user.is_staff and not is_owner and not can_access:
         return JsonResponse({'error': 'You do not have permission to view these questions.'}, status=403)
 
     questions_data = []
