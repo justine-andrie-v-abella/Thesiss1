@@ -281,6 +281,14 @@
         <a href="{% url 'accounts:admin_dashboard' %}" class="btn-custom">
           <i class="bi bi-speedometer2"></i> Go to Admin Dashboard
         </a>
+      {% elif user.subadmin_profile.is_active and user.teacher_profile %}
+        <a href="{% url 'accounts:choose_role' %}" class="btn-custom">
+          <i class="bi bi-person-gear"></i> Choose Your Role
+        </a>
+      {% elif user.subadmin_profile.is_active %}
+        <a href="{% url 'accounts:subadmin_dashboard' %}" class="btn-custom">
+          <i class="bi bi-speedometer2"></i> Go to Dashboard
+        </a>
       {% else %}
         <a href="{% url 'accounts:teacher_dashboard' %}" class="btn-custom">
           <i class="bi bi-speedometer2"></i> Go to Dashboard

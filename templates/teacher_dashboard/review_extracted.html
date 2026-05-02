@@ -873,6 +873,17 @@
 .dp-ak-hd{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#9CA3AF;margin-bottom:6px;font-family:Arial,sans-serif;}
 .dp-ak-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:3px;}
 .dp-ak-item{font-size:11px;color:#374151;font-family:Arial,sans-serif;}
+/* DOCX-matching preview additions */
+.dp-dept{text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#4B5563;margin-bottom:6px;font-family:Arial,sans-serif;}
+.dp-part-label{font-size:13px;font-weight:900;color:#111827;font-family:Arial,sans-serif;}
+.dp-sec-instr{font-size:12px;font-style:italic;color:#4B5563;font-family:Arial,sans-serif;}
+.dp-tf-pre{font-family:"Courier New",monospace;font-size:12px;letter-spacing:1px;color:#374151;}
+.dp-q-ans{font-size:12px;margin-bottom:10px;margin-left:20px;color:#1F2937;font-family:Arial,sans-serif;}
+.dp-ans-blank{display:inline-block;border-bottom:1px solid #374151;min-width:120px;vertical-align:middle;}
+.dp-match-section{margin-bottom:14px;}
+.dp-match-grid3{display:grid;grid-template-columns:0.12fr 0.40fr 0.48fr;gap:4px 12px;padding-left:8px;margin-top:6px;}
+.dp-match-hdr{font-size:11px;font-weight:700;text-decoration:underline;color:#374151;padding-bottom:3px;border-bottom:1px solid #D1D5DB;margin-bottom:3px;font-family:Arial,sans-serif;}
+.dp-match-cell{font-size:12px;color:#374151;font-family:Arial,sans-serif;padding:1px 0;}
 
 @keyframes badgePop {
     0%   { transform: scale(0.8); opacity: 0; }
@@ -1756,21 +1767,23 @@
     // ================================================================
     // DOCUMENT PREVIEW (live, checkbox-filtered)
     // ================================================================
-    var DP_TYPE_ORDER = ['multiple_choice','true_false','identification','fill_in_the_blank','matching','essay'];
+    /* Order matches generators.py section_config */
+    var DP_TYPE_ORDER = ['identification','multiple_choice','true_false','essay','fill_blank','matching'];
     var DP_TYPE_DISPLAY = {
-        multiple_choice:'Multiple Choice', true_false:'True or False',
-        identification:'Identification', fill_in_the_blank:'Fill in the Blanks',
-        matching:'Matching Type', essay:'Essay'
+        identification:'Identification', multiple_choice:'Multiple Choice',
+        true_false:'True or False', essay:'Essay',
+        fill_blank:'Fill in the Blanks', fill_in_the_blank:'Fill in the Blanks',
+        matching:'Matching Type'
     };
-    var DP_DIRECTIONS = {
-        multiple_choice:'Directions: Choose the letter of the best answer.',
-        true_false:'Directions: Write TRUE if the statement is correct, and FALSE if it is not.',
-        identification:'Directions: Identify what is being asked in each item. Write your answer on the blank provided.',
-        fill_in_the_blank:'Directions: Fill in each blank with the correct word or phrase.',
-        matching:'Directions: Match each item in Column A with the corresponding answer in Column B.',
-        essay:'Directions: Answer each question in complete sentences. Use additional paper if needed.'
+    var DP_INSTRUCTIONS = {
+        identification:'Read carefully and identify what is being asked.',
+        multiple_choice:'Write the CAPITAL LETTER of the best response.',
+        true_false:'Write TRUE if the statement is correct, otherwise write FALSE.',
+        essay:'Answer the following questions comprehensively.',
+        fill_blank:'Complete the following statements.',
+        fill_in_the_blank:'Complete the following statements.',
+        matching:'Match the items in Column A with their correct description in Column B. Write the letter of your answer in the blank provided.'
     };
-    var DP_ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
     function dpEsc(s){ if(!s)return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
     var reviewDpOverlay = document.getElementById('reviewDocPreviewModal');
@@ -1839,12 +1852,18 @@
     window.printReviewDocPreview = printReviewDocPreview;
 
     function renderReviewDP(questions, title) {
+        /* Merge fill_in_the_blank into fill_blank so they form one section */
         var groups = {};
-        questions.forEach(function(q){ if(!groups[q.type]) groups[q.type]=[]; groups[q.type].push(q); });
+        questions.forEach(function(q) {
+            var t = q.type === 'fill_in_the_blank' ? 'fill_blank' : q.type;
+            if (!groups[t]) groups[t] = [];
+            groups[t].push(q);
+        });
         var html = '';
+        /* School header — matches bisu_template.docx letterhead */
         html += '<div style="text-align:center;margin-bottom:16px;">';
-        html += '<div class="dp-school">Bohol Island State University</div>';
-        html += '<div class="dp-college">Magsija, Balilihan, Bohol</div>';
+        html += '<div class="dp-school">Republic of the Philippines</div>';
+        html += '<div class="dp-college">Bohol Island State University</div>';
         html += '<hr class="dp-rule"><hr class="dp-rule-thin">';
         html += '<div class="dp-title">' + dpEsc(title) + '</div>';
         html += '</div>';
@@ -1853,13 +1872,20 @@
         html += '<span>Score:&nbsp;<span class="dp-blank" style="min-width:65px;">&nbsp;</span></span>';
         html += '<span>Date:&nbsp;<span class="dp-blank" style="min-width:100px;">&nbsp;</span></span>';
         html += '</div>';
-        var secIdx = 0, globalN = 0, keyItems = [];
+        var partNum = 0, globalN = 0, keyItems = [];
         DP_TYPE_ORDER.forEach(function(type) {
             if (!groups[type] || !groups[type].length) return;
+            partNum++;
             var qs = groups[type];
+            var displayName = DP_TYPE_DISPLAY[type] || type;
+            var instruction  = DP_INSTRUCTIONS[type] || '';
             html += '<div class="dp-section">';
-            html += '<div class="dp-sec-head"><span class="dp-roman">' + (DP_ROMAN[secIdx] || String(secIdx+1) + '.') + '.</span><span class="dp-sec-title">&nbsp;' + dpEsc(DP_TYPE_DISPLAY[type] || type) + '</span></div>';
-            html += '<div class="dp-directions">' + dpEsc(DP_DIRECTIONS[type] || '') + '</div>';
+            /* "PART N. TypeLabel. Instruction text." — bold part+label, italic instruction */
+            html += '<div class="dp-sec-head">';
+            html += '<span class="dp-part-label">PART ' + partNum + '.&nbsp;</span>';
+            html += '<span class="dp-sec-title">' + dpEsc(displayName) + '.&nbsp;</span>';
+            html += '<span class="dp-sec-instr">' + dpEsc(instruction) + '</span>';
+            html += '</div>';
             qs.forEach(function(q) {
                 globalN++;
                 html += renderReviewDPQ(q, globalN, type);
@@ -1876,25 +1902,10 @@
                 }
             });
             html += '</div>';
-            secIdx++;
-        });
-        // Any ungrouped types (edge cases like fill_blank alias)
-        Object.keys(groups).forEach(function(type) {
-            if (DP_TYPE_ORDER.indexOf(type) !== -1) return; // already handled
-            var qs = groups[type];
-            if (!qs || !qs.length) return;
-            html += '<div class="dp-section">';
-            html += '<div class="dp-sec-head"><span class="dp-roman">' + (DP_ROMAN[secIdx] || String(secIdx+1) + '.') + '.</span><span class="dp-sec-title">&nbsp;' + dpEsc(DP_TYPE_DISPLAY[type] || type.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();})) + '</span></div>';
-            qs.forEach(function(q) {
-                globalN++;
-                html += renderReviewDPQ(q, globalN, type);
-                if (q.answer) keyItems.push(globalN + '. ' + q.answer);
-            });
-            html += '</div>';
-            secIdx++;
         });
         if (keyItems.length) {
-            html += '<div class="dp-ans-key"><div class="dp-ak-hd">&#9830; Answer Key</div>';
+            html += '<div class="dp-ans-key">';
+            html += '<div class="dp-ak-hd">&#9830; Answer Key &nbsp;<span style="font-weight:400;font-style:italic;color:#9CA3AF;font-size:9px;">(For Instructor Use Only — Detach Before Distributing)</span></div>';
             html += '<div class="dp-ak-grid">';
             keyItems.forEach(function(k){ html += '<div class="dp-ak-item">' + dpEsc(k) + '</div>'; });
             html += '</div></div>';
@@ -1904,9 +1915,10 @@
 
     function renderReviewDPQ(q, num, type) {
         var L = ['A','B','C','D'];
-        var html = '<div class="dp-q"><span class="dp-qn">' + num + '.</span>&nbsp;';
+        var html = '';
         if (type === 'multiple_choice') {
-            html += dpEsc(q.text);
+            /* N. question_text  then lettered options */
+            html = '<div class="dp-q"><span class="dp-qn">' + num + '.</span>&nbsp;' + dpEsc(q.text);
             if (q.options && q.options.length) {
                 html += '<div class="dp-mc-opts">';
                 q.options.forEach(function(opt, i) {
@@ -1915,28 +1927,38 @@
                 });
                 html += '</div>';
             }
-        } else if (type === 'true_false') {
-            html += dpEsc(q.text) + '&nbsp;<span class="dp-tf-line"></span>';
-        } else if (type === 'identification' || type === 'fill_blank' || type === 'fill_in_the_blank') {
-            html += '<span class="dp-blank-line"></span>&nbsp;' + dpEsc(q.text);
-        } else if (type === 'matching') {
-            html += dpEsc(q.text);
-            if (q.column_a && q.column_a.length && q.column_b && q.column_b.length) {
-                html += '<div class="dp-match-grid"><div><div class="dp-match-col-hd">Column A</div>';
-                q.column_a.forEach(function(item){ html += '<div class="dp-match-item">' + dpEsc(item) + '</div>'; });
-                html += '</div><div><div class="dp-match-col-hd">Column B</div>';
-                q.column_b.forEach(function(item){ html += '<div class="dp-match-item">' + dpEsc(item) + '</div>'; });
-                html += '</div></div>';
-            }
-        } else if (type === 'essay') {
-            html += dpEsc(q.text);
-            html += '<div class="dp-essay-lines">';
-            for (var i = 0; i < 4; i++) html += '<div class="dp-essay-line"></div>';
             html += '</div>';
+        } else if (type === 'true_false') {
+            /* DOCX format: ________ N. question_text */
+            html = '<div class="dp-q"><span class="dp-tf-pre">________&nbsp;</span><span class="dp-qn">' + num + '.</span>&nbsp;' + dpEsc(q.text) + '</div>';
+        } else if (type === 'identification' || type === 'fill_blank' || type === 'fill_in_the_blank') {
+            /* DOCX format: N. question_text  then "Answer: ________________________" below */
+            html = '<div class="dp-q"><span class="dp-qn">' + num + '.</span>&nbsp;' + dpEsc(q.text) + '</div>';
+            html += '<div class="dp-q-ans">Answer:&nbsp;<span class="dp-ans-blank">________________________</span></div>';
+        } else if (type === 'matching') {
+            /* DOCX format: 3-col table — Ans. | Column A | Column B */
+            var colA = q.column_a || [];
+            var colB = q.column_b || [];
+            var maxR = Math.max(colA.length, colB.length);
+            html = '<div class="dp-match-section">';
+            html += '<div class="dp-match-grid3">';
+            html += '<div class="dp-match-hdr" style="text-align:center;">Ans.</div>';
+            html += '<div class="dp-match-hdr">Column A</div>';
+            html += '<div class="dp-match-hdr">Column B</div>';
+            for (var i = 0; i < maxR; i++) {
+                html += '<div class="dp-match-cell" style="text-align:center;">_______</div>';
+                html += '<div class="dp-match-cell">' + dpEsc(colA[i] || '') + '</div>';
+                html += '<div class="dp-match-cell">' + dpEsc(colB[i] || '') + '</div>';
+            }
+            html += '</div></div>';
+        } else if (type === 'essay') {
+            html = '<div class="dp-q"><span class="dp-qn">' + num + '.</span>&nbsp;' + dpEsc(q.text);
+            html += '<div class="dp-essay-lines">';
+            for (var j = 0; j < 4; j++) html += '<div class="dp-essay-line"></div>';
+            html += '</div></div>';
         } else {
-            html += dpEsc(q.text);
+            html = '<div class="dp-q"><span class="dp-qn">' + num + '.</span>&nbsp;' + dpEsc(q.text) + '</div>';
         }
-        html += '</div>';
         return html;
     }
 

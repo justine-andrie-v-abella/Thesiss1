@@ -351,6 +351,13 @@
                 </div>
             </button>
 
+            {% if not user.is_staff and user.subadmin_profile.is_active and user.teacher_profile %}
+            <a href="{% url 'accounts:choose_role' %}"
+                class="flex items-center justify-center space-x-2 w-full bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium mb-2">
+                <i class="bi bi-arrow-left-right"></i>
+                <span>Switch Role</span>
+            </a>
+            {% endif %}
             <a href="{% url 'accounts:logout' %}"
                 class="flex items-center justify-center space-x-2 w-full bg-white text-blue-900 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium">
                 <i class="bi bi-box-arrow-right"></i>

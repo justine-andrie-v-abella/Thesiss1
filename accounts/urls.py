@@ -10,6 +10,7 @@ app_name = 'accounts'
 urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('choose-role/', views.choose_role, name='choose_role'),
 
     # ── Superadmin ──────────────────────────────────────────────────────────
 
@@ -45,6 +46,7 @@ urlpatterns = [
     # Sub-Admin Management (superadmin creates/assigns sub-admins)
     path('manage-subadmins/', views.manage_subadmins, name='manage_subadmins'),
     path('add-subadmin/', views.add_subadmin, name='add_subadmin'),
+    path('assign-teacher-as-subadmin/', views.assign_teacher_as_subadmin, name='assign_teacher_as_subadmin'),
     path('edit-subadmin/<int:pk>/', views.edit_subadmin, name='edit_subadmin'),
     path('delete-subadmin/<int:pk>/', views.delete_subadmin, name='delete_subadmin'),
     path('archive-subadmin/<int:pk>/', views.archive_subadmin, name='archive_subadmin'),

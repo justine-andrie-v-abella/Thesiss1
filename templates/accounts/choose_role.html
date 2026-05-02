@@ -1,0 +1,227 @@
+{% load static %}
+
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 24px 80px;
+    font-family: 'DM Sans', sans-serif;
+    background: url("{% static 'images/violet-bisu-H-plain.png' %}") no-repeat center center fixed;
+    background-size: cover;
+  }
+
+  .card-wrap {
+    width: 100%;
+    max-width: 560px;
+    animation: fadeUp 0.55s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  @keyframes fadeUp {
+    from { opacity:0; transform: translateY(28px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+
+  .card {
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.6);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    padding: 44px 44px 36px;
+    text-align: center;
+  }
+
+  .logo-wrap { margin-bottom: 16px; }
+  .bisu-logo { width: 80px; height: 80px; object-fit: contain; }
+
+  .brand-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 6px;
+    letter-spacing: -0.2px;
+  }
+  .brand-sub {
+    font-size: 0.92rem;
+    color: #5a6c7d;
+    margin-bottom: 6px;
+  }
+  .user-greeting {
+    font-size: 0.9rem;
+    color: #667eea;
+    font-weight: 600;
+    margin-bottom: 28px;
+  }
+
+  .roles-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .role-btn {
+    width: 100%;
+    border: none;
+    border-radius: 14px;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+    transition: transform 0.18s, box-shadow 0.18s;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    overflow: hidden;
+    display: block;
+    text-decoration: none;
+  }
+  .role-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.2);
+  }
+  .role-btn:active { transform: translateY(0); }
+
+  .role-inner {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 18px 22px;
+    color: #fff;
+  }
+
+  .role-icon-wrap {
+    width: 50px;
+    height: 50px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .role-icon-wrap i { font-size: 1.5rem; }
+
+  .role-text { flex: 1; }
+  .role-label {
+    font-size: 1.05rem;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .role-desc {
+    font-size: 0.82rem;
+    opacity: 0.88;
+    line-height: 1.4;
+  }
+
+  .role-arrow {
+    font-size: 1.1rem;
+    opacity: 0.7;
+    flex-shrink: 0;
+  }
+
+  /* Per-role gradient colours */
+  .role-admin    { background: linear-gradient(135deg, #ef4444 0%, #e11d48 100%); }
+  .role-subadmin { background: linear-gradient(135deg, #6366f1 0%, #9333ea 100%); }
+  .role-teacher  { background: linear-gradient(135deg, #14b8a6 0%, #0891b2 100%); }
+
+  .logout-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6c757d;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .logout-link:hover { color: #667eea; }
+
+  /* Footer */
+  .page-footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 20;
+    background: rgba(20,10,50,0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 14px 32px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+  }
+  .footer-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: rgba(255,255,255,0.80);
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+  .footer-item i { color: rgba(255,255,255,0.55); }
+
+  @media (max-width: 520px) {
+    .card { padding: 32px 22px 28px; }
+    .brand-name { font-size: 1.3rem; }
+    .bisu-logo { width: 68px; height: 68px; }
+    body { padding-bottom: 100px; }
+    .page-footer { gap: 14px; padding: 12px 16px; }
+    .footer-item { font-size: 0.74rem; }
+  }
+</style>
+
+<div class="card-wrap">
+  <div class="card">
+
+    <div class="logo-wrap">
+      <img src="{% static 'images/bisulogo.png' %}" alt="BISU Logo" class="bisu-logo">
+    </div>
+
+    <h1 class="brand-name">Welcome back!</h1>
+    <p class="brand-sub">You have multiple roles in this system.</p>
+    <p class="user-greeting"><i class="bi bi-person-circle"></i> {{ full_name }} — choose how you want to continue</p>
+
+    <form method="post" class="roles-grid">
+      {% csrf_token %}
+      {% for role_key, info in roles %}
+      <button type="submit" name="role" value="{{ role_key }}"
+              class="role-btn">
+        <div class="role-inner role-{{ role_key }}">
+          <div class="role-icon-wrap">
+            <i class="bi {{ info.icon }}"></i>
+          </div>
+          <div class="role-text">
+            <span class="role-label">{{ info.label }}</span>
+            <span class="role-desc">{{ info.desc }}</span>
+          </div>
+          <div class="role-arrow">
+            <i class="bi bi-arrow-right-circle-fill"></i>
+          </div>
+        </div>
+      </button>
+      {% endfor %}
+    </form>
+
+    <a href="{% url 'accounts:logout' %}" class="logout-link">
+      <i class="bi bi-box-arrow-left"></i> Sign out
+    </a>
+
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="page-footer">
+  <div class="footer-item"><i class="bi bi-building"></i> Bohol Island State University — Balilihan Campus</div>
+  <div class="footer-item"><i class="bi bi-shield-lock"></i> Secure System</div>
+  <div class="footer-item"><i class="bi bi-geo-alt"></i> Magsija, Balilihan, Bohol</div>
+</footer>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+{% endblock %}

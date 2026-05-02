@@ -230,12 +230,82 @@ If you did not expect this email, please contact your administrator immediately.
         return False
 
 
+def send_subadmin_promotion_email(subadmin):
+    """Send notification email when an existing teacher is promoted to sub-admin.
+    Unlike the invite email, this does NOT include a password — they keep their existing credentials."""
+    full_name  = subadmin.user.get_full_name()
+    username   = subadmin.user.username
+    email      = subadmin.user.email
+    department = subadmin.department.name
+    site_url   = settings.SITE_URL
+    login_url  = f"{site_url}/accounts/login/"
+
+    subject = "You Have Been Assigned as Sub-Admin"
+
+    message = f"""Hello {full_name},
+
+You have been assigned as the Sub-Administrator for the following department:
+
+Department : {department}
+
+You can now access sub-admin features using your existing login credentials.
+
+──────────────────────
+Username : {username}
+──────────────────────
+
+Log in here: {login_url}
+
+If you did not expect this, please contact your administrator immediately.
+
+— System Administration
+"""
+
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send sub-admin promotion email to {email}: {e}")
+        return False
+
+
 # ============================================================================
 # AUTH VIEWS
 # ============================================================================
 
+def _get_user_active_roles(user):
+    """Return a list of active role keys for a user. Possible values: 'admin', 'subadmin', 'teacher'."""
+    roles = []
+    if user.is_staff:
+        roles.append('admin')
+    if hasattr(user, 'subadmin_profile') and user.subadmin_profile.is_active:
+        roles.append('subadmin')
+    if hasattr(user, 'teacher_profile') and user.teacher_profile.is_active:
+        roles.append('teacher')
+    return roles
+
+
+def _redirect_for_role(role):
+    """Return the dashboard redirect for a given role key."""
+    if role == 'admin':
+        return redirect('accounts:admin_dashboard')
+    elif role == 'subadmin':
+        return redirect('accounts:subadmin_dashboard')
+    else:
+        return redirect('accounts:teacher_dashboard')
+
+
 def login_view(request):
     if request.user.is_authenticated:
+        roles = _get_user_active_roles(request.user)
+        if len(roles) > 1:
+            return redirect('accounts:choose_role')
         return redirect('home')
 
     if request.method == 'POST':
@@ -248,9 +318,17 @@ def login_view(request):
             if user is not None:
                 login(request, user)
 
-                user_role = "Administrator" if user.is_staff else "Teacher"
-                if hasattr(user, 'subadmin_profile'):
+                roles = _get_user_active_roles(user)
+
+                # Determine primary role label for the activity log
+                if 'admin' in roles:
+                    user_role = "Administrator"
+                elif 'subadmin' in roles and 'teacher' in roles:
+                    user_role = "Teacher/Sub-Admin"
+                elif 'subadmin' in roles:
                     user_role = "Sub-Admin"
+                else:
+                    user_role = "Teacher"
 
                 ActivityLog.objects.create(
                     activity_type='user_login',
@@ -258,12 +336,17 @@ def login_view(request):
                     description=f"{user_role} {user.get_full_name()} logged in to the system"
                 )
 
-                if user.is_staff:
-                    return redirect('accounts:admin_dashboard')
-                elif hasattr(user, 'subadmin_profile') and user.subadmin_profile.is_active:
-                    return redirect('accounts:subadmin_dashboard')
-                else:
-                    return redirect('accounts:teacher_dashboard')
+                # If the user has more than one active role, let them pick
+                if len(roles) > 1:
+                    return redirect('accounts:choose_role')
+
+                # Single role — go directly to the right dashboard
+                if roles:
+                    return _redirect_for_role(roles[0])
+
+                # Fallback (no profile yet)
+                return redirect('home')
+
             else:
                 messages.error(request, 'Invalid username or password')
 
@@ -273,6 +356,35 @@ def login_view(request):
             messages.error(request, 'An unexpected error occurred. Please try again.')
 
     return render(request, 'accounts/login.html')
+
+
+@login_required
+def choose_role(request):
+    """Shown when a user has multiple active roles — lets them pick which dashboard to enter."""
+    roles = _get_user_active_roles(request.user)
+
+    # If user somehow only has one role, skip the picker
+    if len(roles) == 1:
+        return _redirect_for_role(roles[0])
+    if not roles:
+        return redirect('home')
+
+    if request.method == 'POST':
+        chosen = request.POST.get('role', '')
+        if chosen in roles:
+            return _redirect_for_role(chosen)
+
+    role_info = {
+        'admin':    {'label': 'Administrator',  'icon': 'bi-shield-fill',        'color': 'from-red-500 to-rose-600',       'desc': 'Manage the entire system, departments, and users.'},
+        'subadmin': {'label': 'Sub-Admin',      'icon': 'bi-person-gear',         'color': 'from-indigo-500 to-purple-600',  'desc': 'Manage your department\'s teachers, subjects, and questionnaires.'},
+        'teacher':  {'label': 'Teacher',        'icon': 'bi-person-video3',       'color': 'from-teal-500 to-cyan-600',      'desc': 'Upload and manage your own questionnaires and question banks.'},
+    }
+
+    context = {
+        'roles':     [(r, role_info[r]) for r in roles if r in role_info],
+        'full_name': request.user.get_full_name(),
+    }
+    return render(request, 'accounts/choose_role.html', context)
 
 
 @login_required
@@ -936,11 +1048,21 @@ def manage_subadmins(request):
     all_departments    = Department.objects.all().order_by('name')
     form               = SubAdminCreationForm()
 
+    # Teachers who can be promoted: active, not archived, and don't already have a sub-admin profile
+    promotable_teachers = (
+        TeacherProfile.objects
+        .select_related('user', 'department')
+        .filter(is_active=True, is_archived=False)
+        .exclude(user__subadmin_profile__isnull=False)
+        .order_by('user__last_name', 'user__first_name')
+    )
+
     context = {
-        'subadmins':          subadmins,
-        'archived_subadmins': archived_subadmins,
-        'all_departments':    all_departments,
-        'form':               form,
+        'subadmins':            subadmins,
+        'archived_subadmins':   archived_subadmins,
+        'all_departments':      all_departments,
+        'form':                 form,
+        'promotable_teachers':  promotable_teachers,
     }
     return render(request, 'admin_dashboard/manage_subadmins.html', context)
 
@@ -1011,6 +1133,101 @@ def add_subadmin(request):
             return JsonResponse({'success': False, 'errors': form.errors})
 
     return redirect('accounts:manage_subadmins')
+
+
+@login_required
+@user_passes_test(is_admin)
+def assign_teacher_as_subadmin(request):
+    """Promote an existing teacher to sub-admin without creating a new user account."""
+    if request.method != 'POST':
+        return redirect('accounts:manage_subadmins')
+
+    teacher_id  = request.POST.get('teacher_id', '').strip()
+    dept_id     = request.POST.get('department', '').strip()
+
+    errors = {}
+
+    if not teacher_id:
+        errors['teacher_id'] = ['Please select a teacher.']
+    if not dept_id:
+        errors['department'] = ['Please select a department.']
+
+    if errors:
+        return JsonResponse({'success': False, 'errors': errors})
+
+    try:
+        teacher = TeacherProfile.objects.select_related('user').get(pk=teacher_id, is_archived=False)
+    except TeacherProfile.DoesNotExist:
+        return JsonResponse({'success': False, 'errors': {'teacher_id': ['Selected teacher not found.']}})
+
+    try:
+        department = Department.objects.get(pk=dept_id)
+    except Department.DoesNotExist:
+        return JsonResponse({'success': False, 'errors': {'department': ['Selected department not found.']}})
+
+    # Guard: teacher's user already has a sub-admin profile
+    if hasattr(teacher.user, 'subadmin_profile'):
+        return JsonResponse({'success': False, 'errors': {
+            '__all__': ['This teacher is already a sub-admin.']
+        }})
+
+    # Guard: department already has a sub-admin
+    if SubAdminProfile.objects.filter(department=department).exists():
+        return JsonResponse({'success': False, 'errors': {
+            'department': [f'The department "{department.name}" already has a sub-admin assigned.']
+        }})
+
+    # Check email server connectivity before creating the profile
+    try:
+        from django.core.mail import get_connection
+        connection = get_connection()
+        connection.open()
+        connection.close()
+    except Exception as e:
+        logger.error(f"Email connection failed: {e}")
+        return JsonResponse({'success': False, 'errors': {
+            '__all__': [
+                "Cannot assign sub-admin: the email server is unreachable or credentials are invalid. "
+                "Please check your email settings before assigning a sub-admin."
+            ]
+        }})
+
+    # Create the sub-admin profile using the teacher's existing user
+    subadmin = SubAdminProfile.objects.create(
+        user        = teacher.user,
+        department  = department,
+        assigned_by = request.user,
+        is_active   = True,
+    )
+
+    ActivityLog.objects.create(
+        activity_type='subadmin_created',
+        user=request.user,
+        description=(
+            f"Existing teacher {teacher.user.get_full_name()} was promoted to Sub-Admin "
+            f"for department {department.name}"
+        )
+    )
+
+    email_sent = send_subadmin_promotion_email(subadmin)
+
+    if not email_sent:
+        subadmin.delete()
+        return JsonResponse({'success': False, 'errors': {
+            '__all__': [
+                f"Sub-Admin was NOT assigned. The notification email to {teacher.user.email} could not be sent. "
+                f"Please verify your email server settings."
+            ]
+        }})
+
+    bust_dashboard_cache()
+    return JsonResponse({
+        'success': True,
+        'message': (
+            f"{teacher.user.get_full_name()} has been assigned as Sub-Admin for {department.name}. "
+            f"A notification email has been sent to {teacher.user.email}."
+        )
+    })
 
 
 @login_required
