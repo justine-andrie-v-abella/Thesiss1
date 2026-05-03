@@ -17,11 +17,26 @@ def notifications_context(request):
 
         user = request.user
         is_superadmin = user.is_staff
-        is_subadmin = (
+
+        has_active_subadmin = (
             not user.is_staff
             and hasattr(user, 'subadmin_profile')
             and user.subadmin_profile.is_active
         )
+        has_active_teacher = (
+            not user.is_staff
+            and hasattr(user, 'teacher_profile')
+            and user.teacher_profile.is_active
+        )
+
+        # For dual-role users, respect the session's active_role choice.
+        # A dual-role user who chose 'teacher' should see teacher navigation,
+        # not sub-admin navigation.
+        if has_active_subadmin and has_active_teacher:
+            active_role = getattr(request, 'session', {}).get('active_role', '')
+            is_subadmin = (active_role != 'teacher')  # default to subadmin if no choice
+        else:
+            is_subadmin = has_active_subadmin
 
         # ── Cache keys per user ──────────────────────────────────────────
         activities_key = f'activities_{user.id}_{"super" if is_superadmin else "other"}'

@@ -20,6 +20,17 @@ from django.conf import settings
 from django.utils import timezone
 import json as _json
 
+# Flat list of (value, label) tuples — evaluated once at import time so
+# it's always a plain Python list when passed to template contexts.
+QUESTION_TYPE_CHOICES = [
+    ('multiple_choice', 'Multiple Choice'),
+    ('true_false',      'True/False'),
+    ('identification',  'Identification'),
+    ('essay',           'Essay'),
+    ('fill_blank',      'Fill in the Blanks'),
+    ('matching',        'Matching Type'),
+]
+
 
 def get_current_school_year():
     """Returns the current Philippine academic school year, e.g. '2025-2026'.
@@ -1206,11 +1217,12 @@ def browse_questionnaires(request):
             is_archived=False,
         )
 
-    subject_id           = request.GET.get('subject', '')
-    exam_type            = request.GET.get('exam_type', '')
-    search_query         = request.GET.get('search', '')
-    selected_semester    = request.GET.get('semester', '')
-    selected_school_year = request.GET.get('school_year', '')
+    subject_id             = request.GET.get('subject', '')
+    exam_type              = request.GET.get('exam_type', '')
+    search_query           = request.GET.get('search', '')
+    selected_semester      = request.GET.get('semester', '')
+    selected_school_year   = request.GET.get('school_year', '')
+    selected_question_type = request.GET.get('question_type', '')
 
     if subject_id:
         questionnaires = questionnaires.filter(subject_id=subject_id)
@@ -1220,6 +1232,10 @@ def browse_questionnaires(request):
         questionnaires = questionnaires.filter(semester=selected_semester)
     if selected_school_year:
         questionnaires = questionnaires.filter(school_year=selected_school_year)
+    if selected_question_type:
+        questionnaires = questionnaires.filter(
+            extracted_questions__question_type__name=selected_question_type
+        ).distinct()
     if search_query:
         questionnaires = questionnaires.filter(
             Q(title__icontains=search_query)         |
@@ -1249,16 +1265,18 @@ def browse_questionnaires(request):
     page_obj    = paginator.get_page(page_number)
 
     ctx = {
-        'page_obj':            page_obj,
-        'subjects':            subjects,
-        'selected_subject':    subject_id,
-        'search_query':        search_query,
-        'exam_type':           exam_type,
-        'exam_type_choices':   Questionnaire.EXAM_TYPE_CHOICES,
-        'semester_choices':    Questionnaire.SEMESTER_CHOICES,
-        'selected_semester':   selected_semester,
-        'selected_school_year': selected_school_year,
-        'school_year_options': school_year_options,
+        'page_obj':              page_obj,
+        'subjects':              subjects,
+        'selected_subject':      subject_id,
+        'search_query':          search_query,
+        'exam_type':             exam_type,
+        'exam_type_choices':     Questionnaire.EXAM_TYPE_CHOICES,
+        'semester_choices':      Questionnaire.SEMESTER_CHOICES,
+        'selected_semester':     selected_semester,
+        'selected_school_year':  selected_school_year,
+        'school_year_options':   school_year_options,
+        'question_type_choices': QUESTION_TYPE_CHOICES,
+        'selected_question_type': selected_question_type,
     }
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'teacher_dashboard/browse_questionnaires_partial.html', ctx)
@@ -1282,12 +1300,13 @@ def all_questionnaires(request):
         'department', 'subject', 'uploader__user'
     ).filter(is_archived=True)
 
-    selected_department  = request.GET.get('department', '')
-    selected_subject     = request.GET.get('subject', '')
-    exam_type            = request.GET.get('exam_type', '')
-    search_query         = request.GET.get('search', '')
-    selected_semester    = request.GET.get('semester', '')
-    selected_school_year = request.GET.get('school_year', '')
+    selected_department    = request.GET.get('department', '')
+    selected_subject       = request.GET.get('subject', '')
+    exam_type              = request.GET.get('exam_type', '')
+    search_query           = request.GET.get('search', '')
+    selected_semester      = request.GET.get('semester', '')
+    selected_school_year   = request.GET.get('school_year', '')
+    selected_question_type = request.GET.get('question_type', '')
 
     if selected_department:
         questionnaires = questionnaires.filter(department_id=selected_department)
@@ -1299,6 +1318,10 @@ def all_questionnaires(request):
         questionnaires = questionnaires.filter(semester=selected_semester)
     if selected_school_year:
         questionnaires = questionnaires.filter(school_year=selected_school_year)
+    if selected_question_type:
+        questionnaires = questionnaires.filter(
+            extracted_questions__question_type__name=selected_question_type
+        ).distinct()
     if search_query:
         questionnaires = questionnaires.filter(
             Q(title__icontains=search_query)         |
@@ -1332,6 +1355,8 @@ def all_questionnaires(request):
         'selected_school_year':   selected_school_year,
         'school_year_options':    school_year_options,
         'archived_questionnaires': archived_questionnaires,
+        'question_type_choices':  QUESTION_TYPE_CHOICES,
+        'selected_question_type': selected_question_type,
     }
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'admin_dashboard/all_questionnaires_partial.html', ctx)

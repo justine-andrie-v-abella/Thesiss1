@@ -291,14 +291,39 @@ def _get_user_active_roles(user):
     return roles
 
 
-def _redirect_for_role(role):
-    """Return the dashboard redirect for a given role key."""
+def _redirect_for_role(request, role):
+    """Store the active role in the session and return the dashboard redirect.
+    Uses session.save() explicitly so the value is persisted before the redirect."""
+    request.session['active_role'] = role
+    request.session.modified = True
+    request.session.save()
     if role == 'admin':
         return redirect('accounts:admin_dashboard')
     elif role == 'subadmin':
         return redirect('accounts:subadmin_dashboard')
     else:
         return redirect('accounts:teacher_dashboard')
+
+
+def _user_should_remain_active(user, being_archived_type):
+    """
+    Return True if the Django User should stay active after archiving one profile.
+    being_archived_type: 'teacher' or 'subadmin' — the profile being archived RIGHT NOW.
+    We check whether the OTHER profile is still active.
+    """
+    if being_archived_type != 'teacher':
+        try:
+            if not user.teacher_profile.is_archived:
+                return True
+        except Exception:
+            pass
+    if being_archived_type != 'subadmin':
+        try:
+            if hasattr(user, 'subadmin_profile') and user.subadmin_profile.is_active and not user.subadmin_profile.is_archived:
+                return True
+        except Exception:
+            pass
+    return False
 
 
 def login_view(request):
@@ -342,7 +367,7 @@ def login_view(request):
 
                 # Single role — go directly to the right dashboard
                 if roles:
-                    return _redirect_for_role(roles[0])
+                    return _redirect_for_role(request, roles[0])
 
                 # Fallback (no profile yet)
                 return redirect('home')
@@ -365,14 +390,14 @@ def choose_role(request):
 
     # If user somehow only has one role, skip the picker
     if len(roles) == 1:
-        return _redirect_for_role(roles[0])
+        return _redirect_for_role(request, roles[0])
     if not roles:
         return redirect('home')
 
     if request.method == 'POST':
         chosen = request.POST.get('role', '')
         if chosen in roles:
-            return _redirect_for_role(chosen)
+            return _redirect_for_role(request, chosen)
 
     role_info = {
         'admin':    {'label': 'Administrator',  'icon': 'bi-shield-fill',        'color': 'from-red-500 to-rose-600',       'desc': 'Manage the entire system, departments, and users.'},
@@ -680,9 +705,12 @@ def archive_teacher(request, pk):
     teacher = get_object_or_404(TeacherProfile, pk=pk)
     if request.method == 'POST':
         teacher.is_archived = True
+        teacher.is_active = False
         teacher.save()
-        teacher.user.is_active = False
-        teacher.user.save()
+        # Only deactivate the Django User if they have no other active role
+        if not _user_should_remain_active(teacher.user, being_archived_type='teacher'):
+            teacher.user.is_active = False
+            teacher.user.save()
         ActivityLog.objects.create(
             activity_type='teacher_updated',
             user=request.user,
@@ -700,7 +728,9 @@ def unarchive_teacher(request, pk):
     teacher = get_object_or_404(TeacherProfile, pk=pk, is_archived=True)
     if request.method == 'POST':
         teacher.is_archived = False
+        teacher.is_active = True
         teacher.save()
+        # Re-enable the Django User so they can log in again
         teacher.user.is_active = True
         teacher.user.save()
         ActivityLog.objects.create(
@@ -1332,8 +1362,10 @@ def archive_subadmin(request, pk):
         subadmin.is_archived = True
         subadmin.is_active = False
         subadmin.save()
-        subadmin.user.is_active = False
-        subadmin.user.save()
+        # Only deactivate the Django User if they have no other active role
+        if not _user_should_remain_active(subadmin.user, being_archived_type='subadmin'):
+            subadmin.user.is_active = False
+            subadmin.user.save()
         ActivityLog.objects.create(
             activity_type='subadmin_updated',
             user=request.user,
@@ -1353,6 +1385,7 @@ def unarchive_subadmin(request, pk):
         subadmin.is_archived = False
         subadmin.is_active = True
         subadmin.save()
+        # Re-enable the Django User so they can log in again
         subadmin.user.is_active = True
         subadmin.user.save()
         ActivityLog.objects.create(
@@ -1624,9 +1657,12 @@ def subadmin_archive_teacher(request, pk):
     teacher    = get_object_or_404(TeacherProfile, pk=pk, department=department, is_archived=False)
     if request.method == 'POST':
         teacher.is_archived = True
-        teacher.user.is_active = False
-        teacher.user.save()
+        teacher.is_active = False
         teacher.save()
+        # Only deactivate the Django User if they have no other active role
+        if not _user_should_remain_active(teacher.user, being_archived_type='teacher'):
+            teacher.user.is_active = False
+            teacher.user.save()
         ActivityLog.objects.create(
             activity_type='teacher_archived',
             user=request.user,
@@ -1647,9 +1683,11 @@ def subadmin_unarchive_teacher(request, pk):
     teacher    = get_object_or_404(TeacherProfile, pk=pk, department=department, is_archived=True)
     if request.method == 'POST':
         teacher.is_archived = False
+        teacher.is_active = True
+        teacher.save()
+        # Re-enable the Django User so they can log in again
         teacher.user.is_active = True
         teacher.user.save()
-        teacher.save()
         ActivityLog.objects.create(
             activity_type='teacher_restored',
             user=request.user,
@@ -1694,8 +1732,11 @@ def subadmin_permanent_delete_teacher(request, pk):
 def teacher_dashboard(request):
     if request.user.is_staff:
         return redirect('accounts:admin_dashboard')
-    if hasattr(request.user, 'subadmin_profile'):
-        return redirect('accounts:subadmin_dashboard')
+    # For a dual-role user who hasn't picked a role yet (e.g. direct URL access),
+    # send them to the role picker rather than guessing.
+    roles = _get_user_active_roles(request.user)
+    if len(roles) > 1 and not request.session.get('active_role'):
+        return redirect('accounts:choose_role')
 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
 
@@ -2101,12 +2142,13 @@ def subadmin_browse_questionnaires(request):
         department=department, is_active=True
     ).select_related('user').order_by('user__last_name')
 
-    selected_subject     = request.GET.get('subject', '')
-    selected_teacher     = request.GET.get('teacher', '')
-    exam_type            = request.GET.get('exam_type', '')
-    search_query         = request.GET.get('search', '')
-    selected_semester    = request.GET.get('semester', '')
-    selected_school_year = request.GET.get('school_year', '')
+    selected_subject       = request.GET.get('subject', '')
+    selected_teacher       = request.GET.get('teacher', '')
+    exam_type              = request.GET.get('exam_type', '')
+    search_query           = request.GET.get('search', '')
+    selected_semester      = request.GET.get('semester', '')
+    selected_school_year   = request.GET.get('school_year', '')
+    selected_question_type = request.GET.get('question_type', '')
 
     if selected_subject:
         questionnaires = questionnaires.filter(subject_id=selected_subject)
@@ -2118,6 +2160,10 @@ def subadmin_browse_questionnaires(request):
         questionnaires = questionnaires.filter(semester=selected_semester)
     if selected_school_year:
         questionnaires = questionnaires.filter(school_year=selected_school_year)
+    if selected_question_type:
+        questionnaires = questionnaires.filter(
+            extracted_questions__question_type__name=selected_question_type
+        ).distinct()
     if search_query:
         questionnaires = questionnaires.filter(
             Q(title__icontains=search_query) |
@@ -2137,19 +2183,28 @@ def subadmin_browse_questionnaires(request):
     page_obj    = paginator.get_page(page_number)
 
     context = {
-        'page_obj':            page_obj,
-        'department':          department,
-        'subjects':            subjects,
-        'teachers':            teachers,
-        'selected_subject':    selected_subject,
-        'selected_teacher':    selected_teacher,
-        'exam_type':           exam_type,
-        'search_query':        search_query,
-        'exam_type_choices':   Questionnaire.EXAM_TYPE_CHOICES,
-        'semester_choices':    Questionnaire.SEMESTER_CHOICES,
-        'selected_semester':   selected_semester,
-        'selected_school_year': selected_school_year,
-        'school_year_options': school_year_options,
+        'page_obj':              page_obj,
+        'department':            department,
+        'subjects':              subjects,
+        'teachers':              teachers,
+        'selected_subject':      selected_subject,
+        'selected_teacher':      selected_teacher,
+        'exam_type':             exam_type,
+        'search_query':          search_query,
+        'exam_type_choices':     Questionnaire.EXAM_TYPE_CHOICES,
+        'semester_choices':      Questionnaire.SEMESTER_CHOICES,
+        'selected_semester':     selected_semester,
+        'selected_school_year':  selected_school_year,
+        'school_year_options':   school_year_options,
+        'question_type_choices': [
+            ('multiple_choice', 'Multiple Choice'),
+            ('true_false',      'True/False'),
+            ('identification',  'Identification'),
+            ('essay',           'Essay'),
+            ('fill_blank',      'Fill in the Blanks'),
+            ('matching',        'Matching Type'),
+        ],
+        'selected_question_type': selected_question_type,
     }
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'subadmin_dashboard/browse_questionnaires_partial.html', context)
