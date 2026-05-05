@@ -35,7 +35,7 @@ class AIQuestionExtractor:
     Supports: PDF, DOCX, TXT, XLSX, XLS
     """
 
-    CLAUDE_MODEL = 'claude-haiku-4-5'
+    CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
 
     def __init__(self):
         api_key = getattr(settings, 'ANTHROPIC_API_KEY', None)
@@ -71,20 +71,73 @@ class AIQuestionExtractor:
         extracted_data = self._extract_with_ai(file_content, type_names, mode=mode)
 
         # Step 3: Save questions to the database
+        logger.info(
+            "AI returned %d raw questions for questionnaire pk=%s",
+            len(extracted_data),
+            getattr(questionnaire, 'pk', '?'),
+        )
+        for i, qd in enumerate(extracted_data):
+            logger.info(
+                "  raw[%d]: type=%r question=%r col_a_len=%s col_b_len=%s",
+                i,
+                qd.get('type', '?'),
+                str(qd.get('question', ''))[:60],
+                len(qd.get('column_a', [])) if isinstance(qd.get('column_a'), list) else qd.get('column_a', 'N/A'),
+                len(qd.get('column_b', [])) if isinstance(qd.get('column_b'), list) else qd.get('column_b', 'N/A'),
+            )
+
         created_questions = []
         for question_data in extracted_data:
             try:
-                question_type = QuestionType.objects.get(name=question_data['type'])
+                q_type_name = question_data['type']
+                question_type, created = QuestionType.objects.get_or_create(
+                    name=q_type_name,
+                    defaults={'description': '', 'is_active': True},
+                )
+                if created:
+                    logger.warning(
+                        "QuestionType '%s' did not exist — created it automatically",
+                        q_type_name,
+                    )
+
+                # ── Matching type: store column_a/column_b/pairs as JSON ──────
+                if q_type_name == 'matching':
+                    col_a = question_data.get('column_a', [])
+                    col_b = question_data.get('column_b', [])
+                    pairs = question_data.get('matching_pairs', [])
+
+                    import json as _json_inner
+                    option_a = _json_inner.dumps(col_a, ensure_ascii=False) if col_a else None
+                    option_b = _json_inner.dumps(col_b, ensure_ascii=False) if col_b else None
+                    option_c = _json_inner.dumps(pairs, ensure_ascii=False)
+                    option_d = None
+
+                    correct_answer = question_data.get('answer', '')
+                    # Build a compact answer-key string from pairs if AI didn't supply one
+                    if not correct_answer and pairs:
+                        correct_answer = ', '.join(
+                            f"{p['item'].split('.')[0].strip()}-{p['match']}"
+                            for p in pairs
+                            if isinstance(p, dict) and 'item' in p and 'match' in p
+                        )
+
+                # ── All other types ────────────────────────────────────────────
+                else:
+                    option_a       = question_data.get('option_a')
+                    option_b       = question_data.get('option_b')
+                    option_c       = question_data.get('option_c')
+                    option_d       = question_data.get('option_d')
+                    correct_answer = question_data.get('answer', '')
 
                 question = ExtractedQuestion.objects.create(
                     questionnaire=questionnaire,
                     question_type=question_type,
                     question_text=question_data['question'],
-                    option_a=question_data.get('option_a'),
-                    option_b=question_data.get('option_b'),
-                    option_c=question_data.get('option_c'),
-                    option_d=question_data.get('option_d'),
-                    correct_answer=question_data.get('answer', ''),
+                    option_a=option_a,
+                    option_b=option_b,
+                    option_c=option_c,
+                    option_d=option_d,
+                    correct_answer=correct_answer,
                     explanation=question_data.get('explanation', ''),
                     points=question_data.get('points', 1),
                     difficulty=question_data.get('difficulty', 'medium'),
@@ -494,7 +547,7 @@ class AIQuestionExtractor:
         try:
             response = self.client.messages.create(
                 model=self.CLAUDE_MODEL,
-                max_tokens=8096,
+                max_tokens=8192,
                 temperature=temperature,
                 system=(
                     "You are a document scanner that copies text exactly as written. "
@@ -573,6 +626,20 @@ STEP 2 — EXTRACT QUESTIONS
 - Number questions by position within their section (restart at 1 for each Part/Section).
 - If no questions are found at all, return [].
 
+⚠ CRITICAL — MATCHING TYPE RULE (DO NOT SKIP):
+  If you see ANY of these signals, you are looking at a MATCHING TYPE section.
+  You MUST extract it as ONE question with type "matching" — NEVER as individual questions:
+    ▸ Headers "Column A" and "Column B" anywhere in the document
+    ▸ Items formatted as "_X_ N. Term" (e.g. "_C_ 1. A Record", "_E_ 2. MX Record")
+      where X is a letter and N is a number — this IS a matching section with embedded answers
+    ▸ A scoring note like "37–40. Scoring: 5 correct = 2 pts..."
+      followed by two groups of items
+    ▸ A visible table with two columns of terms and descriptions
+
+  DO NOT extract individual rows of a matching table as identification questions.
+  DO NOT skip a matching section just because the columns appear on separate lines.
+  DO process EACH matching section as its own separate "matching" question.
+
 ════════════════════════════════════════
 FORMATTED TEXT — ANSWER KEY DETECTION
 ════════════════════════════════════════
@@ -603,6 +670,77 @@ Examples:
 
   "3. [HIGHLIGHT:CPU] stands for Central Processing Unit."
   → answer: "CPU"
+
+════════════════════════════════════════
+MATCHING TYPE — CRITICAL INSTRUCTIONS
+════════════════════════════════════════
+A matching question has two columns of items that students must pair together.
+Treat the ENTIRE matching section as ONE question — do NOT split each row into a
+separate question.
+
+Teachers may format matching sections in two ways:
+  A) As a Word/PDF table with two columns (Column A | Column B)
+  B) As two separate paragraph lists (all Column A items, then all Column B items)
+  C) As text with the format:  "1. Term   |   A. Description"
+
+For matching type, include these EXTRA fields in the JSON object:
+  "column_a"       → array of ALL Column A items (terms/words to identify), WITHOUT any
+                     embedded answer prefix — e.g. ["1. A Record", "2. MX Record", "3. DORA"]
+  "column_b"       → array of ALL Column B items (descriptions to match)
+                     e.g. ["A. The four-step process...", "B. A command...", "C. The specific DNS record..."]
+  "matching_pairs" → array of answer pairs, built from wherever the answers appear:
+                     [{{"item": "1. A Record", "match": "C"}}, {{"item": "2. MX Record", "match": "E"}}]
+                     Set to [] if truly no answer key is found anywhere.
+
+════════════════════════════════════════
+MATCHING — ANSWER KEY FORMATS TO DETECT
+════════════════════════════════════════
+
+Format 1 — Underscore-letter prefix embedded in Column A (MOST COMMON in these files):
+  "_C_ 1. A Record"   → column_a item = "1. A Record",   pair = item "1. A Record" → match "C"
+  "_E_ 2. MX Record"  → column_a item = "2. MX Record",  pair = item "2. MX Record" → match "E"
+  "_A_ 3. DORA"       → column_a item = "3. DORA",        pair = item "3. DORA"       → match "A"
+  The letter between the underscores IS the answer — strip the "_X_" prefix when building column_a.
+
+Format 2 — Separate answer key section (e.g. at end of document):
+  "1-C  2-E  3-A  4-B  5-D"
+  → matching_pairs = [{{"item":"1","match":"C"}}, {{"item":"2","match":"E"}}, ...]
+
+Format 3 — In-table answer column (3-column layout: Answer | Column A | Column B):
+  "C  |  1. A Record  |  A. The four-step process..."
+  → extract answer letter "C" for item "1. A Record"
+
+Rules:
+  - Strip the "_X_" prefix from column_a items — do NOT include it in the item text
+  - Preserve the numbering/lettering exactly (e.g. "1. A Record" stays "1. A Record")
+  - The "question" field = the section heading (e.g. "Matching Type") or a scoring note
+    like "41-42. Scoring: 5 correct = 2 pts | 3-4 correct = 1 pt | 0-2 correct = 0 pts"
+  - The "answer" field = compact key string built from pairs, e.g. "1-C, 2-E, 3-A, 4-B, 5-D"
+    Leave "" only if truly no answer information is found anywhere.
+  - NEVER return individual matching rows as separate identification questions
+  - A document may have MULTIPLE separate matching sections — treat each as its own question
+
+Example document text:
+  41 – 42. Scoring: 5 correct = 2 pts | 3–4 correct = 1 pt | 0–2 correct = 0 pts
+  Column A                      Column B
+  _C_ 1. A Record               A. The four-step process (Discover, Offer, Request, ACK)...
+  _E_ 2. MX Record              B. A command used to show the exact route a packet takes...
+  _A_ 3. DORA                   C. The specific DNS record that maps a domain to an IPv4 address.
+  _B_ 4. tracert                D. A command-line tool used specifically for DNS diagnostics.
+  _D_ 5. nslookup               E. The DNS record used to identify the mail server for a domain.
+
+Expected JSON output for that section:
+  {{
+    "type": "matching",
+    "question": "41-42. Matching Type — Scoring: 5 correct = 2 pts | 3-4 correct = 1 pt | 0-2 correct = 0 pts",
+    "column_a": ["1. A Record", "2. MX Record", "3. DORA", "4. tracert", "5. nslookup"],
+    "column_b": ["A. The four-step process (Discover, Offer, Request, ACK) used by DHCP.", "B. A command used to show the exact route a packet takes to a destination.", "C. The specific DNS record that maps a domain to an IPv4 address.", "D. A command-line tool used specifically for DNS diagnostics.", "E. The DNS record used to identify the mail server for a domain."],
+    "matching_pairs": [{{"item": "1. A Record", "match": "C"}}, {{"item": "2. MX Record", "match": "E"}}, {{"item": "3. DORA", "match": "A"}}, {{"item": "4. tracert", "match": "B"}}, {{"item": "5. nslookup", "match": "D"}}],
+    "answer": "1-C, 2-E, 3-A, 4-B, 5-D",
+    "explanation": "",
+    "difficulty": "medium",
+    "points": 2
+  }}
 
 ════════════════════════════════════════
 DASH / HYPHEN ANSWER PATTERNS
@@ -653,17 +791,61 @@ TEXT TO SCAN:
 OUTPUT FORMAT
 ════════════════════════════════════════
 Return ONLY a valid JSON array — no extra text, no markdown, no code fences.
-Each element must have these fields:
+
+Common fields for ALL question types:
   "type"        - one of {type_names}
   "question"    - question text (without inline answer; use _______ placeholder)
-  "option_a"    - (multiple choice only, otherwise omit)
-  "option_b"    - (multiple choice only, otherwise omit)
-  "option_c"    - (multiple choice only, otherwise omit)
-  "option_d"    - (multiple choice only, otherwise omit)
   "answer"      - answer extracted from key, formatting tag, or dash pattern; or ""
   "explanation" - any explanation text found in the document, or ""
   "difficulty"  - "easy", "medium", or "hard"
   "points"      - point value if shown, otherwise 1
+
+Type-specific extra fields:
+  multiple_choice only → "option_a", "option_b", "option_c", "option_d"
+  matching only        → "column_a" (array), "column_b" (array), "matching_pairs" (array)
+
+Examples:
+[
+  {{
+    "type": "multiple_choice",
+    "question": "Which of the following is a type of malware?",
+    "option_a": "Firewall",
+    "option_b": "Virus",
+    "option_c": "Router",
+    "option_d": "Switch",
+    "answer": "B",
+    "explanation": "",
+    "difficulty": "easy",
+    "points": 1
+  }},
+  {{
+    "type": "matching",
+    "question": "Matching Type",
+    "column_a": ["1. CREATE", "2. TINYINT", "3. DROP"],
+    "column_b": ["A. Permanently deletes a database object.", "B. Creates new database objects.", "C. Modifies the structure of an existing table."],
+    "matching_pairs": [{{"item": "1. CREATE", "match": "B"}}, {{"item": "2. TINYINT", "match": "G"}}, {{"item": "3. DROP", "match": "A"}}],
+    "answer": "1-B, 2-G, 3-A",
+    "explanation": "",
+    "difficulty": "medium",
+    "points": 1
+  }},
+  {{
+    "type": "identification",
+    "question": "_______ is the process by which plants make food using sunlight.",
+    "answer": "Photosynthesis",
+    "explanation": "",
+    "difficulty": "medium",
+    "points": 1
+  }},
+  {{
+    "type": "enumeration",
+    "question": "List the nine (9) types of server security threats.",
+    "answer": "Malware\nDDoS\nUnauthorized Access\nSQL Injection\nPhishing\nInsider Threats\nZero-Day Exploits\nMisconfiguration\nBrute Force Attacks",
+    "explanation": "",
+    "difficulty": "medium",
+    "points": 5
+  }}
+]
 
 If no questions found, return: []"""
 
@@ -758,9 +940,15 @@ JSON:"""
         except json.JSONDecodeError as e:
             logger.error("Failed to parse AI response: %s\nPreview: %s", e, response_text[:500])
 
-            # Try to recover individual objects from a malformed response
+            # Try to recover individual objects from a malformed response.
+            # The pattern handles one level of nesting (needed for matching pairs
+            # which contain inner {…} objects inside the matching_pairs array).
             try:
-                objects = re.findall(r'\{[^{}]+\}', response_text, re.DOTALL)
+                objects = re.findall(
+                    r'\{(?:[^{}]|\{[^{}]*\})*\}',
+                    response_text,
+                    re.DOTALL,
+                )
                 recovered = []
                 for obj_str in objects:
                     try:
@@ -784,11 +972,22 @@ JSON:"""
         if not question.get('type') or not question.get('question'):
             return False
 
+        q_type = question['type']
+
         # Multiple choice must have all 4 options
-        if question['type'] == 'multiple_choice':
+        if q_type == 'multiple_choice':
             for option in ['option_a', 'option_b', 'option_c', 'option_d']:
                 if not question.get(option):
                     return False
+
+        # Matching: ensure default arrays — do NOT silently drop the question
+        if q_type == 'matching':
+            if 'column_a' not in question or question.get('column_a') is None:
+                question['column_a'] = []
+            if 'column_b' not in question or question.get('column_b') is None:
+                question['column_b'] = []
+            if 'matching_pairs' not in question or question.get('matching_pairs') is None:
+                question['matching_pairs'] = []
 
         # Set defaults for optional fields
         if question.get('difficulty') not in ['easy', 'medium', 'hard']:
