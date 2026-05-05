@@ -1622,14 +1622,18 @@ def workspace(request):
     active_folders = (
         WorkspaceFolder.objects
         .filter(teacher=teacher, is_archived=False)
+        .select_related('subject')
         .order_by('-created_at')
     )
     folders_data = [
         {
-            'id':         f.pk,
-            'name':       f.name,
-            'created_at': f.created_at.isoformat(),
-            'questions':  _build_folder_questions_data(f),
+            'id':           f.pk,
+            'name':         f.name,
+            'created_at':   f.created_at.isoformat(),
+            'subject_id':   f.subject_id,
+            'subject_code': f.subject.code if f.subject else None,
+            'subject_name': f.subject.name if f.subject else None,
+            'questions':    _build_folder_questions_data(f),
         }
         for f in active_folders
     ]
@@ -1637,22 +1641,38 @@ def workspace(request):
     archived_folders = (
         WorkspaceFolder.objects
         .filter(teacher=teacher, is_archived=True)
+        .select_related('subject')
         .order_by('-created_at')
     )
     archived_folders_data = [
         {
-            'id':         f.pk,
-            'name':       f.name,
-            'created_at': f.created_at.isoformat(),
-            'questions':  _build_folder_questions_data(f),
+            'id':           f.pk,
+            'name':         f.name,
+            'created_at':   f.created_at.isoformat(),
+            'subject_id':   f.subject_id,
+            'subject_code': f.subject.code if f.subject else None,
+            'subject_name': f.subject.name if f.subject else None,
+            'questions':    _build_folder_questions_data(f),
         }
         for f in archived_folders
     ]
+
+    # Pass the teacher's assigned subjects so the "New Folder" modal can list them
+    assigned_subjects = list(
+        teacher.subjects.values('id', 'code', 'name').order_by('code')
+    )
+    if not assigned_subjects:
+        from accounts.models import Subject as SubjectModel
+        assigned_subjects = list(
+            SubjectModel.objects.filter(departments=teacher.department)
+            .values('id', 'code', 'name').order_by('code')
+        )
 
     import json
     return render(request, 'teacher_dashboard/workspace.html', {
         'folders_json':          json.dumps(folders_data),
         'archived_folders_json': json.dumps(archived_folders_data),
+        'subjects_json':         json.dumps(assigned_subjects),
     })
 
 
@@ -1674,9 +1694,24 @@ def workspace_create_folder(request):
     if not name:
         return JsonResponse({'error': 'Folder name is required.'}, status=400)
 
-    folder = WorkspaceFolder.objects.create(teacher=teacher, name=name)
-    cache.delete(f'workspace_folders_{teacher.id}')  # ✅ bust cache after creating folder
-    return JsonResponse({'id': folder.pk, 'name': folder.name})
+    subject_id = body.get('subject_id')
+    subject    = None
+    if subject_id:
+        from accounts.models import Subject as SubjectModel
+        try:
+            subject = SubjectModel.objects.get(pk=subject_id)
+        except SubjectModel.DoesNotExist:
+            return JsonResponse({'error': 'Invalid subject selected.'}, status=400)
+
+    folder = WorkspaceFolder.objects.create(teacher=teacher, name=name, subject=subject)
+    cache.delete(f'workspace_folders_{teacher.id}')
+    return JsonResponse({
+        'id':           folder.pk,
+        'name':         folder.name,
+        'subject_id':   folder.subject_id,
+        'subject_code': folder.subject.code if folder.subject else None,
+        'subject_name': folder.subject.name if folder.subject else None,
+    })
 
 
 @login_required
@@ -1735,11 +1770,14 @@ def workspace_unarchive_folder(request, folder_id):
     folder.save()
     cache.delete(f'workspace_folders_{teacher.id}')
     return JsonResponse({
-        'unarchived':  True,
-        'id':          folder.pk,
-        'name':        folder.name,
-        'created_at':  folder.created_at.isoformat(),
-        'questions':   _build_folder_questions_data(folder),
+        'unarchived':   True,
+        'id':           folder.pk,
+        'name':         folder.name,
+        'created_at':   folder.created_at.isoformat(),
+        'subject_id':   folder.subject_id,
+        'subject_code': folder.subject.code if folder.subject else None,
+        'subject_name': folder.subject.name if folder.subject else None,
+        'questions':    _build_folder_questions_data(folder),
     })
 
 
@@ -1774,7 +1812,28 @@ def workspace_add_questions(request, folder_id):
     if not isinstance(question_ids, list):
         return JsonResponse({'error': 'question_ids must be a list'}, status=400)
 
-    allowed_questions = ExtractedQuestion.objects.filter(pk__in=question_ids)
+    allowed_questions = ExtractedQuestion.objects.filter(
+        pk__in=question_ids
+    ).select_related('questionnaire__subject')
+
+    # Enforce subject lock: if the folder has a subject, only questions from
+    # that subject's questionnaires are allowed.
+    if folder.subject_id:
+        wrong = [
+            q for q in allowed_questions
+            if q.questionnaire.subject_id != folder.subject_id
+        ]
+        if wrong:
+            folder_subject = folder.subject.code if folder.subject else 'this subject'
+            return JsonResponse({
+                'error': (
+                    f'This folder is locked to {folder_subject}. '
+                    f'You can only add questions from {folder_subject} questionnaires.'
+                ),
+                'subject_mismatch': True,
+                'folder_subject_code': folder.subject.code if folder.subject else '',
+                'folder_subject_name': folder.subject.name if folder.subject else '',
+            }, status=400)
 
     added = already = 0
     for q in allowed_questions:
@@ -1784,7 +1843,7 @@ def workspace_add_questions(request, folder_id):
         else:
             already += 1
 
-    cache.delete(f'workspace_folders_{teacher.id}')  # ✅ bust cache after adding questions
+    cache.delete(f'workspace_folders_{teacher.id}')
     return JsonResponse({'added': added, 'already_existed': already})
 
 
@@ -1923,6 +1982,7 @@ def workspace_list_folders(request):
     folders = (
         WorkspaceFolder.objects
         .filter(teacher=teacher)
+        .select_related('subject')
         .prefetch_related(
             'folder_questions',
             'folder_questions__question',
@@ -1940,6 +2000,9 @@ def workspace_list_folders(request):
             'id':             folder.pk,
             'name':           folder.name,
             'question_count': len(qids),
+            'subject_id':     folder.subject_id,
+            'subject_code':   folder.subject.code if folder.subject else None,
+            'subject_name':   folder.subject.name if folder.subject else None,
         })
 
     data = {

@@ -358,6 +358,14 @@ class WorkspaceFolder(models.Model):
         on_delete=models.CASCADE,
         related_name='workspace_folders',
     )
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='workspace_folders',
+        help_text='Subject this folder is locked to — only questions from this subject can be added',
+    )
     name        = models.CharField(max_length=80)
     is_archived = models.BooleanField(default=False)
     created_at  = models.DateTimeField(auto_now_add=True)

@@ -363,6 +363,23 @@
     </div>
 </div>
 
+<!-- Subject Mismatch Warning Modal (Browse page) -->
+<div id="browseSubjectMismatchModal"
+    class="fixed inset-0 bg-black/60 z-[20000] hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
+        <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="bi bi-lock-fill text-3xl text-amber-500"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Wrong Subject</h3>
+        <p class="text-gray-500 mb-1 text-sm">This folder is locked to</p>
+        <p class="font-bold text-indigo-700 text-lg mb-3" id="browseMismatchFolderSubject">—</p>
+        <p class="text-gray-500 text-sm mb-6">You can only add questions that belong to that subject.</p>
+        <button id="browseMismatchModalClose"
+            class="w-full px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-bold
+                   rounded-xl transition-colors">Got it</button>
+    </div>
+</div>
+
 <!-- DOCUMENT PREVIEW MODAL -->
 <div id="docPreviewModal" class="doc-preview-overlay" onclick="if(event.target===this)closeDocPreview()">
     <div class="doc-preview-wrapper">
@@ -858,6 +875,26 @@ function closeFolderPicker() {
 document.getElementById('closeFolderPicker').addEventListener('click', closeFolderPicker);
 folderPickerModal.addEventListener('click', function(e){ if(e.target===folderPickerModal) closeFolderPicker(); });
 
+/* ── Subject mismatch popup ── */
+var browseSubjectMismatchModal = document.getElementById('browseSubjectMismatchModal');
+document.getElementById('browseMismatchModalClose').addEventListener('click', function(){
+    browseSubjectMismatchModal.classList.add('hidden');
+    browseSubjectMismatchModal.classList.remove('flex');
+});
+browseSubjectMismatchModal.addEventListener('click', function(e){
+    if (e.target === browseSubjectMismatchModal) {
+        browseSubjectMismatchModal.classList.add('hidden');
+        browseSubjectMismatchModal.classList.remove('flex');
+    }
+});
+function showBrowseMismatchModal(folderSubjectCode, folderSubjectName) {
+    var label = folderSubjectCode || folderSubjectName || 'another subject';
+    if (folderSubjectCode && folderSubjectName) label = folderSubjectCode + ' — ' + folderSubjectName;
+    document.getElementById('browseMismatchFolderSubject').textContent = label;
+    browseSubjectMismatchModal.classList.remove('hidden');
+    browseSubjectMismatchModal.classList.add('flex');
+}
+
 function renderFolderPicker() {
     var list = document.getElementById('fp-folder-list');
     var nf   = document.getElementById('fp-no-folders');
@@ -875,19 +912,46 @@ function renderFolderPicker() {
     list.innerHTML = '';
     cachedFolders.forEach(function(folder, idx) {
         var grad = GRADS[idx % GRADS.length];
-        var btn  = document.createElement('button');
-        btn.className = 'w-full flex items-center gap-3 p-3.5 rounded-xl border-2 border-gray-100 ' +
-            'hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left group';
+
+        /* Subject lock check — is this folder locked to a DIFFERENT subject? */
+        var isLocked   = !!folder.subject_code;
+        var isMismatch = isLocked && currentSubjectCode && folder.subject_code !== currentSubjectCode;
+
+        var btn = document.createElement('button');
+        btn.className = 'w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left group ' +
+            (isMismatch
+                ? 'border-red-100 bg-red-50 opacity-70 cursor-not-allowed'
+                : 'border-gray-100 hover:border-indigo-400 hover:bg-indigo-50 cursor-pointer');
+
+        /* Subject badge HTML */
+        var subjectBadge = '';
+        if (isLocked) {
+            subjectBadge = '<span class="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ' +
+                (isMismatch ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600') + '">' +
+                '<i class="bi bi-lock-fill"></i> ' + esc(folder.subject_code) + '</span>';
+        }
+
         btn.innerHTML =
             '<div class="w-10 h-10 bg-gradient-to-br '+grad+' rounded-lg flex items-center justify-center flex-shrink-0">' +
                 '<i class="bi bi-folder2-open text-white"></i>' +
             '</div>' +
             '<div class="flex-1 min-w-0">' +
-                '<div class="font-bold text-gray-800 text-sm truncate">'+esc(folder.name)+'</div>' +
+                '<div class="font-bold text-gray-800 text-sm truncate flex items-center flex-wrap gap-1">'+
+                    esc(folder.name) + subjectBadge +
+                '</div>' +
                 '<div class="text-xs text-gray-400">'+(folder.question_count||0)+' question(s)</div>' +
             '</div>' +
-            '<i class="bi bi-arrow-right text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"></i>';
-        btn.addEventListener('click', function(){ saveToFolder(folder.id, folder.name); });
+            (isMismatch
+                ? '<i class="bi bi-slash-circle text-red-400 flex-shrink-0"></i>'
+                : '<i class="bi bi-arrow-right text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"></i>');
+
+        if (isMismatch) {
+            btn.addEventListener('click', function(){
+                showBrowseMismatchModal(folder.subject_code, folder.subject_name);
+            });
+        } else {
+            btn.addEventListener('click', function(){ saveToFolder(folder.id, folder.name); });
+        }
         list.appendChild(btn);
     });
 }
@@ -897,6 +961,11 @@ function saveToFolder(folderId, folderName) {
 
     postJSON(API.addQuestions(folderId), { question_ids: pendingQuestionIds.map(Number) })
         .then(function(data) {
+            if (data.subject_mismatch) {
+                /* Server-side subject lock enforcement (safety net) */
+                showBrowseMismatchModal(data.folder_subject_code, data.folder_subject_name);
+                return;
+            }
             if (data.error) { showToast(data.error,'error'); return; }
             loadFoldersFromServer();
             closeFolderPicker();
@@ -1209,7 +1278,7 @@ function renderDPQ(q,num,type){
 })();
 
 /* ── Move modals to <body> so they escape #main-page-content stacking context ── */
-['reviewModal','folderPickerModal','docPreviewModal'].forEach(function(id){
+['reviewModal','folderPickerModal','docPreviewModal','browseSubjectMismatchModal'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) document.body.appendChild(el);
 });
