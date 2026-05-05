@@ -10,6 +10,7 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 import io
 import os
+import re
 from django.conf import settings
 
 TEMPLATE_PATH = r"C:\DJANGO PROJECTS\THESISattempt4\bisu_template.docx"
@@ -38,7 +39,10 @@ class BISUQuestionnaireGenerator:
 
     def generate_questionnaire(self, questionnaire_data):
         self._fill_placeholders(questionnaire_data)
-        answer_key_data = self._add_questions_by_type(questionnaire_data['questions'])
+        if 'sections' in questionnaire_data:
+            answer_key_data = self._add_sections_in_order(questionnaire_data['sections'])
+        else:
+            answer_key_data = self._add_questions_by_type(questionnaire_data['questions'])
         if answer_key_data:
             self._add_answer_key_page(answer_key_data)
         return self.doc
@@ -139,6 +143,103 @@ class BISUQuestionnaireGenerator:
     # QUESTION SECTIONS
     # =========================================================================
 
+    # =========================================================================
+    # ORDERED SECTIONS (used when section_header entries are present)
+    # =========================================================================
+
+    @staticmethod
+    def _question_number_from_text(text):
+        """Extract the leading question number/range from question_text."""
+        m = re.match(r'^\s*(\d+\s*[\-–]\s*\d+|\d+)[\.\s]', text or '')
+        return m.group(1).strip() if m else None
+
+    def _add_sections_in_order(self, sections):
+        """
+        Render sections in the original document order.
+        Each section has a 'header' (section_header text) and 'questions' list.
+        Question numbers come from the question_text — the generator does NOT add its own.
+        """
+        answer_key = {}
+
+        for idx, section in enumerate(sections):
+            header_text = section.get('header') or ''
+            questions   = section.get('questions', [])
+
+            if not questions and not header_text:
+                continue
+
+            # ── Section header ──────────────────────────────────────────────
+            if header_text:
+                # Separate title from instructions
+                if '\n' in header_text:
+                    title_line, _, instructions = header_text.partition('\n')
+                    title_line = title_line.strip()
+                    instructions = instructions.strip()
+                else:
+                    # "Part I. Multiple Choice: Instructions here..."
+                    m = re.match(
+                        r'^((?:Part|PART)\s+[\w]+\.?\s+[^:]+?):\s*(.+)$',
+                        header_text,
+                        re.DOTALL,
+                    )
+                    if m:
+                        title_line   = m.group(1).strip()
+                        instructions = m.group(2).strip()
+                    else:
+                        title_line   = header_text
+                        instructions = ''
+
+                p = self.doc.add_paragraph()
+                r = p.add_run(title_line)
+                r.bold = True
+                r.font.size = Pt(12)
+                r.font.name = 'Arial'
+
+                if instructions:
+                    p2 = self.doc.add_paragraph()
+                    r2 = p2.add_run(instructions)
+                    r2.bold = False
+                    r2.italic = True
+                    r2.font.size = Pt(11)
+                    r2.font.name = 'Arial'
+
+                self.doc.add_paragraph()
+
+            if not questions:
+                continue
+
+            section_answers = []
+            for question in questions:
+                self._add_question(question, number=None)
+                qtype = question.question_type.name
+                if qtype == 'essay':
+                    continue
+                qnum = self._question_number_from_text(question.question_text) or '?'
+                if qtype == 'matching':
+                    md    = question.get_matching_data()
+                    pairs = md.get('pairs', []) if md else []
+                    section_answers.append((qnum, 'matching', pairs))
+                else:
+                    section_answers.append((qnum, qtype, question.correct_answer or ''))
+
+            if section_answers:
+                if header_text:
+                    if '\n' in header_text:
+                        ak_title = header_text.partition('\n')[0].strip()
+                    else:
+                        m2 = re.match(r'^((?:Part|PART)\s+[\w]+\.?\s+[^:]+?):', header_text)
+                        ak_title = m2.group(1).strip() if m2 else header_text
+                else:
+                    ak_title = f'Section {idx + 1}'
+                answer_key[idx] = {
+                    'title':   ak_title,
+                    'answers': section_answers,
+                }
+
+            self.doc.add_paragraph()
+
+        return answer_key
+
     def _add_questions_by_type(self, questions_by_type):
         """Adds all question sections and returns answer-key data grouped by type."""
         question_number = 1
@@ -185,29 +286,37 @@ class BISUQuestionnaireGenerator:
 
         return answer_key
 
-    def _add_question(self, question, number):
-        """Dispatch to the correct renderer based on question type."""
+    def _add_question(self, question, number=None):
+        """Dispatch to the correct renderer based on question type.
+
+        When number is None (ordered-section mode) the question_text already
+        contains the original question number — do NOT prepend another one.
+        When number is an int (legacy by-type mode) prepend it as before.
+        """
         qtype = question.question_type.name
 
         if qtype == 'matching':
-            # Matching: render the table WITHOUT printing a numbered stem.
-            # The section header already tells students what to do.
-            # The overall question_number is still consumed (counts as 1).
             self._add_matching_question(question, number)
             return
 
-        # All other types: print the numbered question stem first.
-        # True/False gets a blank prepended before the number (like identification).
-        if qtype == 'true_false':
-            p = self.doc.add_paragraph()
-            r = p.add_run(f"________ {number}. {question.question_text}")
-            r.font.size = Pt(12)
-            r.font.name = 'Arial'
+        # Build the stem text
+        if number is not None:
+            # Legacy mode: generator owns the numbering
+            if qtype == 'true_false':
+                stem = f"________ {number}. {question.question_text}"
+            else:
+                stem = f"{number}. {question.question_text}"
         else:
-            p = self.doc.add_paragraph()
-            r = p.add_run(f"{number}. {question.question_text}")
-            r.font.size = Pt(12)
-            r.font.name = 'Arial'
+            # Ordered mode: number is already inside question_text
+            if qtype == 'true_false':
+                stem = f"________ {question.question_text}"
+            else:
+                stem = question.question_text
+
+        p = self.doc.add_paragraph()
+        r = p.add_run(stem)
+        r.font.size = Pt(12)
+        r.font.name = 'Arial'
 
         if qtype == 'multiple_choice':
             self._add_multiple_choice(question)
@@ -481,7 +590,7 @@ class BISUQuestionnaireGenerator:
         self._add_horizontal_rule()
         self.doc.add_paragraph()
 
-        # ── Answers grouped by section ────────────────────────────────────
+        # ── Answers grouped by section ──────────────────────────────────
         for section_key, section_data in answer_key_data.items():
             answers = section_data.get('answers', [])
             if not answers:
@@ -494,27 +603,37 @@ class BISUQuestionnaireGenerator:
             r.font.size = Pt(12)
             r.font.name = 'Arial'
 
-            if section_key == 'matching':
-                # Show Column-A-item → Column-B-letter pairs
-                for num, _qtype, pairs in answers:
+            # Split by individual qtype so matching/enumeration render correctly
+            # regardless of whether section_key is a string (legacy) or int (ordered).
+            matching_answers    = [(n, d) for n, qt, d in answers if qt == 'matching']
+            enumeration_answers = [(n, d) for n, qt, d in answers if qt == 'enumeration']
+            regular_answers     = [(n, d) for n, qt, d in answers
+                                   if qt not in ('matching', 'enumeration')]
+
+            if matching_answers:
+                for num, pairs in matching_answers:
                     if not pairs:
                         continue
+                    p = self.doc.add_paragraph()
+                    r = p.add_run(f"  {num}.")
+                    r.bold = True
+                    r.font.size = Pt(11)
+                    r.font.name = 'Arial'
                     parts = []
                     for pair in pairs:
                         item  = pair.get('item', '')
                         match = pair.get('match', '?')
                         n     = item.split('.')[0].strip() if '.' in str(item) else str(item)
-                        parts.append(f"{n}\u2192{match}")
+                        parts.append(f"{n}→{match}")
                     p = self.doc.add_paragraph()
                     r = p.add_run('   '.join(parts))
                     r.font.size = Pt(11)
                     r.font.name = 'Arial'
 
-            elif section_key == 'enumeration':
-                # Each question: show "Q{num}:" then list all correct items
-                for num, _qtype, answer in answers:
+            if enumeration_answers:
+                for num, answer in enumeration_answers:
                     p = self.doc.add_paragraph()
-                    r = p.add_run(f"Q{num}:")
+                    r = p.add_run(f"  {num}:")
                     r.bold      = True
                     r.font.size = Pt(11)
                     r.font.name = 'Arial'
@@ -523,14 +642,14 @@ class BISUQuestionnaireGenerator:
                         raw_items = [s.strip() for s in answer.split(',') if s.strip()]
                     for i, item in enumerate(raw_items, 1):
                         p = self.doc.add_paragraph()
-                        r = p.add_run(f"   {i}. {item}")
+                        r = p.add_run(f"     {i}. {item}")
                         r.font.size = Pt(11)
                         r.font.name = 'Arial'
 
-            else:
+            if regular_answers:
                 # Layout as a compact grid (5 answers per row)
                 cols = 5
-                rows_needed = (len(answers) + cols - 1) // cols
+                rows_needed = (len(regular_answers) + cols - 1) // cols
                 table = self.doc.add_table(rows=rows_needed, cols=cols)
 
                 # Invisible borders
@@ -541,7 +660,7 @@ class BISUQuestionnaireGenerator:
                     tbl.insert(0, tblPr)
                 self._set_table_borders_invisible(tblPr)
 
-                for idx, (num, _qtype, answer) in enumerate(answers):
+                for idx, (num, answer) in enumerate(regular_answers):
                     row_i = idx // cols
                     col_i = idx % cols
                     cell  = table.rows[row_i].cells[col_i]
@@ -599,61 +718,65 @@ def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
     """
     Generate BISU questionnaire from database objects using the Word template.
     Returns: tuple (docx_path, pdf_path)  — pdf_path may be None.
+
+    Questions are rendered in the EXACT ORDER they were extracted, using
+    section_header entries as section dividers so Part I / Part II / Part III
+    appear as in the original document.
     """
-    from collections import defaultdict
+    from .models import ExtractedQuestion
 
-    questions_by_type = defaultdict(list)
-    for q in selected_questions:
-        questions_by_type[q.question_type.name].append(q)
+    # Convert to a plain list so we can extend it.
+    selected_list = list(selected_questions)
+    selected_ids  = {q.id for q in selected_list}
 
-    section_config = {
-        'identification': {
-            'title_label': 'Identification',
-            'instruction': 'Read carefully and identify what is being asked.',
-        },
-        'multiple_choice': {
-            'title_label': 'Multiple Choice',
-            'instruction': 'Write the CAPITAL LETTER of the best response.',
-        },
-        'true_false': {
-            'title_label': 'True or False',
-            'instruction': 'Write TRUE if the statement is correct, otherwise write FALSE.',
-        },
-        'essay': {
-            'title_label': 'Essay',
-            'instruction': 'Answer the following questions comprehensively.',
-        },
-        'fill_blank': {
-            'title_label': 'Fill in the Blanks',
-            'instruction': 'Complete the following statements.',
-        },
-        'fill_in_the_blank': {
-            'title_label': 'Fill in the Blanks',
-            'instruction': 'Complete the following statements.',
-        },
-        'matching': {
-            'title_label': 'Matching Type',
-            'instruction': (
-                'Match the items in Column A with their correct description in Column B. '
-                'Write the letter of your answer in the blank provided.'
-            ),
-        },
-        'enumeration': {
-            'title_label': 'Enumeration',
-            'instruction': 'List all the correct items being asked in each question.',
-        },
-    }
+    # section_header questions are rendered as banners in the review UI —
+    # they have no checkbox, so their IDs are never in the download URL.
+    # Always pull them from the DB and merge them back in creation order.
+    section_headers = list(
+        questionnaire_obj.extracted_questions
+        .filter(question_type__name='section_header')
+        .exclude(id__in=selected_ids)
+        .select_related('question_type')
+        .order_by('created_at')
+    )
 
-    sections = {}
-    part_number = 1
-    for qtype, config in section_config.items():
-        if questions_by_type.get(qtype):
-            sections[qtype] = {
-                'title':       f'PART {part_number}. {config["title_label"]}',
-                'instruction': config['instruction'],
-                'questions':   questions_by_type[qtype],
-            }
-            part_number += 1
+    if section_headers:
+        # Merge by created_at so the original document order is preserved.
+        all_questions = sorted(
+            selected_list + section_headers,
+            key=lambda q: q.created_at,
+        )
+    else:
+        all_questions = selected_list
+
+    # Build ordered sections from the question list.
+    # section_header questions become section titles; all others are body questions.
+    sections = []
+    current_header = None
+    current_questions = []
+
+    for q in all_questions:
+        if q.question_type.name == 'section_header':
+            if current_questions or current_header is not None:
+                sections.append({
+                    'header':    current_header,
+                    'questions': current_questions[:],
+                })
+            current_header    = q.question_text
+            current_questions = []
+        else:
+            current_questions.append(q)
+
+    # Flush the last section
+    if current_questions or current_header is not None:
+        sections.append({
+            'header':    current_header,
+            'questions': current_questions[:],
+        })
+
+    # Fallback: no section_headers at all — dump everything into one unlabelled section
+    if not sections:
+        sections = [{'header': None, 'questions': all_questions}]
 
     try:
         instructor_name = (questionnaire_obj.uploader.user.get_full_name()
@@ -669,7 +792,7 @@ def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
         'instructor':  instructor_name,
         'department':  questionnaire_obj.department.name,
         'semester':    '1st Semester, A.Y.2025-2026',
-        'questions':   sections,
+        'sections':    sections,   # ordered; uses section_header entries as dividers
     }
 
     generator = BISUQuestionnaireGenerator()

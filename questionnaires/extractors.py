@@ -426,30 +426,10 @@ class AIQuestionExtractor:
     def _read_docx(self, file_path: str) -> str:
         """
         Extract DOCX text in reading order, preserving answer-key formatting
-        cues ([RED:...], [BOLD:...], etc.) and auto-list numbering.
+        cues ([RED:...], [BOLD:...], etc.).
         Also reads table cells so answer keys placed in tables are captured.
         """
         _WNS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
-
-        def _list_number(block, counters):
-            """Return the auto-generated list counter for this paragraph, or None."""
-            pPr = block.find(f'{{{_WNS}}}pPr')
-            if pPr is None:
-                return None
-            numPr = pPr.find(f'{{{_WNS}}}numPr')
-            if numPr is None:
-                return None
-            numId_el = numPr.find(f'{{{_WNS}}}numId')
-            ilvl_el  = numPr.find(f'{{{_WNS}}}ilvl')
-            if numId_el is None or ilvl_el is None:
-                return None
-            num_id = numId_el.get(f'{{{_WNS}}}val', '0')
-            ilvl   = ilvl_el.get(f'{{{_WNS}}}val', '0')
-            if num_id == '0':
-                return None
-            key = (num_id, ilvl)
-            counters[key] = counters.get(key, 0) + 1
-            return counters[key]
 
         def _plain_text(element):
             """Fallback: extract plain text from an XML element."""
@@ -460,8 +440,7 @@ class AIQuestionExtractor:
 
         try:
             doc = Document(file_path)
-            text          = []
-            list_counters = {}
+            text = []
 
             # Build element → paragraph object map so we can use
             # _extract_para_with_formatting (which needs a python-docx Para).
@@ -479,9 +458,6 @@ class AIQuestionExtractor:
                         para_text = _plain_text(block)
 
                     if para_text:
-                        num = _list_number(block, list_counters)
-                        if num is not None:
-                            para_text = f"{num}. {para_text}"
                         text.append(para_text)
 
                 elif tag == 'tbl':
@@ -623,17 +599,33 @@ STEP 2 — EXTRACT QUESTIONS
 - When an answer is embedded inline (via formatting tags or a dash pattern),
   extract that answer into the "answer" field and write the question WITHOUT
   the inline answer — replace it with a blank _______ if needed.
-- Number questions by position within their section (restart at 1 for each Part/Section).
 - If no questions are found at all, return [].
+
+NUMBERING — PRESERVE THE ORIGINAL:
+  ▸ Keep the EXACT question number that appears in the document in the "question" field.
+    e.g. if the document says "15. Which of the following..." → question starts with "15."
+  ▸ Do NOT renumber, do NOT restart from 1, do NOT add your own numbering.
+  ▸ If the document has no number on a question, leave it without one.
+
+PART / SECTION TRACKING — EXTRACT HEADER ONCE, NOT ON EVERY QUESTION:
+  ▸ Detect section headers such as: "Part I", "Part II", "PART I.", "Section A",
+    "I. Multiple Choice", "II. Identification", etc.
+  ▸ When you reach a new section, emit ONE "section_header" entry BEFORE the questions in
+    that section. Include the section title AND the directions/instructions line if present.
+      {{"type": "section_header", "question": "Part I. Multiple Choice\nDirections: Choose the letter of the best answer.", "answer": "", "explanation": "", "difficulty": "easy", "points": 0}}
+  ▸ Do NOT add the section label to individual question texts — questions start with their number only:
+      "1. Which of the following best describes a file server?"   ← correct
+      "(Part I) 1. Which of the following..."                     ← WRONG, do not do this
+  ▸ If no section header exists in the document, do not emit any section_header entry.
 
 ⚠ CRITICAL — MATCHING TYPE RULE (DO NOT SKIP):
   If you see ANY of these signals, you are looking at a MATCHING TYPE section.
   You MUST extract it as ONE question with type "matching" — NEVER as individual questions:
     ▸ Headers "Column A" and "Column B" anywhere in the document
-    ▸ Items formatted as "_X_ N. Term" (e.g. "_C_ 1. A Record", "_E_ 2. MX Record")
+    ▸ Items formatted as "_X_ N. Term" (e.g. "_C_ 1. Linux Server", "_A_ 2. Windows Server")
       where X is a letter and N is a number — this IS a matching section with embedded answers
-    ▸ A scoring note like "37–40. Scoring: 5 correct = 2 pts..."
-      followed by two groups of items
+    ▸ A scoring/range note like "30 – 31. 5 correct = 2 pts | 3-4 correct = 1.5 pts..."
+      followed by Column A / Column B lists — "30 – 31" is the question NUMBER RANGE
     ▸ A visible table with two columns of terms and descriptions
 
   DO NOT extract individual rows of a matching table as identification questions.
@@ -712,31 +704,33 @@ Format 3 — In-table answer column (3-column layout: Answer | Column A | Column
 
 Rules:
   - Strip the "_X_" prefix from column_a items — do NOT include it in the item text
-  - Preserve the numbering/lettering exactly (e.g. "1. A Record" stays "1. A Record")
-  - The "question" field = the section heading (e.g. "Matching Type") or a scoring note
-    like "41-42. Scoring: 5 correct = 2 pts | 3-4 correct = 1 pt | 0-2 correct = 0 pts"
-  - The "answer" field = compact key string built from pairs, e.g. "1-C, 2-E, 3-A, 4-B, 5-D"
+  - Preserve the numbering/lettering exactly (e.g. "1. Linux Server" stays "1. Linux Server")
+  - The "question" field = section prefix (if any) + the question number range + scoring note:
+      "(Part IV) 30-31. 5 correct = 2 pts | 3-4 correct = 1.5 pts | 1-2 correct = 1 pt | 0 correct = 0 pts"
+    If there is no scoring note, use: "(Part IV) 30-31. Matching Type"
+    If there is no range number, use the section heading alone.
+  - The "answer" field = compact key string built from pairs, e.g. "1-C, 2-A, 3-B, 4-E, 5-D"
     Leave "" only if truly no answer information is found anywhere.
   - NEVER return individual matching rows as separate identification questions
   - A document may have MULTIPLE separate matching sections — treat each as its own question
 
 Example document text:
-  41 – 42. Scoring: 5 correct = 2 pts | 3–4 correct = 1 pt | 0–2 correct = 0 pts
+  30 – 31. 5 correct = 2 pts | 3-4 correct = 1.5 pts | 1-2 correct = 1 pt | 0 correct = 0 pts
   Column A                      Column B
-  _C_ 1. A Record               A. The four-step process (Discover, Offer, Request, ACK)...
-  _E_ 2. MX Record              B. A command used to show the exact route a packet takes...
-  _A_ 3. DORA                   C. The specific DNS record that maps a domain to an IPv4 address.
-  _B_ 4. tracert                D. A command-line tool used specifically for DNS diagnostics.
-  _D_ 5. nslookup               E. The DNS record used to identify the mail server for a domain.
+  _C_ 1. Linux Server           A. Proprietary OS; best for .NET and Active Directory integration.
+  _A_ 2. Windows Server         B. Highly stable, proprietary OS often used in high-end workstations.
+  _B_ 3. UNIX                   C. Open-source; favored for web servers due to low cost and security.
+  _E_ 4. Command Line (CLI)     D. A minimal Windows install option that reduces the attack surface.
+  _D_ 5. Server Core            E. The primary management interface for Linux/UNIX servers.
 
 Expected JSON output for that section:
   {{
     "type": "matching",
-    "question": "41-42. Matching Type — Scoring: 5 correct = 2 pts | 3-4 correct = 1 pt | 0-2 correct = 0 pts",
-    "column_a": ["1. A Record", "2. MX Record", "3. DORA", "4. tracert", "5. nslookup"],
-    "column_b": ["A. The four-step process (Discover, Offer, Request, ACK) used by DHCP.", "B. A command used to show the exact route a packet takes to a destination.", "C. The specific DNS record that maps a domain to an IPv4 address.", "D. A command-line tool used specifically for DNS diagnostics.", "E. The DNS record used to identify the mail server for a domain."],
-    "matching_pairs": [{{"item": "1. A Record", "match": "C"}}, {{"item": "2. MX Record", "match": "E"}}, {{"item": "3. DORA", "match": "A"}}, {{"item": "4. tracert", "match": "B"}}, {{"item": "5. nslookup", "match": "D"}}],
-    "answer": "1-C, 2-E, 3-A, 4-B, 5-D",
+    "question": "30-31. 5 correct = 2 pts | 3-4 correct = 1.5 pts | 1-2 correct = 1 pt | 0 correct = 0 pts",
+    "column_a": ["1. Linux Server", "2. Windows Server", "3. UNIX", "4. Command Line (CLI)", "5. Server Core"],
+    "column_b": ["A. Proprietary OS; best for .NET and Active Directory integration.", "B. Highly stable, proprietary OS often used in high-end workstations.", "C. Open-source; favored for web servers due to low cost and security.", "D. A minimal Windows install option that reduces the attack surface.", "E. The primary management interface for Linux/UNIX servers."],
+    "matching_pairs": [{{"item": "1. Linux Server", "match": "C"}}, {{"item": "2. Windows Server", "match": "A"}}, {{"item": "3. UNIX", "match": "B"}}, {{"item": "4. Command Line (CLI)", "match": "E"}}, {{"item": "5. Server Core", "match": "D"}}],
+    "answer": "1-C, 2-A, 3-B, 4-E, 5-D",
     "explanation": "",
     "difficulty": "medium",
     "points": 2
@@ -773,9 +767,11 @@ seems wrong, unusual, or doesn't match the question topic.
 The answer key is the authority — copy it exactly, always.
 
 Matching rules:
-  • Answer key numbering RESTARTS per section:
-      Body "Part I: Q1, Q2, Q3..." → matched to Key "Part I: 1., 2., 3...."
-      Body "Part II: Q1, Q2..."    → matched to Key "Part II: 1., 2...."
+  • Answer keys typically use the ORIGINAL document question numbers (not restarted).
+    Match each answer to the question with the SAME number in the document.
+    e.g. answer key "15. A" → the question numbered "15." in the document
+  • If the answer key DOES restart numbering per section (e.g. "Part I: 1. A  2. B..."),
+    match by position within that section.
   • If the answer key has no numbers (plain list), match by position:
       1st answer item → 1st question in that section
       2nd answer item → 2nd question in that section, etc.
@@ -793,22 +789,32 @@ OUTPUT FORMAT
 Return ONLY a valid JSON array — no extra text, no markdown, no code fences.
 
 Common fields for ALL question types:
-  "type"        - one of {type_names}
+  "type"        - one of {type_names} OR "section_header" (for part/section title + directions)
   "question"    - question text (without inline answer; use _______ placeholder)
+                  for section_header: the section title + newline + directions line
   "answer"      - answer extracted from key, formatting tag, or dash pattern; or ""
   "explanation" - any explanation text found in the document, or ""
   "difficulty"  - "easy", "medium", or "hard"
-  "points"      - point value if shown, otherwise 1
+  "points"      - point value if shown, otherwise 1 (use 0 for section_header)
 
 Type-specific extra fields:
   multiple_choice only → "option_a", "option_b", "option_c", "option_d"
   matching only        → "column_a" (array), "column_b" (array), "matching_pairs" (array)
+  section_header       → no extra fields needed
 
-Examples:
+Examples (section header appears once; individual questions keep only their original number):
 [
   {{
+    "type": "section_header",
+    "question": "Part I. Multiple Choice\nDirections: Choose the letter of the best answer. Write the letter on the blank provided.",
+    "answer": "",
+    "explanation": "",
+    "difficulty": "easy",
+    "points": 0
+  }},
+  {{
     "type": "multiple_choice",
-    "question": "Which of the following is a type of malware?",
+    "question": "1. Which of the following is a type of malware?",
     "option_a": "Firewall",
     "option_b": "Virus",
     "option_c": "Router",
@@ -819,31 +825,39 @@ Examples:
     "points": 1
   }},
   {{
-    "type": "matching",
-    "question": "Matching Type",
-    "column_a": ["1. CREATE", "2. TINYINT", "3. DROP"],
-    "column_b": ["A. Permanently deletes a database object.", "B. Creates new database objects.", "C. Modifies the structure of an existing table."],
-    "matching_pairs": [{{"item": "1. CREATE", "match": "B"}}, {{"item": "2. TINYINT", "match": "G"}}, {{"item": "3. DROP", "match": "A"}}],
-    "answer": "1-B, 2-G, 3-A",
+    "type": "section_header",
+    "question": "Part II. Identification\nDirections: Write the correct answer on the blank.",
+    "answer": "",
     "explanation": "",
-    "difficulty": "medium",
-    "points": 1
+    "difficulty": "easy",
+    "points": 0
   }},
   {{
     "type": "identification",
-    "question": "_______ is the process by which plants make food using sunlight.",
+    "question": "16. _______ is the process by which plants make food using sunlight.",
     "answer": "Photosynthesis",
     "explanation": "",
     "difficulty": "medium",
     "points": 1
   }},
   {{
-    "type": "enumeration",
-    "question": "List the nine (9) types of server security threats.",
-    "answer": "Malware\nDDoS\nUnauthorized Access\nSQL Injection\nPhishing\nInsider Threats\nZero-Day Exploits\nMisconfiguration\nBrute Force Attacks",
+    "type": "section_header",
+    "question": "Part IV. Matching Type\nDirections: Match Column A with Column B.",
+    "answer": "",
+    "explanation": "",
+    "difficulty": "easy",
+    "points": 0
+  }},
+  {{
+    "type": "matching",
+    "question": "30-31. 5 correct = 2 pts | 3-4 correct = 1.5 pts | 1-2 correct = 1 pt | 0 correct = 0 pts",
+    "column_a": ["1. Linux Server", "2. Windows Server", "3. UNIX", "4. Command Line (CLI)", "5. Server Core"],
+    "column_b": ["A. Proprietary OS; best for .NET and Active Directory integration.", "B. Highly stable, proprietary OS often used in high-end workstations.", "C. Open-source; favored for web servers due to low cost and security.", "D. A minimal Windows install option that reduces the attack surface.", "E. The primary management interface for Linux/UNIX servers."],
+    "matching_pairs": [{{"item": "1. Linux Server", "match": "C"}}, {{"item": "2. Windows Server", "match": "A"}}, {{"item": "3. UNIX", "match": "B"}}, {{"item": "4. Command Line (CLI)", "match": "E"}}, {{"item": "5. Server Core", "match": "D"}}],
+    "answer": "1-C, 2-A, 3-B, 4-E, 5-D",
     "explanation": "",
     "difficulty": "medium",
-    "points": 5
+    "points": 2
   }}
 ]
 
@@ -973,6 +987,14 @@ JSON:"""
             return False
 
         q_type = question['type']
+
+        # Section headers are always valid — no further checks needed
+        if q_type == 'section_header':
+            question.setdefault('answer', '')
+            question.setdefault('explanation', '')
+            question.setdefault('difficulty', 'easy')
+            question.setdefault('points', 0)
+            return True
 
         # Multiple choice must have all 4 options
         if q_type == 'multiple_choice':

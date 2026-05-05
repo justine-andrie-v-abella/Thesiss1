@@ -212,7 +212,7 @@ def upload_questionnaire(request):
                 # Essays legitimately have no answer key; all others should.
                 non_essay_qs = [
                     q for q in created_questions
-                    if q.question_type and q.question_type.name != 'essay'
+                    if q.question_type and q.question_type.name not in ('essay', 'section_header')
                 ]
                 answered_qs = [
                     q for q in non_essay_qs
@@ -498,7 +498,7 @@ def review_extracted_questions(request):
                         id__in=extracted_questions.values_list(
                             'question_type', flat=True
                         ).distinct()
-                    )
+                    ).exclude(name='section_header')
                     return render(request, 'teacher_dashboard/review_extracted.html', {
                         'questionnaire':  questionnaire,
                         'questions':      extracted_questions,
@@ -592,7 +592,7 @@ def review_extracted_questions(request):
         # GET
         question_types = QuestionType.objects.filter(
             id__in=extracted_questions.values_list('question_type', flat=True).distinct()
-        )
+        ).exclude(name='section_header')
         return render(request, 'teacher_dashboard/review_extracted.html', {
             'questionnaire':  questionnaire,
             'questions':      extracted_questions,
@@ -979,7 +979,7 @@ def review_extracted_questions_pk(request, pk):
 
     question_types = QuestionType.objects.filter(
         id__in=extracted_questions.values_list('question_type', flat=True).distinct()
-    )
+    ).exclude(name='section_header')
     return render(request, 'teacher_dashboard/review_extracted.html', {
         'questionnaire':  questionnaire,
         'questions':      extracted_questions,
@@ -1418,15 +1418,15 @@ def download_questionnaire(request, pk):
                 ]
                 selected_questions = questionnaire.extracted_questions.filter(
                     id__in=question_ids
-                ).select_related('question_type').order_by('question_type__name', 'created_at')
+                ).select_related('question_type').order_by('created_at')
             except (ValueError, TypeError):
                 selected_questions = questionnaire.extracted_questions.filter(
                     is_approved=True
-                ).select_related('question_type').order_by('question_type__name', 'created_at')
+                ).select_related('question_type').order_by('created_at')
         else:
             selected_questions = questionnaire.extracted_questions.filter(
                 is_approved=True
-            ).select_related('question_type').order_by('question_type__name', 'created_at')
+            ).select_related('question_type').order_by('created_at')
 
         if not selected_questions.exists():
             messages.warning(request, 'No questions available to generate the document.')

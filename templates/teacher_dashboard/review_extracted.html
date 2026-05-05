@@ -103,9 +103,24 @@
             {% for question in questions %}
 
             {# ═══════════════════════════════════════════════════════ #}
+            {# SECTION HEADER — rendered as a divider, not selectable  #}
+            {# ═══════════════════════════════════════════════════════ #}
+            {% if question.question_type.name == 'section_header' %}
+            <div class="section-header-divider mt-6 mb-2" data-type="section_header">
+                <div class="flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow">
+                    <i class="bi bi-bookmark-fill text-white text-sm"></i>
+                    <div>
+                        {% with lines=question.question_text|linebreaksbr %}
+                        <p class="text-white font-bold text-sm leading-snug">{{ lines }}</p>
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+
+            {# ═══════════════════════════════════════════════════════ #}
             {# MATCHING TYPE CARD                                       #}
             {# ═══════════════════════════════════════════════════════ #}
-            {% if question.question_type.name == 'matching' %}
+            {% elif question.question_type.name == 'matching' %}
             {% with md=question.get_matching_data %}
             <div class="question-card bg-white rounded-xl shadow-md overflow-hidden border-l-4
                 {% if question.difficulty == 'easy' %}border-green-500
