@@ -116,32 +116,56 @@
 
                 </div>
 
-                <!-- Term -->
-                <div>
-                    <label for="id_exam_type" class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="bi bi-tag-fill text-orange-500 mr-1"></i> Term *
-                    </label>
-                    <select name="exam_type" id="id_exam_type" required onchange="checkUploadBtn()"
-                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition-colors">
-                        <option value="" disabled {% if not form.exam_type.value %}selected{% endif %}>-- Select Term --</option>
-                        <option value="prelim"      {% if form.exam_type.value == 'prelim'      %}selected{% endif %}>Prelim</option>
-                        <option value="midterm"     {% if form.exam_type.value == 'midterm'     %}selected{% endif %}>Midterm</option>
-                        <option value="semi_final"  {% if form.exam_type.value == 'semi_final'  %}selected{% endif %}>Semi-Final</option>
-                        <option value="final"       {% if form.exam_type.value == 'final'       %}selected{% endif %}>Final Term</option>
-                        <option value="others"      {% if form.exam_type.value == 'others'      %}selected{% endif %}>Others</option>
-                    </select>
-                    {% if form.exam_type.errors %}
-                        <p class="text-red-500 text-sm mt-1"><i class="bi bi-exclamation-circle mr-1"></i>{{ form.exam_type.errors.0 }}</p>
-                    {% endif %}
+                <!-- Term + Sub-category -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-                    <!-- Exam type color preview -->
-                    <div id="examTypePreview" class="mt-2 hidden">
-                        <div id="examTypeBadge" class="inline-flex items-center px-3 py-1.5 rounded-full text-white text-xs font-semibold">
-                            <i class="bi bi-tag-fill mr-1.5"></i>
-                            <span id="examTypeBadgeText"></span>
-                        </div>
-                        <span class="text-xs text-gray-400 ml-2">— this badge will appear on your questionnaire card</span>
+                    <!-- Term -->
+                    <div>
+                        <label for="id_exam_type" class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-calendar2-range text-orange-500 mr-1"></i> Term *
+                        </label>
+                        <select name="exam_type" id="id_exam_type" required
+                            onchange="onTermChange(); checkUploadBtn();"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition-colors">
+                            <option value="" disabled {% if not form.exam_type.value %}selected{% endif %}>-- Select Term --</option>
+                            <option value="midterm"    {% if form.exam_type.value == 'midterm'    %}selected{% endif %}>Midterm</option>
+                            <option value="final_term" {% if form.exam_type.value == 'final_term' %}selected{% endif %}>Final Term</option>
+                        </select>
+                        {% if form.exam_type.errors %}
+                            <p class="text-red-500 text-sm mt-1"><i class="bi bi-exclamation-circle mr-1"></i>{{ form.exam_type.errors.0 }}</p>
+                        {% endif %}
                     </div>
+
+                    <!-- Sub-category (shown after term is chosen) -->
+                    <div id="subCategoryWrapper" class="{% if not form.exam_type.value %}hidden{% endif %}">
+                        <label for="id_sub_category" class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-tag-fill text-orange-400 mr-1"></i> Sub-category *
+                        </label>
+                        <select name="sub_category" id="id_sub_category" required
+                            onchange="updateBadgePreview(); checkUploadBtn();"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-400 transition-colors">
+                            <option value="">-- Select Sub-category --</option>
+                            {% comment %}Options are populated by JS; on re-render keep server value{% endcomment %}
+                            <option value="short_quiz"  {% if form.sub_category.value == 'short_quiz'  %}selected{% endif %}>Short Quiz</option>
+                            <option value="long_quiz"   {% if form.sub_category.value == 'long_quiz'   %}selected{% endif %}>Long Quiz</option>
+                            <option value="prelim"      {% if form.sub_category.value == 'prelim'      %}selected{% endif %}>Prelim</option>
+                            <option value="semi_final"  {% if form.sub_category.value == 'semi_final'  %}selected{% endif %}>Semi-Final</option>
+                            <option value="final_exam"  {% if form.sub_category.value == 'final_exam'  %}selected{% endif %}>Final Exam</option>
+                        </select>
+                        {% if form.sub_category.errors %}
+                            <p class="text-red-500 text-sm mt-1"><i class="bi bi-exclamation-circle mr-1"></i>{{ form.sub_category.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                </div>
+
+                <!-- Badge preview (appears when both term + sub-category are chosen) -->
+                <div id="examTypePreview" class="hidden">
+                    <div id="examTypeBadge" class="inline-flex items-center px-3 py-1.5 rounded-full text-white text-xs font-semibold">
+                        <i class="bi bi-tag-fill mr-1.5"></i>
+                        <span id="examTypeBadgeText"></span>
+                    </div>
+                    <span class="text-xs text-gray-400 ml-2">— this badge will appear on your questionnaire card</span>
                 </div>
 
                 <!-- File Upload -->
@@ -315,6 +339,106 @@
 <script>
 (function () {
 
+    // ── Sub-category options per term ────────────────────────────────────────
+    var TERM_SUBS = {
+        midterm:    [
+            { value: 'short_quiz', label: 'Short Quiz' },
+            { value: 'long_quiz',  label: 'Long Quiz'  },
+            { value: 'prelim',     label: 'Prelim'     },
+            { value: 'final_exam', label: 'Final Exam' },
+        ],
+        final_term: [
+            { value: 'short_quiz', label: 'Short Quiz' },
+            { value: 'long_quiz',  label: 'Long Quiz'  },
+            { value: 'semi_final', label: 'Semi-Final' },
+            { value: 'final_exam', label: 'Final Exam' },
+        ],
+    };
+
+    // Badge colors keyed by sub_category value
+    var SUB_COLORS = {
+        short_quiz: { bg: '#0891b2', label: 'Short Quiz'  },
+        long_quiz:  { bg: '#2563eb', label: 'Long Quiz'   },
+        prelim:     { bg: '#d97706', label: 'Prelim'      },
+        semi_final: { bg: '#9f1239', label: 'Semi-Final'  },
+        final_exam: { bg: '#7c3aed', label: 'Final Exam'  },
+    };
+
+    var termSelect      = document.getElementById('id_exam_type');
+    var subWrapper      = document.getElementById('subCategoryWrapper');
+    var subSelect       = document.getElementById('id_sub_category');
+    var examTypePreview = document.getElementById('examTypePreview');
+    var examTypeBadge   = document.getElementById('examTypeBadge');
+    var examTypeBadgeText = document.getElementById('examTypeBadgeText');
+
+    // Called when the term dropdown changes.
+    function onTermChange() {
+        var term = termSelect ? termSelect.value : '';
+        var subs = TERM_SUBS[term] || [];
+
+        if (!subWrapper || !subSelect) return;
+
+        // Rebuild sub-category options
+        subSelect.innerHTML = '<option value="">-- Select Sub-category --</option>';
+        subs.forEach(function (s) {
+            var opt = document.createElement('option');
+            opt.value = s.value;
+            opt.textContent = s.label;
+            subSelect.appendChild(opt);
+        });
+        subSelect.value = '';   // reset selection
+
+        // Show/hide the wrapper
+        if (subs.length > 0) {
+            subWrapper.classList.remove('hidden');
+        } else {
+            subWrapper.classList.add('hidden');
+        }
+
+        // Hide badge when term changes (sub-category not yet chosen)
+        if (examTypePreview) examTypePreview.classList.add('hidden');
+    }
+    window.onTermChange = onTermChange;
+
+    // Called when sub-category changes — update badge preview.
+    function updateBadgePreview() {
+        var sub = subSelect ? subSelect.value : '';
+        if (sub && SUB_COLORS[sub]) {
+            examTypeBadge.style.backgroundColor = SUB_COLORS[sub].bg;
+            examTypeBadgeText.textContent = SUB_COLORS[sub].label;
+            examTypePreview.classList.remove('hidden');
+        } else {
+            examTypePreview.classList.add('hidden');
+        }
+    }
+    window.updateBadgePreview = updateBadgePreview;
+
+    // ── On page load: restore state if form re-rendered with values ──────────
+    (function initTermState() {
+        if (!termSelect || !termSelect.value) return;
+        var term      = termSelect.value;
+        var savedSub  = subSelect ? subSelect.value : '';
+        var subs      = TERM_SUBS[term] || [];
+
+        // Rebuild options first
+        subSelect.innerHTML = '<option value="">-- Select Sub-category --</option>';
+        subs.forEach(function (s) {
+            var opt = document.createElement('option');
+            opt.value = s.value;
+            opt.textContent = s.label;
+            subSelect.appendChild(opt);
+        });
+
+        // Restore server-supplied value (form re-render after validation error)
+        if (savedSub) subSelect.value = savedSub;
+
+        // Show sub-category wrapper
+        if (subs.length > 0) subWrapper.classList.remove('hidden');
+
+        // Show badge if sub already selected
+        updateBadgePreview();
+    })();
+
     // ── Button validation ────────────────────────────────────────────────────
     function checkUploadBtn() {
         var btn     = document.getElementById('submitBtn');
@@ -322,11 +446,19 @@
         var subject = document.getElementById('id_subject');
         var sem     = document.getElementById('id_semester');
         var term    = document.getElementById('id_exam_type');
+        var sub     = document.getElementById('id_sub_category');
         var file    = document.getElementById('id_file');
+
+        // sub_category is required only when sub-category wrapper is visible
+        var subOk = !subWrapper || subWrapper.classList.contains('hidden')
+                    ? true
+                    : (sub && sub.value !== '');
+
         var ok = (title   && title.value.trim() !== '')  &&
                  (subject && subject.value      !== '')  &&
                  (sem     && sem.value          !== '')  &&
                  (term    && term.value         !== '')  &&
+                 subOk                                   &&
                  (file    && file.files && file.files.length > 0);
         if (!btn) return;
         btn.disabled = !ok;
@@ -342,36 +474,11 @@
         subjSelect.addEventListener('change', checkUploadBtn);
     }
 
-    // ── Exam Type badge preview ──────────────────────────────────────────────
-    var EXAM_COLORS = {
-        short_quiz: { bg: '#0891b2', label: 'Short Quiz' },
-        long_quiz:  { bg: '#2563eb', label: 'Long Quiz' },
-        prelim:     { bg: '#d97706', label: 'Prelim Exam' },
-        midterm:    { bg: '#dc2626', label: 'Midterm Exam' },
-        prefinal:   { bg: '#ca8a04', label: 'Pre-Final Exam' },
-        final:      { bg: '#9f1239', label: 'Final Exam' },
-        activity:   { bg: '#16a34a', label: 'Activity / Seatwork' },
-        others:     { bg: '#7c3aed', label: 'Others' },
-    };
-
-    var examTypeSelect  = document.getElementById('id_exam_type');
-    var examTypePreview = document.getElementById('examTypePreview');
-    var examTypeBadge   = document.getElementById('examTypeBadge');
-    var examTypeBadgeText = document.getElementById('examTypeBadgeText');
-
-    function updateExamPreview() {
-        var val = examTypeSelect.value;
-        if (val && EXAM_COLORS[val]) {
-            examTypeBadge.style.backgroundColor = EXAM_COLORS[val].bg;
-            examTypeBadgeText.textContent = EXAM_COLORS[val].label;
-            examTypePreview.classList.remove('hidden');
-        } else {
-            examTypePreview.classList.add('hidden');
-        }
-    }
-    if (examTypeSelect) {
-        examTypeSelect.addEventListener('change', updateExamPreview);
-        updateExamPreview(); // run on load in case of form re-render with value
+    if (subSelect) {
+        subSelect.addEventListener('change', function () {
+            updateBadgePreview();
+            checkUploadBtn();
+        });
     }
 
     // ── File input + preview + clear button ─────────────────────────────────

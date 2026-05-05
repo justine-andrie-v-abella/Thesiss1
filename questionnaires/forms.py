@@ -29,6 +29,19 @@ class QuestionnaireUploadForm(forms.ModelForm):
         }),
     )
 
+    sub_category = forms.ChoiceField(
+        choices=[('', '-- Select Sub-category --')] + Questionnaire.SUB_CATEGORY_CHOICES,
+        required=True,
+        label="Sub-category",
+        widget=forms.Select(attrs={
+            'id': 'id_sub_category',
+            'class': (
+                'w-full px-4 py-3 border-2 border-gray-300 rounded-lg '
+                'focus:outline-none focus:border-orange-400 transition-colors'
+            ),
+        }),
+    )
+
     semester = forms.ChoiceField(
         choices=[('', '-- Select Semester --')] + Questionnaire.SEMESTER_CHOICES,
         required=True,
@@ -58,7 +71,7 @@ class QuestionnaireUploadForm(forms.ModelForm):
 
     class Meta:
         model  = Questionnaire
-        fields = ['title', 'description', 'subject', 'exam_type', 'semester', 'file']
+        fields = ['title', 'description', 'subject', 'exam_type', 'sub_category', 'semester', 'file']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
@@ -86,6 +99,16 @@ class QuestionnaireUploadForm(forms.ModelForm):
         valid = [k for k, _ in Questionnaire.EXAM_TYPE_CHOICES]
         if value not in valid:
             raise forms.ValidationError('Invalid term selected.')
+        return value
+
+    def clean_sub_category(self):
+        value    = self.cleaned_data.get('sub_category')
+        term     = self.cleaned_data.get('exam_type')
+        if not value:
+            raise forms.ValidationError('Please select a sub-category.')
+        allowed = Questionnaire.TERM_SUB_CATEGORIES.get(term, [])
+        if value not in allowed:
+            raise forms.ValidationError('Invalid sub-category for the selected term.')
         return value
 
     def clean_semester(self):
@@ -116,9 +139,23 @@ class QuestionnaireEditForm(forms.ModelForm):
         required=True,
         label="Term",
         widget=forms.Select(attrs={
+            'id': 'id_exam_type',
             'class': (
                 'w-full px-4 py-3 border-2 border-gray-300 rounded-lg '
                 'focus:outline-none focus:border-orange-500 transition-colors'
+            ),
+        }),
+    )
+
+    sub_category = forms.ChoiceField(
+        choices=[('', '-- Select Sub-category --')] + Questionnaire.SUB_CATEGORY_CHOICES,
+        required=False,
+        label="Sub-category",
+        widget=forms.Select(attrs={
+            'id': 'id_sub_category',
+            'class': (
+                'w-full px-4 py-3 border-2 border-gray-300 rounded-lg '
+                'focus:outline-none focus:border-orange-400 transition-colors'
             ),
         }),
     )
@@ -137,10 +174,19 @@ class QuestionnaireEditForm(forms.ModelForm):
 
     class Meta:
         model  = Questionnaire
-        fields = ['title', 'description', 'exam_type', 'semester']
+        fields = ['title', 'description', 'exam_type', 'sub_category', 'semester']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
+
+    def clean_sub_category(self):
+        value = self.cleaned_data.get('sub_category')
+        term  = self.cleaned_data.get('exam_type')
+        if value:
+            allowed = Questionnaire.TERM_SUB_CATEGORIES.get(term, [])
+            if value not in allowed:
+                raise forms.ValidationError('Invalid sub-category for the selected term.')
+        return value
 
 
 class QuestionnaireFilterForm(forms.Form):
@@ -158,5 +204,10 @@ class QuestionnaireFilterForm(forms.Form):
         choices=[('', 'All Terms')] + Questionnaire.EXAM_TYPE_CHOICES,
         required=False,
         label="Term",
+    )
+    sub_category = forms.ChoiceField(
+        choices=[('', 'All Sub-categories')] + Questionnaire.SUB_CATEGORY_CHOICES,
+        required=False,
+        label="Sub-category",
     )
     search = forms.CharField(required=False, max_length=200)

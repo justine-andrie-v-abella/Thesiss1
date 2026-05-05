@@ -22,12 +22,23 @@ class Questionnaire(models.Model):
     ]
 
     EXAM_TYPE_CHOICES = [
-        ('prelim',     'Prelim'),
         ('midterm',    'Midterm'),
-        ('semi_final', 'Semi-Final'),
-        ('final',      'Final Term'),
-        ('others',     'Others'),
+        ('final_term', 'Final Term'),
     ]
+
+    SUB_CATEGORY_CHOICES = [
+        ('short_quiz',  'Short Quiz'),
+        ('long_quiz',   'Long Quiz'),
+        ('prelim',      'Prelim'),
+        ('semi_final',  'Semi-Final'),
+        ('final_exam',  'Final Exam'),
+    ]
+
+    # Which sub-categories belong to which term (used in validation + JS).
+    TERM_SUB_CATEGORIES = {
+        'midterm':    ['short_quiz', 'long_quiz', 'prelim',     'final_exam'],
+        'final_term': ['short_quiz', 'long_quiz', 'semi_final', 'final_exam'],
+    }
 
     SEMESTER_CHOICES = [
         ('1st', '1st Semester'),
@@ -48,8 +59,16 @@ class Questionnaire(models.Model):
     exam_type = models.CharField(
         max_length=20,
         choices=EXAM_TYPE_CHOICES,
-        default='others',
+        default='midterm',
         help_text='Academic term this questionnaire is intended for',
+    )
+
+    sub_category = models.CharField(
+        max_length=20,
+        choices=SUB_CATEGORY_CHOICES,
+        blank=True,
+        default='',
+        help_text='Sub-category within the term (e.g. Short Quiz, Prelim)',
     )
 
     semester = models.CharField(

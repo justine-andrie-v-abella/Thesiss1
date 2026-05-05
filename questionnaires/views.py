@@ -175,12 +175,13 @@ def upload_questionnaire(request):
                         {'form': form, 'current_school_year': get_current_school_year()},
                     )
 
-            questionnaire             = form.save(commit=False)
-            questionnaire.uploader    = teacher
-            questionnaire.department  = teacher.department
-            questionnaire.exam_type   = form.cleaned_data['exam_type']
-            questionnaire.semester    = form.cleaned_data['semester']
-            questionnaire.school_year = get_current_school_year()
+            questionnaire              = form.save(commit=False)
+            questionnaire.uploader     = teacher
+            questionnaire.department   = teacher.department
+            questionnaire.exam_type    = form.cleaned_data['exam_type']
+            questionnaire.sub_category = form.cleaned_data.get('sub_category', '')
+            questionnaire.semester     = form.cleaned_data['semester']
+            questionnaire.school_year  = get_current_school_year()
             questionnaire.extraction_status = 'processing'
             questionnaire.save()
 
