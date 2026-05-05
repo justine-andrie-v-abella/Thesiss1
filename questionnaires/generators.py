@@ -164,7 +164,7 @@ class BISUQuestionnaireGenerator:
             for question in section_data['questions']:
                 self._add_question(question, question_number)
                 qtype = question.question_type.name
-                if qtype != 'essay':
+                if qtype not in ('essay',):
                     if qtype == 'matching':
                         md = question.get_matching_data()
                         pairs = md.get('pairs', []) if md else []
@@ -217,6 +217,20 @@ class BISUQuestionnaireGenerator:
             r = p.add_run("Answer: ________________________")
             r.font.size = Pt(12)
             r.font.name = 'Arial'
+
+        elif qtype == 'enumeration':
+            # Count how many items the student should list from correct_answer
+            raw = question.correct_answer or ''
+            # Try newline-split first, then comma-split
+            items = [s.strip() for s in raw.splitlines() if s.strip()]
+            if len(items) <= 1:
+                items = [s.strip() for s in raw.split(',') if s.strip()]
+            num_lines = max(len(items), 3)  # at least 3 blank lines
+            for idx in range(num_lines):
+                p = self.doc.add_paragraph()
+                r = p.add_run(f"{idx + 1}. ________________________")
+                r.font.size = Pt(12)
+                r.font.name = 'Arial'
 
         elif qtype == 'essay':
             for _ in range(4):
@@ -496,6 +510,23 @@ class BISUQuestionnaireGenerator:
                     r.font.size = Pt(11)
                     r.font.name = 'Arial'
 
+            elif section_key == 'enumeration':
+                # Each question: show "Q{num}:" then list all correct items
+                for num, _qtype, answer in answers:
+                    p = self.doc.add_paragraph()
+                    r = p.add_run(f"Q{num}:")
+                    r.bold      = True
+                    r.font.size = Pt(11)
+                    r.font.name = 'Arial'
+                    raw_items = [s.strip() for s in answer.splitlines() if s.strip()]
+                    if len(raw_items) <= 1:
+                        raw_items = [s.strip() for s in answer.split(',') if s.strip()]
+                    for i, item in enumerate(raw_items, 1):
+                        p = self.doc.add_paragraph()
+                        r = p.add_run(f"   {i}. {item}")
+                        r.font.size = Pt(11)
+                        r.font.name = 'Arial'
+
             else:
                 # Layout as a compact grid (5 answers per row)
                 cols = 5
@@ -606,6 +637,10 @@ def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
                 'Match the items in Column A with their correct description in Column B. '
                 'Write the letter of your answer in the blank provided.'
             ),
+        },
+        'enumeration': {
+            'title_label': 'Enumeration',
+            'instruction': 'List all the correct items being asked in each question.',
         },
     }
 

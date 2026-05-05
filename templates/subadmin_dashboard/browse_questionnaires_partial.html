@@ -162,13 +162,13 @@
             </div>
         </div>
 
-        <div class="bg-gray-50 px-5 py-4">
+        <div class="bg-gray-50 px-5 py-4 space-y-2">
             {% if quest.is_extracted %}
-            <div class="grid grid-cols-2 gap-2">
+            <div class="flex items-center gap-2">
                 <button type="button"
                     data-quest-id="{{ quest.pk }}"
                     data-quest-title="{{ quest.title }}"
-                    class="view-questions-btn bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-2.5 px-3 rounded-lg transition-all flex items-center justify-center shadow text-sm">
+                    class="view-questions-btn flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-2.5 px-3 rounded-lg transition-all flex items-center justify-center shadow text-sm">
                     <i class="bi bi-eye mr-1.5"></i> View
                 </button>
                 <button type="button"
@@ -177,15 +177,20 @@
                     data-quest-subject="{{ quest.subject.code|escapejs }} — {{ quest.subject.name|escapejs }}"
                     data-quest-exam-type-display="{{ quest.get_exam_type_display|escapejs }}"
                     class="doc-preview-btn bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-semibold py-2.5 px-3 rounded-lg transition-all flex items-center justify-center shadow text-sm">
-                    <i class="bi bi-file-earmark-text mr-1.5"></i> Preview
+                    <i class="bi bi-file-earmark-text"></i>
                 </button>
             </div>
             {% else %}
             <button type="button" disabled
-                class="w-full bg-gray-200 text-gray-400 font-semibold py-2.5 px-4 rounded-lg flex items-center justify-center cursor-not-allowed">
+                class="w-full bg-gray-200 text-gray-400 font-semibold py-2.5 px-4 rounded-lg flex items-center justify-center cursor-not-allowed text-sm">
                 <i class="bi bi-hourglass-split mr-2"></i> Questions Not Extracted
             </button>
             {% endif %}
+            <button type="button"
+                onclick="openArchiveModal('{{ quest.pk }}','{{ quest.title|escapejs }}','{{ quest.department.name|escapejs }}','{{ quest.subject.code|escapejs }} - {{ quest.subject.name|escapejs }}','{{ quest.file_type|upper }}','{{ quest.get_file_size_display|escapejs }}','{{ quest.uploaded_at|date:"M d, Y" }}')"
+                class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow-sm text-sm">
+                <i class="bi bi-archive-fill"></i> Archive Questionnaire
+            </button>
         </div>
     </div>
     {% endfor %}

@@ -21,6 +21,12 @@ try:
 except ImportError:
     pass
 
+try:
+    import fitz  # PyMuPDF — optional, improves PDF colour/column detection
+    _PYMUPDF_AVAILABLE = True
+except ImportError:
+    _PYMUPDF_AVAILABLE = False
+
 
 class AIQuestionExtractor:
     """
@@ -104,11 +110,133 @@ class AIQuestionExtractor:
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
 
+    # -------------------------------------------------------------------------
+    # Formatting detection helpers (used by both PDF and DOCX readers)
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _get_run_format_tag(run):
+        """
+        Inspect a python-docx Run for answer-key formatting cues.
+        Returns 'RED', 'HIGHLIGHT', 'UNDERLINE', 'BOLD', or 'ITALIC' — or None
+        if the run has no special formatting.
+
+        Priority: RED > HIGHLIGHT > UNDERLINE > BOLD > ITALIC
+        (RED colour is the strongest signal that something is an answer key.)
+        """
+        try:
+            from docx.oxml.ns import qn
+            rPr = run._r.find(qn('w:rPr'))
+            if rPr is not None:
+
+                # 1. Direct RGB colour ------------------------------------------
+                color_el = rPr.find(qn('w:color'))
+                if color_el is not None:
+                    val = (color_el.get(qn('w:val')) or '').strip()
+                    if val and val.lower() not in ('auto', '000000', 'ffffff') and len(val) == 6:
+                        try:
+                            r_v = int(val[0:2], 16)
+                            g_v = int(val[2:4], 16)
+                            b_v = int(val[4:6], 16)
+                            if r_v > 150 and g_v < 100 and b_v < 100:
+                                return 'RED'
+                        except ValueError:
+                            pass
+
+                # 2. Highlight --------------------------------------------------
+                hl = rPr.find(qn('w:highlight'))
+                if hl is not None:
+                    hl_val = (hl.get(qn('w:val')) or '').lower()
+                    if hl_val and hl_val != 'none':
+                        return 'HIGHLIGHT'
+
+        except Exception:
+            pass
+
+        # 3. Underline (python-docx API is reliable here) ----------------------
+        try:
+            if run.underline:
+                return 'UNDERLINE'
+        except Exception:
+            pass
+
+        # 4. Bold (lower priority — headings are also bold) --------------------
+        try:
+            if run.bold:
+                return 'BOLD'
+        except Exception:
+            pass
+
+        # 5. Italic ------------------------------------------------------------
+        try:
+            if run.italic:
+                return 'ITALIC'
+        except Exception:
+            pass
+
+        return None
+
+    @staticmethod
+    def _is_noise_run(text: str) -> bool:
+        """
+        Returns True for short runs that are unlikely to be answer text even if
+        formatted — e.g. question numbers ("1.", "2)"), pure punctuation, blanks.
+        These are skipped to avoid tagging noise as answers.
+        """
+        stripped = text.strip()
+        if not stripped:
+            return True
+        # Purely numeric / punctuation runs (question numbers, dashes, underscores)
+        if re.match(r'^[\d\s\.\)\-\_]+$', stripped):
+            return True
+        # Very short single non-alpha character
+        if len(stripped) <= 1 and not stripped.isalpha():
+            return True
+        return False
+
+    def _extract_para_with_formatting(self, para) -> str:
+        """
+        Extract paragraph text, wrapping formatted runs in tags so Claude AI
+        can identify them as answer-key markers.
+        e.g.  "1. [RED:Malware] is a type of malicious software."
+        """
+        parts = []
+        for run in para.runs:
+            text = run.text
+            if not text:
+                continue
+            tag = self._get_run_format_tag(run)
+            if tag and not self._is_noise_run(text):
+                stripped = text.strip()
+                leading  = text[: len(text) - len(text.lstrip())]
+                trailing = text[len(text.rstrip()):]
+                parts.append(f"{leading}[{tag}:{stripped}]{trailing}")
+            else:
+                parts.append(text)
+        result = ''.join(parts).strip()
+        # Fallback: use para.text if all runs were plain (handles edge cases)
+        return result if result else para.text.strip()
+
     def _read_txt(self, file_path: str) -> str:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             return f.read()
 
     def _read_pdf(self, file_path: str) -> str:
+        """
+        Extract text from a PDF with formatting cues preserved where possible.
+
+        Uses PyMuPDF (fitz) as the primary engine because it:
+          - Detects text colour → emits [RED:text] tags for reddish spans
+          - Handles multi-column layouts correctly (sorts by position)
+        Falls back to PyPDF2 if PyMuPDF is unavailable.
+        """
+        if _PYMUPDF_AVAILABLE:
+            try:
+                return self._read_pdf_pymupdf(file_path)
+            except Exception as e:
+                logger.warning("PyMuPDF failed (%s), falling back to PyPDF2", e)
+
+        # ── PyPDF2 fallback ────────────────────────────────────────────────
         text = []
         try:
             with open(file_path, 'rb') as f:
@@ -121,7 +249,133 @@ class AIQuestionExtractor:
             raise ValueError(f"Failed to read PDF: {str(e)}")
         return '\n\n'.join(text)
 
+    def _read_pdf_pymupdf(self, file_path: str) -> str:
+        """
+        PyMuPDF-based PDF extraction.
+
+        Key features:
+          1. Colour detection — spans with reddish colour get tagged [RED:text]
+          2. Multi-column layout — text blocks are sorted by their vertical
+             position within each horizontal column so columns read top-to-bottom
+             rather than being interleaved.
+          3. Bold / italic detection via font flags.
+        """
+        COLUMN_BAND_TOLERANCE = 15  # px — spans within this y-delta share a row
+
+        def is_reddish(color_int):
+            """Return True for colours where R > 150, G < 100, B < 100."""
+            if color_int is None:
+                return False
+            r = (color_int >> 16) & 0xFF
+            g = (color_int >> 8)  & 0xFF
+            b =  color_int        & 0xFF
+            return r > 150 and g < 100 and b < 100
+
+        def span_tag(span):
+            """Return formatting tag for a span, or None."""
+            color = span.get('color', 0)
+            if is_reddish(color):
+                return 'RED'
+            flags = span.get('flags', 0)
+            # fitz font flags: bit 4 = italic, bits 3/1 = bold
+            if flags & (1 << 4):
+                return 'ITALIC'
+            if flags & (1 << 3) or flags & (1 << 1):
+                return 'BOLD'
+            return None
+
+        def spans_to_lines(spans):
+            """Cluster spans into logical lines by y0 proximity."""
+            if not spans:
+                return []
+            spans = sorted(spans, key=lambda s: (round(s[1] / 5) * 5, s[0]))
+            lines    = []
+            cur_y    = None
+            cur_line = []
+            for span in spans:
+                y = span[1]
+                if cur_y is None or abs(y - cur_y) > COLUMN_BAND_TOLERANCE:
+                    if cur_line:
+                        lines.append(cur_line)
+                    cur_line = [span]
+                    cur_y    = y
+                else:
+                    cur_line.append(span)
+            if cur_line:
+                lines.append(cur_line)
+            return lines
+
+        def render_lines(lines):
+            result = []
+            for line in lines:
+                line_text = ''
+                for (x0, y0, x1, y1, txt, tag) in sorted(line, key=lambda s: s[0]):
+                    stripped = txt.strip()
+                    if not stripped:
+                        line_text += txt
+                        continue
+                    if tag and not self._is_noise_run(stripped):
+                        leading  = txt[: len(txt) - len(txt.lstrip())]
+                        trailing = txt[len(txt.rstrip()):]
+                        line_text += f'{leading}[{tag}:{stripped}]{trailing}'
+                    else:
+                        line_text += txt
+                rendered = line_text.strip()
+                if rendered:
+                    result.append(rendered)
+            return result
+
+        pages_text = []
+        try:
+            doc = fitz.open(file_path)
+            for page in doc:
+                page_width = page.rect.width
+
+                # Collect all text spans with position info ──────────────────
+                raw_spans = []  # (x0, y0, x1, y1, text, tag)
+                blocks = page.get_text('dict', flags=fitz.TEXT_PRESERVE_WHITESPACE)['blocks']
+                for block in blocks:
+                    if block.get('type') != 0:
+                        continue
+                    for line in block.get('lines', []):
+                        for span in line.get('spans', []):
+                            txt = span.get('text', '')
+                            if not txt.strip():
+                                continue
+                            bbox = span.get('bbox', (0, 0, 0, 0))
+                            tag  = span_tag(span)
+                            raw_spans.append((bbox[0], bbox[1], bbox[2], bbox[3], txt, tag))
+
+                if not raw_spans:
+                    continue
+
+                mid_x       = page_width / 2
+                left_spans  = [s for s in raw_spans if s[0] < mid_x]
+                right_spans = [s for s in raw_spans if s[0] >= mid_x]
+
+                # If there are meaningful right-column spans, render columns separately
+                if right_spans and len(right_spans) >= 2:
+                    left_lines  = spans_to_lines(left_spans)
+                    right_lines = spans_to_lines(right_spans)
+                    page_lines  = render_lines(left_lines) + render_lines(right_lines)
+                else:
+                    all_lines  = spans_to_lines(raw_spans)
+                    page_lines = render_lines(all_lines)
+
+                pages_text.append('\n'.join(page_lines))
+
+            doc.close()
+            return '\n\n'.join(pages_text)
+
+        except Exception as e:
+            raise ValueError(f"PyMuPDF error: {str(e)}") from e
+
     def _read_docx(self, file_path: str) -> str:
+        """
+        Extract DOCX text in reading order, preserving answer-key formatting
+        cues ([RED:...], [BOLD:...], etc.) and auto-list numbering.
+        Also reads table cells so answer keys placed in tables are captured.
+        """
         _WNS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 
         def _list_number(block, counters):
@@ -144,37 +398,59 @@ class AIQuestionExtractor:
             counters[key] = counters.get(key, 0) + 1
             return counters[key]
 
+        def _plain_text(element):
+            """Fallback: extract plain text from an XML element."""
+            return ''.join(
+                node.text for node in element.iter()
+                if node.tag.endswith('}t') and node.text
+            ).strip()
+
         try:
             doc = Document(file_path)
-            text = []
+            text          = []
             list_counters = {}
-            # Read paragraphs AND table cells so no content is missed
-            # (answer keys are sometimes placed inside tables in Word documents)
+
+            # Build element → paragraph object map so we can use
+            # _extract_para_with_formatting (which needs a python-docx Para).
+            # doc.paragraphs includes ALL paragraphs, including those in tables.
+            para_map = {p._element: p for p in doc.paragraphs}
+
             for block in doc.element.body:
                 tag = block.tag.split('}')[-1] if '}' in block.tag else block.tag
+
                 if tag == 'p':
-                    para_text = ''.join(
-                        node.text for node in block.iter()
-                        if node.tag.endswith('}t') and node.text
-                    ).strip()
+                    para = para_map.get(block)
+                    if para is not None:
+                        para_text = self._extract_para_with_formatting(para)
+                    else:
+                        para_text = _plain_text(block)
+
                     if para_text:
                         num = _list_number(block, list_counters)
                         if num is not None:
                             para_text = f"{num}. {para_text}"
                         text.append(para_text)
+
                 elif tag == 'tbl':
-                    # Table — read every cell row by row
+                    # Table — read every cell row by row with formatting cues
                     for row in block.iter(f'{{{_WNS}}}tr'):
                         row_cells = []
                         for cell in row.iter(f'{{{_WNS}}}tc'):
-                            cell_text = ''.join(
-                                node.text for node in cell.iter()
-                                if node.tag.endswith('}t') and node.text
-                            ).strip()
+                            cell_parts = []
+                            for para_elem in cell.iter(f'{{{_WNS}}}p'):
+                                para = para_map.get(para_elem)
+                                if para is not None:
+                                    pt = self._extract_para_with_formatting(para)
+                                else:
+                                    pt = _plain_text(para_elem)
+                                if pt:
+                                    cell_parts.append(pt)
+                            cell_text = ' '.join(cell_parts).strip()
                             if cell_text:
                                 row_cells.append(cell_text)
                         if row_cells:
                             text.append('  |  '.join(row_cells))
+
             return '\n'.join(text)
         except Exception as e:
             raise ValueError(f"Failed to read DOCX: {str(e)}")
@@ -250,10 +526,11 @@ class AIQuestionExtractor:
         type_descriptions = {
             'multiple_choice': 'Multiple Choice (has options A, B, C, D)',
             'true_false':      'True/False (answer is True or False)',
-            'identification':  'Identification (short answer, one word or phrase)',
+            'identification':  'Identification (short answer, one word or phrase); answer key may be formatted ([RED]/[BOLD]/[UNDERLINE]/[HIGHLIGHT]/[ITALIC]) or separated by a dash',
             'essay':           'Essay (requires a long written answer)',
             'fill_blank':      'Fill in the Blank (sentence with a blank to complete)',
             'matching':        'Matching Type (match items from two columns)',
+            'enumeration':     'Enumeration (asks to LIST or ENUMERATE multiple items, e.g. "List the 9 types of..."); answer = newline-separated list of all items',
         }
 
         types_list = '\n'.join([
@@ -262,7 +539,8 @@ class AIQuestionExtractor:
 
         prompt = f"""You are scanning a test questionnaire document. Your job is to:
   1. Extract every question exactly as written.
-  2. Copy the answer for each question VERBATIM from the answer key — exactly as written, no judgment.
+  2. Find the answer for each question from the answer key — either a separate key section
+     OR inline formatting/dash patterns within the question itself.
 
 QUESTION TYPES TO FIND:
 {types_list}
@@ -287,10 +565,66 @@ Example answer key formats you might see:
 ════════════════════════════════════════
 STEP 2 — EXTRACT QUESTIONS
 ════════════════════════════════════════
-- Copy every question text EXACTLY word for word — do NOT rephrase or invent anything.
-- Do NOT treat answer key entries as questions.
+- Copy every question text as written — do NOT rephrase or invent anything.
+- Do NOT treat answer key entries as standalone questions.
+- When an answer is embedded inline (via formatting tags or a dash pattern),
+  extract that answer into the "answer" field and write the question WITHOUT
+  the inline answer — replace it with a blank _______ if needed.
 - Number questions by position within their section (restart at 1 for each Part/Section).
 - If no questions are found at all, return [].
+
+════════════════════════════════════════
+FORMATTED TEXT — ANSWER KEY DETECTION
+════════════════════════════════════════
+The extracted text may contain formatting tags where the teacher used special
+formatting to mark the answer. Use these to set the "answer" field:
+
+  [RED:text]       → red-coloured text  ← STRONGEST signal; almost always the answer
+  [HIGHLIGHT:text] → highlighted text   ← very strong signal; likely the answer
+  [UNDERLINE:text] → underlined text    ← likely the answer
+  [BOLD:text]      → bold text          ← may be the answer (also used for headings)
+  [ITALIC:text]    → italic text        ← may be the answer
+
+Rules for formatted tags:
+- Strip the tag wrapper: [RED:Malware] → answer = "Malware"
+- If multiple format tags appear inside one question, combine them:
+    [RED:term1] [RED:term2] → "term1, term2"
+- Ignore formatting on section headings (e.g. [BOLD:PART I. IDENTIFICATION])
+- Ignore formatting on item numbers (e.g. [BOLD:1.])
+- For the "question" field, remove the tag and replace with _______ where it was inline
+
+Examples:
+  "1. [RED:Photosynthesis] is the process by which plants make food."
+  → question: "1. _______ is the process by which plants make food."
+    answer: "Photosynthesis"
+
+  "2. ________ [BOLD:osmosis] – the movement of water across a membrane"
+  → answer: "osmosis"
+
+  "3. [HIGHLIGHT:CPU] stands for Central Processing Unit."
+  → answer: "CPU"
+
+════════════════════════════════════════
+DASH / HYPHEN ANSWER PATTERNS
+════════════════════════════════════════
+Teachers often embed the answer key using dashes. Detect these patterns:
+
+Pattern A — answer BEFORE the dash (most common for identification):
+  "Malware – This is malicious software that damages systems."
+  "1. Malware - A type of malicious software."
+  → question = the descriptive part, answer = "Malware"
+
+Pattern B — answer AFTER the blank/dash:
+  "1. _______ – Malware – A type of malicious software."
+  "1. _____ - Malware"
+  → answer = "Malware"  (the word/phrase right after the blank)
+
+Pattern C — answer placed BEFORE the question number:
+  "Malware – 1. What is a type of malicious software that damages systems?"
+  → answer = "Malware"
+
+When using a dash pattern, the "question" field should contain the question text
+only (not the answer inline). Replace the answer position with _______ if needed.
 
 ════════════════════════════════════════
 STEP 3 — COPY ANSWERS VERBATIM
@@ -308,7 +642,8 @@ Matching rules:
       1st answer item → 1st question in that section
       2nd answer item → 2nd question in that section, etc.
   • Multiple choice → store only the letter: "A", "B", "C", or "D" (uppercase)
-  • All other types → copy the answer text EXACTLY as written in the answer key
+  • Enumeration → store all items as a newline-separated list in the "answer" field
+  • All other types → copy the answer text as written in the answer key
   • If truly no answer key entry exists for a question anywhere, use ""
 
 TEXT TO SCAN:
@@ -320,12 +655,12 @@ OUTPUT FORMAT
 Return ONLY a valid JSON array — no extra text, no markdown, no code fences.
 Each element must have these fields:
   "type"        - one of {type_names}
-  "question"    - exact question text copied from the document
+  "question"    - question text (without inline answer; use _______ placeholder)
   "option_a"    - (multiple choice only, otherwise omit)
   "option_b"    - (multiple choice only, otherwise omit)
   "option_c"    - (multiple choice only, otherwise omit)
   "option_d"    - (multiple choice only, otherwise omit)
-  "answer"      - answer text copied verbatim from the answer key, or ""
+  "answer"      - answer extracted from key, formatting tag, or dash pattern; or ""
   "explanation" - any explanation text found in the document, or ""
   "difficulty"  - "easy", "medium", or "hard"
   "points"      - point value if shown, otherwise 1

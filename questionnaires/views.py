@@ -29,6 +29,7 @@ QUESTION_TYPE_CHOICES = [
     ('essay',           'Essay'),
     ('fill_blank',      'Fill in the Blanks'),
     ('matching',        'Matching Type'),
+    ('enumeration',     'Enumeration'),
 ]
 
 
@@ -1119,6 +1120,8 @@ def archive_questionnaire(request, pk):
         can_act = True
     elif hasattr(request.user, 'teacher_profile'):
         can_act = questionnaire.uploader == request.user.teacher_profile
+    elif hasattr(request.user, 'subadmin_profile') and request.user.subadmin_profile.is_active:
+        can_act = questionnaire.department == request.user.subadmin_profile.department
     else:
         can_act = False
     if not can_act:

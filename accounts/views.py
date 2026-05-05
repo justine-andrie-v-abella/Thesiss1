@@ -2203,6 +2203,7 @@ def subadmin_browse_questionnaires(request):
             ('essay',           'Essay'),
             ('fill_blank',      'Fill in the Blanks'),
             ('matching',        'Matching Type'),
+            ('enumeration',     'Enumeration'),
         ],
         'selected_question_type': selected_question_type,
     }

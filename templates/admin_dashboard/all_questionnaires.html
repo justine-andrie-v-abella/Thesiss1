@@ -721,9 +721,9 @@ function esc(s) {
 var dpOverlay=document.getElementById('docPreviewModal');
 var dpPaper=document.getElementById('dpPaper');
 if(!dpOverlay||!dpPaper)return;
-var DP_TYPE_ORDER=['multiple_choice','true_false','identification','fill_blank','matching','essay'];
-var DP_TYPE_DISPLAY={multiple_choice:'Multiple Choice',true_false:'True or False',identification:'Identification',fill_blank:'Fill in the Blanks',matching:'Matching Type',essay:'Essay'};
-var DP_DIRECTIONS={multiple_choice:'Directions: Choose the letter of the best answer.',true_false:'Directions: Write TRUE if the statement is correct, and FALSE if it is not.',identification:'Directions: Identify what is being asked in each item. Write your answer on the blank provided.',fill_blank:'Directions: Fill in each blank with the correct word or phrase.',matching:'Directions: Match each item in Column A with the corresponding answer in Column B.',essay:'Directions: Answer each question in complete sentences. Use additional paper if needed.'};
+var DP_TYPE_ORDER=['multiple_choice','true_false','identification','fill_blank','matching','essay','enumeration'];
+var DP_TYPE_DISPLAY={multiple_choice:'Multiple Choice',true_false:'True or False',identification:'Identification',fill_blank:'Fill in the Blanks',matching:'Matching Type',essay:'Essay',enumeration:'Enumeration'};
+var DP_DIRECTIONS={multiple_choice:'Directions: Choose the letter of the best answer.',true_false:'Directions: Write TRUE if the statement is correct, and FALSE if it is not.',identification:'Directions: Identify what is being asked in each item. Write your answer on the blank provided.',fill_blank:'Directions: Fill in each blank with the correct word or phrase.',matching:'Directions: Match each item in Column A with the corresponding answer in Column B.',essay:'Directions: Answer each question in complete sentences. Use additional paper if needed.',enumeration:'Directions: List all the correct items being asked in each question.'};
 var DP_ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX','X'];
 
 function dpEsc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -859,6 +859,17 @@ function renderDPQ(q,num,type){
         html+=dpEsc(q.question_text);
         html+='<div class="dp-essay-lines">';
         for(var i=0;i<4;i++)html+='<div class="dp-essay-line"></div>';
+        html+='</div>';
+    }else if(type==='enumeration'){
+        html+=dpEsc(q.question_text);
+        var raw=q.correct_answer||'';
+        var enumItems=raw.split('\n').map(function(s){return s.trim();}).filter(Boolean);
+        if(enumItems.length<=1)enumItems=raw.split(',').map(function(s){return s.trim();}).filter(Boolean);
+        var nLines=Math.max(enumItems.length,3);
+        html+='<div class="dp-essay-lines">';
+        for(var k=0;k<nLines;k++){
+            html+='<div style="margin-bottom:5px;font-size:12px;font-family:Arial,sans-serif;">'+(k+1)+'.&nbsp;<span class="dp-blank-line">&nbsp;</span></div>';
+        }
         html+='</div>';
     }else{
         html+=dpEsc(q.question_text);

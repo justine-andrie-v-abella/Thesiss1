@@ -111,6 +111,7 @@ class QuestionType(models.Model):
     ESSAY            = 'essay'
     FILL_BLANK       = 'fill_blank'
     MATCHING         = 'matching'
+    ENUMERATION      = 'enumeration'
 
     TYPE_CHOICES = [
         (MULTIPLE_CHOICE, 'Multiple Choice'),
@@ -119,6 +120,7 @@ class QuestionType(models.Model):
         (ESSAY,            'Essay'),
         (FILL_BLANK,       'Fill in the Blanks'),
         (MATCHING,         'Matching Type'),
+        (ENUMERATION,      'Enumeration'),
     ]
 
     name        = models.CharField(max_length=50, choices=TYPE_CHOICES, unique=True)

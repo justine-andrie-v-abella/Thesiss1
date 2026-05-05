@@ -146,36 +146,36 @@
             </div>
         </div>
 
-        <div class="bg-gray-50 px-5 py-4 flex items-center space-x-2">
-            {% if quest.is_extracted %}
-            <button type="button"
-                data-quest-id="{{ quest.pk }}"
-                data-quest-title="{{ quest.title|escapejs }}"
-                class="view-questions-btn flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm flex items-center justify-center">
-                <i class="bi bi-list-ul mr-1"></i> Questions
-            </button>
-            <button type="button"
-                data-quest-id="{{ quest.pk }}"
-                data-quest-title="{{ quest.title|escapejs }}"
-                data-quest-subject="{{ quest.subject.code|escapejs }} — {{ quest.subject.name|escapejs }}"
-                data-quest-exam-type-display="{{ quest.get_exam_type_display|escapejs }}"
-                class="doc-preview-btn bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-semibold py-2 px-3 rounded-lg transition-all shrink-0"
-                title="Document Preview">
-                <i class="bi bi-file-earmark-text"></i>
-            </button>
-            {% else %}
-            <button type="button" disabled
-                class="flex-1 bg-gray-200 text-gray-400 font-semibold py-2 px-3 rounded-lg text-sm flex items-center justify-center cursor-not-allowed">
-                <i class="bi bi-hourglass-split mr-1"></i> Not Extracted
-            </button>
-            <span class="w-9 shrink-0"></span>
-            {% endif %}
-
-            <button type="button"
-                onclick="openArchiveModal('{{ quest.pk }}','{{ quest.title|escapejs }}','{{ quest.department.name|escapejs }}','{{ quest.subject.code|escapejs }} - {{ quest.subject.name|escapejs }}','{{ quest.file_type|upper }}','{{ quest.get_file_size_display|escapejs }}','{{ quest.uploaded_at|date:"M d, Y" }}')"
-                class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-3 rounded-lg transition-all" title="Archive">
-                <i class="bi bi-archive-fill"></i>
-            </button>
+        <div class="bg-gray-50 px-5 py-4">
+            <div class="flex items-center gap-2">
+                {% if quest.is_extracted %}
+                <button type="button"
+                    data-quest-id="{{ quest.pk }}"
+                    data-quest-title="{{ quest.title|escapejs }}"
+                    class="view-questions-btn flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-sm flex items-center justify-center">
+                    <i class="bi bi-list-ul mr-1.5"></i> Questions
+                </button>
+                <button type="button"
+                    data-quest-id="{{ quest.pk }}"
+                    data-quest-title="{{ quest.title|escapejs }}"
+                    data-quest-subject="{{ quest.subject.code|escapejs }} — {{ quest.subject.name|escapejs }}"
+                    data-quest-exam-type-display="{{ quest.get_exam_type_display|escapejs }}"
+                    class="doc-preview-btn flex-1 bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-sm flex items-center justify-center gap-1"
+                    title="Document Preview">
+                    <i class="bi bi-file-earmark-text"></i> Preview
+                </button>
+                {% else %}
+                <button type="button" disabled
+                    class="flex-1 bg-gray-200 text-gray-400 font-semibold py-2 px-4 rounded-lg text-sm flex items-center justify-center cursor-not-allowed">
+                    <i class="bi bi-hourglass-split mr-1.5"></i> Not Extracted
+                </button>
+                {% endif %}
+                <button type="button"
+                    onclick="openArchiveModal('{{ quest.pk }}','{{ quest.title|escapejs }}','{{ quest.department.name|escapejs }}','{{ quest.subject.code|escapejs }} - {{ quest.subject.name|escapejs }}','{{ quest.file_type|upper }}','{{ quest.get_file_size_display|escapejs }}','{{ quest.uploaded_at|date:"M d, Y" }}')"
+                    class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow flex items-center">
+                    <i class="bi bi-archive"></i>
+                </button>
+            </div>
         </div>
     </div>
     {% endfor %}

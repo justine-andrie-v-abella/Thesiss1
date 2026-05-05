@@ -51,22 +51,282 @@ class GeminiQuestionnaireExtractor:
             raise ValueError(f"Unsupported file format: {extension}")
 
     def _extract_from_pdf(self, file_path: str) -> str:
-        text = ""
+        """
+        Extract text from a PDF with formatting cues preserved.
+
+        Uses PyMuPDF (fitz) as the primary engine because it:
+          - Detects text colour → emits [RED:text] tags for reddish spans
+          - Handles multi-column layouts correctly (sorts blocks by position)
+          - Falls back to PyPDF2 if fitz is unavailable.
+        """
         try:
+            import fitz  # PyMuPDF
+            return self._extract_from_pdf_pymupdf(file_path)
+        except ImportError:
+            pass
+        # ── PyPDF2 fallback ────────────────────────────────────────────
+        try:
+            text = ""
             with open(file_path, 'rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
                 for page in pdf_reader.pages:
                     extracted = page.extract_text()
                     if extracted:
                         text += extracted + "\n"
+            return text
         except Exception as e:
             raise Exception(f"Error extracting PDF: {str(e)}") from e
-        return text
+
+    def _extract_from_pdf_pymupdf(self, file_path: str) -> str:
+        """
+        PyMuPDF-based PDF extraction.
+
+        Key features:
+          1. Colour detection — spans with reddish colour get tagged [RED:text]
+          2. Multi-column layout — text blocks are sorted by their vertical
+             position within the same horizontal band so columns read top-to-
+             bottom rather than being interleaved.
+          3. Bold / italic detection via font flags.
+        """
+        import fitz
+
+        COLUMN_BAND_TOLERANCE = 15  # px — spans within this y-delta share a row
+
+        def is_reddish(color_int):
+            """Return True for colours where R > 150, G < 100, B < 100."""
+            if color_int is None:
+                return False
+            # fitz returns colour as a packed integer (ARGB on some builds; always sRGB)
+            r = (color_int >> 16) & 0xFF
+            g = (color_int >> 8)  & 0xFF
+            b =  color_int        & 0xFF
+            return r > 150 and g < 100 and b < 100
+
+        def span_tag(span):
+            """Return formatting tag for a span or None."""
+            color = span.get('color', 0)
+            if is_reddish(color):
+                return 'RED'
+            flags = span.get('flags', 0)
+            # fitz font flags: bit 4 = italic, bit 3 = bold (serifed), bit 0 = superscript
+            if flags & (1 << 4):   # italic
+                return 'ITALIC'
+            if flags & (1 << 3):   # bold (some fonts use bit 1 instead)
+                return 'BOLD'
+            if flags & (1 << 1):
+                return 'BOLD'
+            return None
+
+        pages_text = []
+
+        try:
+            doc = fitz.open(file_path)
+            for page in doc:
+                page_width = page.rect.width
+
+                # ── Collect all text spans with position info ──────────────
+                raw_spans = []  # list of (x0, y0, x1, y1, text, tag)
+                blocks = page.get_text('dict', flags=fitz.TEXT_PRESERVE_WHITESPACE)['blocks']
+                for block in blocks:
+                    if block.get('type') != 0:
+                        continue
+                    for line in block.get('lines', []):
+                        for span in line.get('spans', []):
+                            txt = span.get('text', '')
+                            if not txt.strip():
+                                continue
+                            bbox = span.get('bbox', (0, 0, 0, 0))
+                            tag  = span_tag(span)
+                            raw_spans.append((bbox[0], bbox[1], bbox[2], bbox[3], txt, tag))
+
+                if not raw_spans:
+                    continue
+
+                # ── Detect columns by looking for a clear x-gap ───────────
+                # Sort by x0; if page has two clusters of x0, treat as 2-column
+                x0_vals   = sorted(set(round(s[0] / 10) * 10 for s in raw_spans))
+                mid_x     = page_width / 2
+
+                # Group spans into left / right columns then sort each by y
+                left_spans  = [s for s in raw_spans if s[0] < mid_x]
+                right_spans = [s for s in raw_spans if s[0] >= mid_x]
+
+                def spans_to_lines(spans):
+                    """Cluster spans into logical lines by y0 proximity."""
+                    if not spans:
+                        return []
+                    spans = sorted(spans, key=lambda s: (round(s[1] / 5) * 5, s[0]))
+                    lines  = []
+                    cur_y  = None
+                    cur_line = []
+                    for span in spans:
+                        y = span[1]
+                        if cur_y is None or abs(y - cur_y) > COLUMN_BAND_TOLERANCE:
+                            if cur_line:
+                                lines.append(cur_line)
+                            cur_line = [span]
+                            cur_y = y
+                        else:
+                            cur_line.append(span)
+                    if cur_line:
+                        lines.append(cur_line)
+                    return lines
+
+                def render_lines(lines):
+                    result = []
+                    for line in lines:
+                        line_text = ''
+                        for (x0, y0, x1, y1, txt, tag) in sorted(line, key=lambda s: s[0]):
+                            stripped = txt.strip()
+                            if not stripped:
+                                line_text += txt
+                                continue
+                            if tag and not self._is_noise_run(stripped):
+                                leading  = txt[: len(txt) - len(txt.lstrip())]
+                                trailing = txt[len(txt.rstrip()):]
+                                line_text += f'{leading}[{tag}:{stripped}]{trailing}'
+                            else:
+                                line_text += txt
+                        rendered = line_text.strip()
+                        if rendered:
+                            result.append(rendered)
+                    return result
+
+                # If there are meaningful right-column spans, render columns separately
+                if right_spans and len(right_spans) >= 2:
+                    left_lines  = spans_to_lines(left_spans)
+                    right_lines = spans_to_lines(right_spans)
+                    page_lines  = render_lines(left_lines) + render_lines(right_lines)
+                else:
+                    all_lines  = spans_to_lines(raw_spans)
+                    page_lines = render_lines(all_lines)
+
+                pages_text.append('\n'.join(page_lines))
+
+            doc.close()
+            return '\n\n'.join(pages_text)
+
+        except Exception as e:
+            raise Exception(f"Error extracting PDF with PyMuPDF: {str(e)}") from e
+
+    # =========================================================================
+    # FORMATTING DETECTION HELPERS
+    # =========================================================================
+
+    @staticmethod
+    def _get_run_format_tag(run):
+        """
+        Inspect a python-docx Run for answer-key formatting cues.
+        Returns a tag string ('RED', 'HIGHLIGHT', 'UNDERLINE', 'BOLD', 'ITALIC')
+        or None if the run has no special formatting.
+
+        Priority order (most → least reliable as answer indicator):
+          RED colour → HIGHLIGHT → UNDERLINE → BOLD → ITALIC
+        """
+        try:
+            from docx.oxml.ns import qn
+            rPr = run._r.find(qn('w:rPr'))
+            if rPr is not None:
+
+                # 1. Direct RGB colour -------------------------------------------
+                color_el = rPr.find(qn('w:color'))
+                if color_el is not None:
+                    val = (color_el.get(qn('w:val')) or '').strip()
+                    if val and val.lower() not in ('auto', '000000', 'ffffff') and len(val) == 6:
+                        try:
+                            r_v = int(val[0:2], 16)
+                            g_v = int(val[2:4], 16)
+                            b_v = int(val[4:6], 16)
+                            # "Reddish" = high red channel, low green & blue
+                            if r_v > 150 and g_v < 100 and b_v < 100:
+                                return 'RED'
+                        except ValueError:
+                            pass
+
+                # 2. Highlight ---------------------------------------------------
+                hl = rPr.find(qn('w:highlight'))
+                if hl is not None:
+                    hl_val = (hl.get(qn('w:val')) or '').lower()
+                    if hl_val and hl_val != 'none':
+                        return 'HIGHLIGHT'
+
+        except Exception:
+            pass
+
+        # 3. Underline (python-docx API is reliable here) -----------------------
+        try:
+            if run.underline:
+                return 'UNDERLINE'
+        except Exception:
+            pass
+
+        # 4. Bold (lower priority — headings are also bold) ---------------------
+        try:
+            if run.bold:
+                return 'BOLD'
+        except Exception:
+            pass
+
+        # 5. Italic -------------------------------------------------------------
+        try:
+            if run.italic:
+                return 'ITALIC'
+        except Exception:
+            pass
+
+        return None
+
+    @staticmethod
+    def _is_noise_run(text):
+        """
+        Returns True for short runs that are unlikely to be answer text even if
+        formatted — e.g. question numbers ("1.", "2)"), pure punctuation, blanks.
+        These are skipped to avoid tagging noise as answers.
+        """
+        stripped = text.strip()
+        if not stripped:
+            return True
+        # Purely numeric/punctuation runs (question numbers, dashes, underscores)
+        if re.match(r'^[\d\s\.\)\-\_]+$', stripped):
+            return True
+        # Very short runs that are just punctuation
+        if len(stripped) <= 1 and not stripped.isalpha():
+            return True
+        return False
+
+    def _extract_para_with_formatting(self, para):
+        """
+        Extract paragraph text, wrapping formatted runs with tags so Gemini
+        can identify them as answer-key markers.
+        e.g.  "1. [RED:Malware] is a type of malicious software."
+        """
+        parts = []
+        for run in para.runs:
+            text = run.text
+            if not text:
+                continue
+            tag = self._get_run_format_tag(run)
+            # Only tag runs that are meaningful (not question numbers / punctuation)
+            if tag and not self._is_noise_run(text):
+                stripped = text.strip()
+                leading  = text[: len(text) - len(text.lstrip())]
+                trailing = text[len(text.rstrip()):]
+                parts.append(f"{leading}[{tag}:{stripped}]{trailing}")
+            else:
+                parts.append(text)
+        result = ''.join(parts).strip()
+        # Fallback: if all runs are plain, use para.text (handles edge cases)
+        return result if result else para.text.strip()
+
+    # =========================================================================
+    # FILE EXTRACTION
+    # =========================================================================
 
     def _extract_from_docx(self, file_path: str) -> str:
         """
         Extract text from DOCX in reading order.
         Handles both real Word tables and paragraph-based column layouts.
+        Preserves answer-key formatting cues ([RED:...], [BOLD:...], etc.)
         After raw extraction, runs _reconstruct_matching_sections() to
         reformat split Column A / Column B blocks into [TABLE] format.
         """
@@ -84,7 +344,7 @@ class GeminiQuestionnaireExtractor:
                 if tag == 'p':
                     para = para_map.get(child)
                     if para and para.text.strip():
-                        parts.append(para.text.strip())
+                        parts.append(self._extract_para_with_formatting(para))
 
                 # ── Real Word table ───────────────────────────────────────
                 elif tag == 'tbl':
@@ -97,10 +357,16 @@ class GeminiQuestionnaireExtractor:
                         seen  = set()
                         cells = []
                         for cell in row.cells:
-                            txt     = cell.text.strip()
                             cell_id = id(cell._tc)
                             if cell_id not in seen:
                                 seen.add(cell_id)
+                                # Extract cell text with formatting cues
+                                cell_parts = []
+                                for para in cell.paragraphs:
+                                    pt = self._extract_para_with_formatting(para)
+                                    if pt:
+                                        cell_parts.append(pt)
+                                txt = ' '.join(cell_parts).strip()
                                 cells.append(txt)
                         if any(cells):
                             grid.append(cells)
@@ -315,9 +581,13 @@ class GeminiQuestionnaireExtractor:
 
 STRICT RULES:
 - DO NOT create, generate, invent, or add any new questions.
-- DO NOT rephrase or rewrite — copy the question text EXACTLY word for word.
 - ONLY include questions that are literally present in the provided text.
 - If no questions are found, return {{"questions": []}}.
+- Copy the question stem EXACTLY — but when an answer is embedded inline
+  (via formatting tags [RED:…] / [BOLD:…] or a dash pattern), extract that
+  answer into correct_answer and write the question WITHOUT the inline answer
+  (replace it with a blank _______ if needed).
+- NEVER leave correct_answer empty when you can see the answer in the text.
 
 ═══════════════════════════════════════════════════════
 SECTION RECOGNITION
@@ -330,16 +600,68 @@ Recognize ALL of these as question sections:
 - Numbered sub-questions inside any section are individual questions.
 
 ═══════════════════════════════════════════════════════
+FORMATTED TEXT — ANSWER KEY DETECTION
+═══════════════════════════════════════════════════════
+The extracted text contains formatting tags where the teacher used special
+formatting to mark the answer key. Use these to set correct_answer:
+
+  [RED:text]       → red-coloured text  ← STRONGEST signal; almost always the answer
+  [HIGHLIGHT:text] → highlighted text   ← very strong signal; likely the answer
+  [UNDERLINE:text] → underlined text    ← likely the answer
+  [BOLD:text]      → bold text          ← may be the answer (also used for headings)
+  [ITALIC:text]    → italic text        ← may be the answer
+
+Rules for formatted tags:
+- Strip the tag wrapper: [RED:Malware] → correct_answer = "Malware"
+- If multiple format tags appear inside one question, combine them: [RED:term1] [RED:term2] → "term1, term2"
+- Ignore formatting on section headings (e.g. [BOLD:PART I. IDENTIFICATION]) — those are not answers
+- Ignore formatting on item numbers (e.g. [BOLD:1.]) — those are not answers
+
+Examples:
+  "1. [RED:Photosynthesis] is the process by which plants make food."
+  → question: "_______ is the process by which plants make food."  correct_answer: "Photosynthesis"
+
+  "2. ________ [BOLD:osmosis] – the movement of water across a membrane"
+  → correct_answer: "osmosis"
+
+  "3. [HIGHLIGHT:CPU] stands for Central Processing Unit."
+  → correct_answer: "CPU"
+
+═══════════════════════════════════════════════════════
+DASH / HYPHEN ANSWER PATTERNS
+═══════════════════════════════════════════════════════
+Teachers often embed the answer key using dashes. Detect these patterns:
+
+Pattern A — answer BEFORE the dash:
+  "Malware – This is malicious software that damages systems."
+  "1. Malware - A type of malicious software."
+  → question stem = the descriptive part, correct_answer = "Malware"
+
+Pattern B — answer AFTER the blank/dash:
+  "1. _______ – Malware – A type of malicious software."
+  "1. _____ - Malware"
+  → correct_answer = "Malware"  (the word/phrase between the blank and the description)
+
+Pattern C — answer placed BEFORE the question number:
+  "Malware – 1. What is a type of malicious software that damages systems?"
+  → correct_answer = "Malware"
+
+When extracting the question text for correct_answer detection:
+- Remove the answer from the question stem and replace with a blank if needed
+- The question field should contain the QUESTION TEXT only (not the answer inline)
+
+═══════════════════════════════════════════════════════
 QUESTION TYPES
 ═══════════════════════════════════════════════════════
 Use ONLY these types: {', '.join(question_types)}
 
 - "multiple_choice"  → has lettered options A B C D
 - "true_false"       → asks true or false
-- "identification"   → short answer; also Scenario-Based and Spot-the-Error
-- "essay"            → long open-ended answer
+- "identification"   → short answer; answer key may be formatted ([RED]/[BOLD]/[UNDERLINE]/[HIGHLIGHT]/[ITALIC]) or separated by a dash; also Scenario-Based and Spot-the-Error
+- "essay"            → long open-ended answer (no single correct answer expected)
 - "fill_blank"       → sentence with ___ to complete
 - "matching"         → two-column table with Column A and Column B
+- "enumeration"      → asks to LIST or ENUMERATE multiple items (e.g. "List the 9 types of...", "Give 5 examples of..."); correct_answer = newline-separated list of all items
 
 ═══════════════════════════════════════════════════════
 MATCHING TYPE — CRITICAL INSTRUCTIONS
@@ -410,8 +732,8 @@ RETURN — valid JSON only, no markdown, no extra text
         }},
         {{
             "type": "identification",
-            "question": "exact question text",
-            "correct_answer": "",
+            "question": "_______ is the process by which plants make food using sunlight.",
+            "correct_answer": "Photosynthesis",
             "explanation": "",
             "difficulty": "medium",
             "points": 1
@@ -438,6 +760,14 @@ RETURN — valid JSON only, no markdown, no extra text
             "correct_answer": "",
             "explanation": "",
             "difficulty": "hard",
+            "points": 5
+        }},
+        {{
+            "type": "enumeration",
+            "question": "List the nine (9) types of server security threats.",
+            "correct_answer": "Malware\nDistributed Denial of Service (DDoS)\nUnauthorized Access\nSQL Injection\nPhishing\nInsider Threats\nZero-Day Exploits\nMisconfiguration\nBrute Force Attacks",
+            "explanation": "",
+            "difficulty": "medium",
             "points": 5
         }}
     ]
