@@ -477,9 +477,10 @@ var state = { folders: [], archivedFolders: [], subjects: [] };
 
 /* ── sidebar badge ── */
 function refreshSidebarBadge() {
-    var total = state.folders.reduce(function(a,f){ return a + f.questions.length; }, 0);
+    var count = state.folders.length;
     var b = document.getElementById('ws-sidebar-badge');
-    if (b) b.textContent = total;
+    if (b) b.textContent = count;
+    try { localStorage.setItem('bisu_workspace_folder_count', count); } catch(e){}
 }
 refreshSidebarBadge();
 

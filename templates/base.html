@@ -975,15 +975,14 @@
             var badge = document.getElementById('ws-sidebar-badge');
             if (!badge) return;
             try {
-                var ws = JSON.parse(localStorage.getItem('bisu_workspace_questions') || '[]');
-                badge.textContent = ws.length;
-                badge.style.display = ws.length > 0 ? 'flex' : 'flex'; // always show
+                var count = parseInt(localStorage.getItem('bisu_workspace_folder_count') || '0', 10);
+                badge.textContent = isNaN(count) ? '0' : count;
             } catch(e) { badge.textContent = '0'; }
         }
         refreshWorkspaceBadge();
         // Re-read on storage changes from other tabs / pages
         window.addEventListener('storage', function(e) {
-            if (e.key === 'bisu_workspace_questions') refreshWorkspaceBadge();
+            if (e.key === 'bisu_workspace_folder_count') refreshWorkspaceBadge();
         });
 
         // ── Django messages → toasts ──────────────────────────────────────────

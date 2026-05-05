@@ -508,7 +508,8 @@ function updateBrowseBanner() {
     if (el1) el1.textContent = cachedFolders.length;
     if (el2) el2.textContent = totalQ;
     var badge = document.getElementById('ws-sidebar-badge');
-    if (badge) badge.textContent = totalQ;
+    if (badge) badge.textContent = cachedFolders.length;
+    try { localStorage.setItem('bisu_workspace_folder_count', cachedFolders.length); } catch(e){}
 }
 
 loadFoldersFromServer();
