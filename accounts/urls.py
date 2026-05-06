@@ -91,9 +91,6 @@ urlpatterns = [
     path('programs/<int:pk>/edit/',                                   views.edit_program,                 name='edit_program'),
     path('programs/<int:pk>/delete/',                                 views.delete_program,               name='delete_program'),
     path('programs/<int:pk>/subjects/',                               views.program_detail,               name='program_detail'),
-    path('programs/<int:prog_pk>/subjects/add/',                      views.add_subject_to_program,        name='add_subject_to_program'),
-    path('programs/<int:prog_pk>/subjects/bulk-add/',                 views.bulk_add_subjects_to_program,  name='bulk_add_subjects_to_program'),
-    path('programs/<int:prog_pk>/subjects/<int:subj_pk>/remove/',     views.remove_subject_from_program,   name='remove_subject_from_program'),
 
     # Curriculum Management (superadmin)
     path('programs/<int:pk>/curriculum/',                                   views.program_curriculum,             name='program_curriculum'),
@@ -106,9 +103,6 @@ urlpatterns = [
     path('subadmin/programs/<int:pk>/edit/',                          views.subadmin_edit_program,                 name='subadmin_edit_program'),
     path('subadmin/programs/<int:pk>/delete/',                        views.subadmin_delete_program,               name='subadmin_delete_program'),
     path('subadmin/programs/<int:pk>/subjects/',                      views.subadmin_program_detail,               name='subadmin_program_detail'),
-    path('subadmin/programs/<int:prog_pk>/subjects/add/',             views.subadmin_add_subject_to_program,            name='subadmin_add_subject_to_program'),
-    path('subadmin/programs/<int:prog_pk>/subjects/bulk-add/',        views.subadmin_bulk_add_subjects_to_program,      name='subadmin_bulk_add_subjects_to_program'),
-    path('subadmin/programs/<int:prog_pk>/subjects/<int:subj_pk>/remove/', views.subadmin_remove_subject_from_program, name='subadmin_remove_subject_from_program'),
 
     # Curriculum Management (sub-admin)
     path('subadmin/programs/<int:pk>/curriculum/',                                  views.subadmin_program_curriculum,           name='subadmin_program_curriculum'),
