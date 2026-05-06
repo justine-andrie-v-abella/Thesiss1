@@ -249,9 +249,9 @@
 
 
 <script>
-const CSRF            = '{{ csrf_token }}';
-const ADD_URL         = '{% url "accounts:add_curriculum_subject" program.pk %}';
-const REMOVE_URL_TMPL = '{% url "accounts:remove_curriculum_subject" program.pk 0 %}'.replace('/0/', '/');
+const CSRF = '{{ csrf_token }}';
+const ADD_URL = '{% url "accounts:add_curriculum_subject" program.pk %}';
+const PROGRAM_PK = {{ program.pk }};
 
 /* ── Full available-subject pool (seeded from server, pruned as subjects are added) ── */
 let availableSubjects = [
@@ -314,12 +314,8 @@ function closeAddModal() {
     modalSem = null;
 }
 
-// Also ensure the modal backdrop click doesn't cause issues
+// Modal backdrop click
 document.getElementById('addModal')?.addEventListener('click', function(e) {
-    if (e.target === this) closeAddModal();
-});
-
-document.getElementById('addModal').addEventListener('click', function(e) {
     if (e.target === this) closeAddModal();
 });
 
@@ -333,7 +329,6 @@ function buildCheckList(query) {
         return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
     });
 
-    // Check if noMsg exists before trying to use it
     if (availableSubjects.length === 0) {
         container.innerHTML = '';
         if (noMsg) {
@@ -403,6 +398,7 @@ function selectAll() {
     });
     updateSelectedCount();
 }
+
 function deselectAll() {
     document.querySelectorAll('#subjectCheckList .subject-cb').forEach(function(cb) {
         cb.checked = false;
@@ -504,13 +500,17 @@ function removeEntry(entryId, year, sem, code) {
     pendingRemove = { entryId, year, sem, code };
     document.getElementById('removeSubjectCode').textContent = code;
     const m = document.getElementById('removeModal');
-    m.classList.remove('hidden'); m.classList.add('flex');
+    m.classList.remove('hidden'); 
+    m.classList.add('flex');
 }
+
 function closeRemoveModal() {
-    document.getElementById('removeModal').classList.add('hidden');
-    document.getElementById('removeModal').classList.remove('flex');
+    const m = document.getElementById('removeModal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
     pendingRemove = null;
 }
+
 document.getElementById('removeModal').addEventListener('click', function(e) {
     if (e.target === this) closeRemoveModal();
 });
@@ -519,41 +519,51 @@ function confirmRemove() {
     if (!pendingRemove) return;
     const { entryId, year, sem, code } = pendingRemove;
     const btn = document.getElementById('removeConfirmBtn');
-    btn.disabled = true; btn.textContent = 'Removing…';
+    btn.disabled = true; 
+    btn.textContent = 'Removing…';
 
-    fetch(REMOVE_URL_TMPL + entryId + '/', {
+    // Build the URL correctly
+    const removeUrl = `/accounts/programs/${PROGRAM_PK}/curriculum/${entryId}/remove/`;
+    
+    fetch(removeUrl, {
         method: 'POST',
-        headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+        headers: { 
+            'X-CSRFToken': CSRF, 
+            'X-Requested-With': 'XMLHttpRequest' 
+        },
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        btn.disabled = false; btn.textContent = 'Remove';
+        btn.disabled = false; 
+        btn.textContent = 'Remove';
         if (data.success) {
             const row = document.getElementById('row-' + entryId);
             if (row) row.remove();
             const tbody = document.getElementById('tbody-' + year + '-' + sem);
-            if (tbody && tbody.querySelectorAll('tr').length === 0) {
+            if (tbody && tbody.querySelectorAll('tr:not([class^="empty-row"])').length === 0) {
                 const tr = document.createElement('tr');
                 tr.className = 'empty-row-' + year + '-' + sem;
                 tr.innerHTML =
                     '<td colspan="3" class="px-4 py-8 text-center text-gray-400">' +
                     '<i class="bi bi-inbox text-2xl block mb-1 opacity-40"></i>' +
-                    '<span class="text-xs">No subjects yet — click <strong>Add Subject</strong></span></td>';
+                    '<span class="text-xs">No subjects yet — click <strong>Add Subject</strong></span>' +
+                    '</td>';
                 tbody.appendChild(tr);
             }
             updateCounter(year, sem);
             closeRemoveModal();
-            showToast('"' + code + '" removed.', 'info');
-            setTimeout(function() { location.reload(); }, 700);
+            showToast('"' + code + '" removed.', 'success');
         } else {
             closeRemoveModal();
             showToast(data.error || 'Failed to remove.', 'error');
         }
     })
-    .catch(function() {
-        btn.disabled = false; btn.textContent = 'Remove';
+    .catch(function(error) {
+        console.error('Remove error:', error);
+        btn.disabled = false; 
+        btn.textContent = 'Remove';
         closeRemoveModal();
-        showToast('Network error.', 'error');
+        showToast('Network error: Could not remove subject.', 'error');
     });
 }
 
@@ -564,12 +574,11 @@ function updateCounter(year, sem) {
     const el    = document.getElementById('count-' + year + '-' + sem);
     if (el) el.textContent = rows;
     
-    // Calculate total for the year
     let total = 0;
     for (let s = 1; s <= 2; s++) {
-        const tbody = document.getElementById('tbody-' + year + '-' + s);
-        if (tbody) {
-            total += tbody.querySelectorAll('tr:not([class^="empty-row"])').length;
+        const tbodySem = document.getElementById('tbody-' + year + '-' + s);
+        if (tbodySem) {
+            total += tbodySem.querySelectorAll('tr:not([class^="empty-row"])').length;
         }
     }
     const yel = document.getElementById('year-count-' + year);
