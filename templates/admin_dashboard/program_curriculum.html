@@ -46,7 +46,7 @@
 </div>
 
 <!-- ── Summary bar ───────────────────────────────────────────────────────── -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+<div class="flex flex-wrap items-center gap-4 mb-8">
     {% for year_data in curriculum_grid %}
     <div class="bg-white rounded-xl shadow p-4 flex items-center gap-3">
         <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -54,7 +54,7 @@
         </div>
         <div>
             <div class="text-xl font-bold text-gray-800" id="year-count-{{ year_data.year }}">
-                {% with total=0 %}{% for sem_data in year_data.semesters %}{{ sem_data.entries|length }}{% endfor %}{% endwith %}
+                {{ year_data.total }}  <!-- Changed from the broken calculation -->
             </div>
             <div class="text-xs text-gray-500">Year {{ year_data.year }} subjects</div>
         </div>
@@ -287,9 +287,37 @@ function openAddModal(year, sem) {
 
 function closeAddModal() {
     const m = document.getElementById('addModal');
-    m.classList.add('hidden');
-    m.classList.remove('flex');
+    if (m) {
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+    }
+    
+    // Reset form state
+    const searchInput = document.getElementById('subjectSearch');
+    if (searchInput) searchInput.value = '';
+    
+    const errEl = document.getElementById('modal_error');
+    if (errEl) errEl.classList.add('hidden');
+    
+    // Reset submit button
+    const submitBtn = document.getElementById('modal_submit_btn');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-plus-circle"></i> <span id="submitBtnLabel">Add to Curriculum</span>';
+    }
+    
+    // Clear any checked checkboxes that might remain
+    const checkboxes = document.querySelectorAll('.subject-cb');
+    checkboxes.forEach(function(cb) { cb.checked = false; });
+    
+    modalYear = null;
+    modalSem = null;
 }
+
+// Also ensure the modal backdrop click doesn't cause issues
+document.getElementById('addModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeAddModal();
+});
 
 document.getElementById('addModal').addEventListener('click', function(e) {
     if (e.target === this) closeAddModal();
@@ -305,14 +333,23 @@ function buildCheckList(query) {
         return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
     });
 
+    // Check if noMsg exists before trying to use it
     if (availableSubjects.length === 0) {
         container.innerHTML = '';
-        noMsg.style.display = 'block';
-        document.getElementById('modal_submit_btn').disabled = true;
+        if (noMsg) {
+            noMsg.style.display = 'block';
+        }
+        const submitBtn = document.getElementById('modal_submit_btn');
+        if (submitBtn) submitBtn.disabled = true;
         return;
     }
-    noMsg.style.display = 'none';
-    document.getElementById('modal_submit_btn').disabled = false;
+    
+    if (noMsg) {
+        noMsg.style.display = 'none';
+    }
+    
+    const submitBtn = document.getElementById('modal_submit_btn');
+    if (submitBtn) submitBtn.disabled = false;
 
     if (filtered.length === 0) {
         container.innerHTML =
@@ -526,11 +563,15 @@ function updateCounter(year, sem) {
     const rows  = tbody ? tbody.querySelectorAll('tr:not([class^="empty-row"])').length : 0;
     const el    = document.getElementById('count-' + year + '-' + sem);
     if (el) el.textContent = rows;
+    
+    // Calculate total for the year
     let total = 0;
-    [1, 2].forEach(function(s) {
-        const t = document.getElementById('tbody-' + year + '-' + s);
-        if (t) total += t.querySelectorAll('tr:not([class^="empty-row"])').length;
-    });
+    for (let s = 1; s <= 2; s++) {
+        const tbody = document.getElementById('tbody-' + year + '-' + s);
+        if (tbody) {
+            total += tbody.querySelectorAll('tr:not([class^="empty-row"])').length;
+        }
+    }
     const yel = document.getElementById('year-count-' + year);
     if (yel) yel.textContent = total;
 }

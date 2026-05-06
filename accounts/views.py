@@ -2487,18 +2487,26 @@ def _build_curriculum_grid(program):
     )
     # index by (year, semester)
     slot_map = {}
+    year_totals = {}  # Add this to track totals per year
     for y in range(1, 5):
         for s in range(1, 3):
             slot_map[(y, s)] = []
+        year_totals[y] = 0  # Initialize year total
+    
     for e in entries:
         slot_map[(e.year_level, e.semester)].append(e)
+        year_totals[e.year_level] += 1  # Add to year total
 
     grid = []
     for y in range(1, 5):
         semesters = []
         for s in range(1, 3):
             semesters.append({'semester': s, 'entries': slot_map[(y, s)]})
-        grid.append({'year': y, 'semesters': semesters})
+        grid.append({
+            'year': y, 
+            'semesters': semesters,
+            'total': year_totals[y]  # Add total to the year dict
+        })
     return grid, {e.subject_id for e in entries}
 
 

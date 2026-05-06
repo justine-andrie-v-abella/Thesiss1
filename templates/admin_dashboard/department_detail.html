@@ -121,10 +121,10 @@
                                         class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow text-sm" title="Curriculum">
                                         <i class="bi bi-layout-text-sidebar"></i>
                                     </a>
-                                    <a href="{% url 'accounts:program_detail' program.pk %}"
+                                    {% comment %} <a href="{% url 'accounts:program_detail' program.pk %}"
                                         class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow text-sm" title="View Subjects">
                                         <i class="bi bi-book"></i>
-                                    </a>
+                                    </a> {% endcomment %}
                                     <button onclick="openEditModal({{ program.pk }}, '{{ program.name|escapejs }}', '{{ program.code|escapejs }}', '{{ program.description|escapejs }}', {{ program.is_active|yesno:'true,false' }})"
                                         class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow text-sm" title="Edit">
                                         <i class="bi bi-pencil-square"></i>
