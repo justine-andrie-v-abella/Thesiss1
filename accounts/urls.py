@@ -95,6 +95,11 @@ urlpatterns = [
     path('programs/<int:prog_pk>/subjects/bulk-add/',                 views.bulk_add_subjects_to_program,  name='bulk_add_subjects_to_program'),
     path('programs/<int:prog_pk>/subjects/<int:subj_pk>/remove/',     views.remove_subject_from_program,   name='remove_subject_from_program'),
 
+    # Curriculum Management (superadmin)
+    path('programs/<int:pk>/curriculum/',                                   views.program_curriculum,             name='program_curriculum'),
+    path('programs/<int:prog_pk>/curriculum/add/',                          views.add_curriculum_subject,         name='add_curriculum_subject'),
+    path('programs/<int:prog_pk>/curriculum/<int:entry_pk>/remove/',        views.remove_curriculum_subject,      name='remove_curriculum_subject'),
+
     # ── Program Management (sub-admin) ──────────────────────────────────────
     path('subadmin/programs/',                                        views.subadmin_manage_programs,              name='subadmin_manage_programs'),
     path('subadmin/programs/add/',                                    views.subadmin_add_program,                  name='subadmin_add_program'),
@@ -104,6 +109,11 @@ urlpatterns = [
     path('subadmin/programs/<int:prog_pk>/subjects/add/',             views.subadmin_add_subject_to_program,            name='subadmin_add_subject_to_program'),
     path('subadmin/programs/<int:prog_pk>/subjects/bulk-add/',        views.subadmin_bulk_add_subjects_to_program,      name='subadmin_bulk_add_subjects_to_program'),
     path('subadmin/programs/<int:prog_pk>/subjects/<int:subj_pk>/remove/', views.subadmin_remove_subject_from_program, name='subadmin_remove_subject_from_program'),
+
+    # Curriculum Management (sub-admin)
+    path('subadmin/programs/<int:pk>/curriculum/',                                  views.subadmin_program_curriculum,           name='subadmin_program_curriculum'),
+    path('subadmin/programs/<int:prog_pk>/curriculum/add/',                         views.subadmin_add_curriculum_subject,        name='subadmin_add_curriculum_subject'),
+    path('subadmin/programs/<int:prog_pk>/curriculum/<int:entry_pk>/remove/',       views.subadmin_remove_curriculum_subject,     name='subadmin_remove_curriculum_subject'),
 
     path('profile/update/', views.update_profile, name='update_profile'),
     path('profile/change-password/', views.change_credentials, name='change_credentials'),

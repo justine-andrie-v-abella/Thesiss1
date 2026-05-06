@@ -9,7 +9,7 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Q, Count
-from .models import ActivityLog, TeacherProfile, Department, Subject, SubAdminProfile, Program
+from .models import ActivityLog, TeacherProfile, Department, Subject, SubAdminProfile, Program, ProgramCurriculum
 from .forms import (
     TeacherCreationForm, TeacherEditForm,
     DepartmentForm, SubjectForm,
@@ -2547,6 +2547,130 @@ def bulk_add_subjects_to_program(request, prog_pk):
 
 
 # ============================================================================
+# SUPERADMIN — CURRICULUM  (year-level / semester slots per program)
+# ============================================================================
+
+def _build_curriculum_grid(program):
+    """Return a list of year dicts with nested semester dicts + entries."""
+    entries = (
+        ProgramCurriculum.objects
+        .filter(program=program)
+        .select_related('subject')
+        .order_by('year_level', 'semester', 'subject__code')
+    )
+    # index by (year, semester)
+    slot_map = {}
+    for y in range(1, 5):
+        for s in range(1, 3):
+            slot_map[(y, s)] = []
+    for e in entries:
+        slot_map[(e.year_level, e.semester)].append(e)
+
+    grid = []
+    for y in range(1, 5):
+        semesters = []
+        for s in range(1, 3):
+            semesters.append({'semester': s, 'entries': slot_map[(y, s)]})
+        grid.append({'year': y, 'semesters': semesters})
+    return grid, {e.subject_id for e in entries}
+
+
+@login_required
+@user_passes_test(is_admin)
+def program_curriculum(request, pk):
+    """Superadmin: view/manage curriculum (year-level × semester) for a program."""
+    program    = get_object_or_404(Program, pk=pk)
+    department = program.department
+    grid, placed_ids = _build_curriculum_grid(program)
+    available_subjects = (
+        Subject.objects
+        .filter(departments=department, is_archived=False)
+        .exclude(pk__in=placed_ids)
+        .order_by('code')
+    )
+    return render(request, 'admin_dashboard/program_curriculum.html', {
+        'program':            program,
+        'department':         department,
+        'curriculum_grid':    grid,
+        'available_subjects': available_subjects,
+    })
+
+
+@login_required
+@user_passes_test(is_admin)
+def add_curriculum_subject(request, prog_pk):
+    """Superadmin: AJAX — add one or more subjects to a year/semester slot."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+    program     = get_object_or_404(Program, pk=prog_pk)
+    subject_ids = request.POST.getlist('subject_ids[]') or request.POST.getlist('subject_ids')
+    try:
+        year_level = int(request.POST.get('year_level', 0))
+        semester   = int(request.POST.get('semester', 0))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Invalid year level or semester.'}, status=400)
+    if year_level not in range(1, 5) or semester not in range(1, 3):
+        return JsonResponse({'error': 'Year level must be 1–4; semester must be 1 or 2.'}, status=400)
+    if not subject_ids:
+        return JsonResponse({'error': 'Please select at least one subject.'}, status=400)
+
+    added   = []
+    skipped = []
+    for sid in subject_ids:
+        subject = Subject.objects.filter(pk=sid, departments=program.department, is_archived=False).first()
+        if not subject:
+            continue
+        if ProgramCurriculum.objects.filter(program=program, subject=subject).exists():
+            skipped.append(subject.code)
+            continue
+        entry = ProgramCurriculum.objects.create(
+            program=program, subject=subject,
+            year_level=year_level, semester=semester,
+        )
+        program.subjects.add(subject)
+        added.append({
+            'entry_id':            entry.pk,
+            'subject_id':          subject.pk,
+            'subject_code':        subject.code,
+            'subject_name':        subject.name,
+            'subject_description': subject.description,
+            'year_level':          year_level,
+            'semester':            semester,
+        })
+
+    if added:
+        codes = ', '.join(a['subject_code'] for a in added)
+        log_activity(
+            'program_updated',
+            f'{len(added)} subject(s) added to curriculum of "{program.name}" '
+            f'— Year {year_level} Sem {semester}: {codes}',
+            user=request.user,
+            metadata={'program_id': program.pk},
+        )
+    return JsonResponse({'success': True, 'added': added, 'skipped': skipped})
+
+
+@login_required
+@user_passes_test(is_admin)
+def remove_curriculum_subject(request, prog_pk, entry_pk):
+    """Superadmin: AJAX — remove a subject from the curriculum."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+    program = get_object_or_404(Program, pk=prog_pk)
+    entry   = get_object_or_404(ProgramCurriculum, pk=entry_pk, program=program)
+    code    = entry.subject.code
+    name    = entry.subject.name
+    entry.delete()
+    log_activity(
+        'program_updated',
+        f'Subject "{name}" ({code}) removed from curriculum of "{program.name}"',
+        user=request.user,
+        metadata={'program_id': program.pk},
+    )
+    return JsonResponse({'success': True})
+
+
+# ============================================================================
 # SUB-ADMIN — PROGRAMS  (their department only)
 # ============================================================================
 
@@ -2727,3 +2851,106 @@ def subadmin_bulk_add_subjects_to_program(request, prog_pk):
         else:
             messages.warning(request, 'No valid subjects were selected.')
     return redirect('accounts:subadmin_program_detail', pk=prog_pk)
+
+
+# ============================================================================
+# SUB-ADMIN — CURRICULUM  (their department only)
+# ============================================================================
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_program_curriculum(request, pk):
+    """Sub-admin: view/manage curriculum for one of their programs."""
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=pk, department=department)
+    grid, placed_ids = _build_curriculum_grid(program)
+    available_subjects = (
+        Subject.objects
+        .filter(departments=department, is_archived=False)
+        .exclude(pk__in=placed_ids)
+        .order_by('code')
+    )
+    return render(request, 'subadmin_dashboard/program_curriculum.html', {
+        'program':            program,
+        'department':         department,
+        'curriculum_grid':    grid,
+        'available_subjects': available_subjects,
+    })
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_add_curriculum_subject(request, prog_pk):
+    """Sub-admin: AJAX — add one or more subjects to a year/semester slot."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+    department  = request.user.subadmin_profile.department
+    program     = get_object_or_404(Program, pk=prog_pk, department=department)
+    subject_ids = request.POST.getlist('subject_ids[]') or request.POST.getlist('subject_ids')
+    try:
+        year_level = int(request.POST.get('year_level', 0))
+        semester   = int(request.POST.get('semester', 0))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Invalid year level or semester.'}, status=400)
+    if year_level not in range(1, 5) or semester not in range(1, 3):
+        return JsonResponse({'error': 'Year level must be 1–4; semester must be 1 or 2.'}, status=400)
+    if not subject_ids:
+        return JsonResponse({'error': 'Please select at least one subject.'}, status=400)
+
+    added   = []
+    skipped = []
+    for sid in subject_ids:
+        subject = Subject.objects.filter(pk=sid, departments=department, is_archived=False).first()
+        if not subject:
+            continue
+        if ProgramCurriculum.objects.filter(program=program, subject=subject).exists():
+            skipped.append(subject.code)
+            continue
+        entry = ProgramCurriculum.objects.create(
+            program=program, subject=subject,
+            year_level=year_level, semester=semester,
+        )
+        program.subjects.add(subject)
+        added.append({
+            'entry_id':            entry.pk,
+            'subject_id':          subject.pk,
+            'subject_code':        subject.code,
+            'subject_name':        subject.name,
+            'subject_description': subject.description,
+            'year_level':          year_level,
+            'semester':            semester,
+        })
+
+    if added:
+        codes = ', '.join(a['subject_code'] for a in added)
+        log_activity(
+            'program_updated',
+            f'{len(added)} subject(s) added to curriculum of "{program.name}" '
+            f'— Year {year_level} Sem {semester}: {codes} '
+            f'by Sub-Admin {request.user.get_full_name()}',
+            user=request.user,
+            metadata={'program_id': program.pk},
+        )
+    return JsonResponse({'success': True, 'added': added, 'skipped': skipped})
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_remove_curriculum_subject(request, prog_pk, entry_pk):
+    """Sub-admin: AJAX — remove a subject from the curriculum."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=prog_pk, department=department)
+    entry      = get_object_or_404(ProgramCurriculum, pk=entry_pk, program=program)
+    code = entry.subject.code
+    name = entry.subject.name
+    entry.delete()
+    log_activity(
+        'program_updated',
+        f'Subject "{name}" ({code}) removed from curriculum of "{program.name}" '
+        f'by Sub-Admin {request.user.get_full_name()}',
+        user=request.user,
+        metadata={'program_id': program.pk},
+    )
+    return JsonResponse({'success': True})

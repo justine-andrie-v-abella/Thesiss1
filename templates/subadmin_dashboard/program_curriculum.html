@@ -1,0 +1,351 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ program.code }} Curriculum - Sub-Admin{% endblock %}
+{% block header_title %}{{ program.name }}{% endblock %}
+{% block header_subtitle %}Curriculum — organize subjects by year level and semester{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+<!-- ── Breadcrumb ─────────────────────────────────────────────────────────── -->
+<nav class="flex items-center flex-wrap gap-1 text-sm text-gray-500 mb-6">
+    <a href="{% url 'accounts:subadmin_manage_programs' %}" class="hover:text-blue-600 transition-colors flex items-center">
+        <i class="bi bi-mortarboard mr-1"></i> Programs
+    </a>
+    <i class="bi bi-chevron-right text-gray-400"></i>
+    <span class="text-gray-800 font-semibold">{{ program.code }} — Curriculum</span>
+</nav>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<div class="flex flex-wrap items-center gap-4 mb-8">
+    <div class="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+        <i class="bi bi-layout-text-sidebar text-white text-2xl"></i>
+    </div>
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">{{ program.name }}</h1>
+        <div class="flex items-center gap-2 mt-1 flex-wrap">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-indigo-100 text-indigo-800">{{ program.code }}</span>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-gray-100 text-gray-700">
+                <i class="bi bi-building mr-1 text-xs"></i>{{ department.code }}
+            </span>
+            {% if program.is_active %}
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                <i class="bi bi-check-circle-fill mr-1"></i> Active
+            </span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ── Summary bar ───────────────────────────────────────────────────────── -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    {% for year_data in curriculum_grid %}
+    <div class="bg-white rounded-xl shadow p-4 flex items-center gap-3">
+        <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <span class="text-indigo-700 font-black text-lg">{{ year_data.year }}</span>
+        </div>
+        <div>
+            <div class="text-xl font-bold text-gray-800" id="year-count-{{ year_data.year }}">
+                {% for sem_data in year_data.semesters %}{{ sem_data.entries|length }}{% endfor %}
+            </div>
+            <div class="text-xs text-gray-500">Year {{ year_data.year }} subjects</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ── Year / Semester Grid ──────────────────────────────────────────────── -->
+{% for year_data in curriculum_grid %}
+<div class="mb-10" id="year-section-{{ year_data.year }}">
+    <div class="flex items-center gap-3 mb-4">
+        <div class="h-0.5 w-6 bg-indigo-300 rounded"></div>
+        <h2 class="text-base font-extrabold text-gray-700 uppercase tracking-widest">Year {{ year_data.year }}</h2>
+        <div class="flex-1 h-0.5 bg-indigo-100 rounded"></div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {% for sem_data in year_data.semesters %}
+        <div class="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden"
+             id="slot-{{ year_data.year }}-{{ sem_data.semester }}">
+            <div class="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-gray-800 to-gray-700">
+                <span class="text-white font-bold text-sm tracking-wide">
+                    Year: {{ year_data.year }}&nbsp;&nbsp;Sem: {{ sem_data.semester }}
+                </span>
+                <button onclick="openAddModal({{ year_data.year }}, {{ sem_data.semester }})"
+                    class="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                    <i class="bi bi-plus-lg"></i> Add Subject
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-200 bg-gray-50">
+                            <th class="px-4 py-2.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wider w-28">Subject Code</th>
+                            <th class="px-4 py-2.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Subject Description</th>
+                            <th class="px-4 py-2.5 text-center text-xs font-bold text-gray-600 uppercase tracking-wider w-16">Remove</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100" id="tbody-{{ year_data.year }}-{{ sem_data.semester }}">
+                        {% for entry in sem_data.entries %}
+                        <tr class="hover:bg-indigo-50 transition-colors" id="row-{{ entry.pk }}">
+                            <td class="px-4 py-3">
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">{{ entry.subject.code }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-gray-700 font-medium">
+                                {{ entry.subject.name }}
+                                {% if entry.subject.description %}
+                                <p class="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{{ entry.subject.description|truncatewords:10 }}</p>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <button onclick="removeEntry({{ entry.pk }}, {{ year_data.year }}, {{ sem_data.semester }}, '{{ entry.subject.code|escapejs }}')"
+                                    class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                    <i class="bi bi-x-circle text-base"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr class="empty-row-{{ year_data.year }}-{{ sem_data.semester }}">
+                            <td colspan="3" class="px-4 py-8 text-center text-gray-400">
+                                <i class="bi bi-inbox text-2xl block mb-1 opacity-40"></i>
+                                <span class="text-xs">No subjects yet — click <strong>Add Subject</strong></span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="border-t-2 border-gray-200 bg-gray-50">
+                            <td colspan="2" class="px-4 py-2.5 text-right text-xs font-bold text-gray-600 uppercase">Sub Total:</td>
+                            <td class="px-4 py-2.5 text-center">
+                                <span class="text-sm font-black text-indigo-700" id="count-{{ year_data.year }}-{{ sem_data.semester }}">
+                                    {{ sem_data.entries|length }}
+                                </span>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+</div>
+
+
+<!-- ADD SUBJECTS MODAL -->
+<div id="addModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+<div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <i class="bi bi-journal-plus text-white text-xl"></i>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold text-white">Add Subjects</h3>
+                <p class="text-white/80 text-xs font-medium" id="addModalSlot">—</p>
+            </div>
+        </div>
+        <button onclick="closeAddModal()" class="text-white hover:text-indigo-200">
+            <i class="bi bi-x-lg text-xl"></i>
+        </button>
+    </div>
+    <div class="px-5 pt-4 pb-3 border-b border-gray-200 flex-shrink-0">
+        <div class="relative">
+            <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+            <input type="text" id="subjectSearch" placeholder="Search by code or name…"
+                oninput="filterSubjects()"
+                class="w-full pl-9 pr-4 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+        </div>
+        <div class="flex items-center justify-between mt-2.5">
+            <span class="text-xs text-gray-500" id="selectedCountLabel">0 selected</span>
+            <div class="flex gap-3">
+                <button onclick="selectAll()" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">Select All</button>
+                <span class="text-gray-300">|</span>
+                <button onclick="deselectAll()" class="text-xs text-gray-500 hover:text-gray-700 font-semibold">Deselect All</button>
+            </div>
+        </div>
+    </div>
+    <div class="flex-1 overflow-y-auto px-5 py-3 min-h-0" id="subjectCheckList">
+        <p class="text-center text-gray-400 py-8 text-sm" id="noSubjectsMsg" style="display:none;">
+            <i class="bi bi-check2-all text-3xl block mb-2 text-green-400"></i>
+            All available subjects are already in the curriculum.
+        </p>
+    </div>
+    <div class="px-5 flex-shrink-0">
+        <p id="modal_error" class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3 hidden"></p>
+    </div>
+    <div class="px-5 pb-5 flex items-center justify-end gap-3 border-t border-gray-100 pt-4 flex-shrink-0">
+        <button onclick="closeAddModal()"
+            class="px-5 py-2.5 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-medium text-sm">Cancel</button>
+        <button id="modal_submit_btn" onclick="submitAdd()"
+            class="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600
+                   hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-xl shadow transition-all text-sm">
+            <i class="bi bi-plus-circle"></i>
+            <span id="submitBtnLabel">Add to Curriculum</span>
+        </button>
+    </div>
+</div>
+</div>
+
+<!-- REMOVE CONFIRM MODAL -->
+<div id="removeModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+<div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8">
+    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="bi bi-trash3 text-red-500 text-3xl"></i>
+    </div>
+    <h3 class="text-xl font-bold text-gray-800 mb-2">Remove Subject?</h3>
+    <p class="text-gray-500 text-sm mb-1">You are about to remove</p>
+    <p class="font-bold text-indigo-700 text-lg mb-5" id="removeSubjectCode">—</p>
+    <div class="flex gap-3">
+        <button onclick="closeRemoveModal()"
+            class="flex-1 px-4 py-2.5 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-medium text-sm">Cancel</button>
+        <button id="removeConfirmBtn" onclick="confirmRemove()"
+            class="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl text-sm">Remove</button>
+    </div>
+</div>
+</div>
+
+<script>
+const CSRF            = '{{ csrf_token }}';
+const ADD_URL         = '{% url "accounts:subadmin_add_curriculum_subject" program.pk %}';
+const REMOVE_URL_TMPL = '{% url "accounts:subadmin_remove_curriculum_subject" program.pk 0 %}'.replace('/0/', '/');
+
+let availableSubjects = [
+    {% for subj in available_subjects %}
+    { id: {{ subj.pk }}, code: '{{ subj.code|escapejs }}', name: '{{ subj.name|escapejs }}' },
+    {% endfor %}
+];
+
+let modalYear = null, modalSem = null;
+
+function openAddModal(year, sem) {
+    modalYear = year; modalSem = sem;
+    const SN = ['','1st','2nd'];
+    document.getElementById('addModalSlot').textContent = 'Year ' + year + '  —  ' + SN[sem] + ' Semester';
+    document.getElementById('subjectSearch').value = '';
+    document.getElementById('modal_error').classList.add('hidden');
+    buildCheckList('');
+    updateSelectedCount();
+    const m = document.getElementById('addModal');
+    m.classList.remove('hidden'); m.classList.add('flex');
+    document.getElementById('subjectSearch').focus();
+}
+function closeAddModal() {
+    const m = document.getElementById('addModal');
+    m.classList.add('hidden'); m.classList.remove('flex');
+}
+document.getElementById('addModal').addEventListener('click', function(e){ if(e.target===this)closeAddModal(); });
+
+function buildCheckList(query) {
+    const container = document.getElementById('subjectCheckList');
+    const noMsg     = document.getElementById('noSubjectsMsg');
+    const q = query.toLowerCase();
+    const filtered = availableSubjects.filter(function(s){
+        return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
+    });
+    if (availableSubjects.length === 0) {
+        container.innerHTML = ''; noMsg.style.display = 'block';
+        document.getElementById('modal_submit_btn').disabled = true; return;
+    }
+    noMsg.style.display = 'none';
+    document.getElementById('modal_submit_btn').disabled = false;
+    if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-400 py-6 text-sm"><i class="bi bi-search block text-2xl mb-1 opacity-40"></i>No subjects match your search.</p>';
+        return;
+    }
+    container.innerHTML = '';
+    filtered.forEach(function(s){
+        const row = document.createElement('label');
+        row.className = 'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-indigo-50 transition-colors border border-transparent has-[:checked]:border-indigo-200 has-[:checked]:bg-indigo-50 mb-1';
+        row.innerHTML =
+            '<input type="checkbox" value="' + s.id + '" class="subject-cb w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer flex-shrink-0" onchange="updateSelectedCount()">' +
+            '<div class="min-w-0"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 mr-1.5">' + esc(s.code) + '</span>' +
+            '<span class="text-sm text-gray-700 font-medium">' + esc(s.name) + '</span></div>';
+        container.appendChild(row);
+    });
+}
+function filterSubjects(){ buildCheckList(document.getElementById('subjectSearch').value); updateSelectedCount(); }
+function getChecked(){ return Array.from(document.querySelectorAll('#subjectCheckList .subject-cb:checked')).map(function(cb){return cb.value;}); }
+function updateSelectedCount(){
+    const n = getChecked().length;
+    document.getElementById('selectedCountLabel').textContent = n + ' selected';
+    document.getElementById('submitBtnLabel').textContent = n > 0 ? 'Add ' + n + ' Subject' + (n>1?'s':'') : 'Add to Curriculum';
+}
+function selectAll(){ document.querySelectorAll('#subjectCheckList .subject-cb').forEach(function(cb){cb.checked=true;}); updateSelectedCount(); }
+function deselectAll(){ document.querySelectorAll('#subjectCheckList .subject-cb').forEach(function(cb){cb.checked=false;}); updateSelectedCount(); }
+
+function submitAdd() {
+    const selectedIds = getChecked();
+    const errEl = document.getElementById('modal_error');
+    errEl.classList.add('hidden');
+    if (selectedIds.length === 0) { errEl.textContent='Please select at least one subject.'; errEl.classList.remove('hidden'); return; }
+    const btn = document.getElementById('modal_submit_btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span> Adding…';
+    const body = new URLSearchParams({ year_level: modalYear, semester: modalSem });
+    selectedIds.forEach(function(id){ body.append('subject_ids[]', id); });
+    fetch(ADD_URL, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken':CSRF,'X-Requested-With':'XMLHttpRequest'}, body:body })
+    .then(function(r){return r.json();})
+    .then(function(data){
+        btn.disabled=false; btn.innerHTML='<i class="bi bi-plus-circle"></i> <span id="submitBtnLabel">Add to Curriculum</span>';
+        if(data.success){
+            data.added.forEach(function(item){ addRowToTable(item); availableSubjects=availableSubjects.filter(function(s){return s.id!==item.subject_id;}); });
+            closeAddModal();
+            const n=data.added.length;
+            if(n>0) showToast(n+' subject'+(n>1?'s':'')+' added to Year '+modalYear+' Sem '+modalSem+'.','success');
+            if(data.skipped&&data.skipped.length>0) showToast(data.skipped.length+' already placed: '+data.skipped.join(', '),'info');
+        } else { errEl.textContent=data.error||'Something went wrong.'; errEl.classList.remove('hidden'); }
+    })
+    .catch(function(){ btn.disabled=false; btn.innerHTML='<i class="bi bi-plus-circle"></i> <span id="submitBtnLabel">Add to Curriculum</span>'; errEl.textContent='Network error.'; errEl.classList.remove('hidden'); });
+}
+
+function addRowToTable(data){
+    const tbody=document.getElementById('tbody-'+data.year_level+'-'+data.semester);
+    tbody.querySelectorAll('.empty-row-'+data.year_level+'-'+data.semester).forEach(function(r){r.remove();});
+    const tr=document.createElement('tr'); tr.id='row-'+data.entry_id; tr.className='hover:bg-indigo-50 transition-colors';
+    tr.innerHTML='<td class="px-4 py-3"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">'+esc(data.subject_code)+'</span></td>'+
+        '<td class="px-4 py-3 text-gray-700 font-medium">'+esc(data.subject_name)+'</td>'+
+        '<td class="px-4 py-3 text-center"><button onclick="removeEntry('+data.entry_id+','+data.year_level+','+data.semester+',\''+esc(data.subject_code)+'\')" class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><i class="bi bi-x-circle text-base"></i></button></td>';
+    tbody.appendChild(tr); updateCounter(data.year_level,data.semester);
+}
+
+let pendingRemove=null;
+function removeEntry(entryId,year,sem,code){ pendingRemove={entryId,year,sem,code}; document.getElementById('removeSubjectCode').textContent=code; const m=document.getElementById('removeModal'); m.classList.remove('hidden'); m.classList.add('flex'); }
+function closeRemoveModal(){ const m=document.getElementById('removeModal'); m.classList.add('hidden'); m.classList.remove('flex'); pendingRemove=null; }
+document.getElementById('removeModal').addEventListener('click',function(e){if(e.target===this)closeRemoveModal();});
+function confirmRemove(){
+    if(!pendingRemove)return;
+    const {entryId,year,sem,code}=pendingRemove;
+    const btn=document.getElementById('removeConfirmBtn'); btn.disabled=true; btn.textContent='Removing…';
+    fetch(REMOVE_URL_TMPL+entryId+'/',{method:'POST',headers:{'X-CSRFToken':CSRF,'X-Requested-With':'XMLHttpRequest'}})
+    .then(function(r){return r.json();})
+    .then(function(data){
+        btn.disabled=false; btn.textContent='Remove';
+        if(data.success){
+            const row=document.getElementById('row-'+entryId); if(row)row.remove();
+            const tbody=document.getElementById('tbody-'+year+'-'+sem);
+            if(tbody&&tbody.querySelectorAll('tr').length===0){ const tr=document.createElement('tr'); tr.className='empty-row-'+year+'-'+sem; tr.innerHTML='<td colspan="3" class="px-4 py-8 text-center text-gray-400"><i class="bi bi-inbox text-2xl block mb-1 opacity-40"></i><span class="text-xs">No subjects yet — click <strong>Add Subject</strong></span></td>'; tbody.appendChild(tr); }
+            updateCounter(year,sem); closeRemoveModal(); showToast('"'+code+'" removed.','info');
+            setTimeout(function(){location.reload();},700);
+        } else { closeRemoveModal(); showToast(data.error||'Failed.','error'); }
+    })
+    .catch(function(){btn.disabled=false;btn.textContent='Remove';closeRemoveModal();showToast('Network error.','error');});
+}
+
+function updateCounter(year,sem){
+    const tbody=document.getElementById('tbody-'+year+'-'+sem);
+    const rows=tbody?tbody.querySelectorAll('tr:not([class^="empty-row"])').length:0;
+    const el=document.getElementById('count-'+year+'-'+sem); if(el)el.textContent=rows;
+    let total=0; [1,2].forEach(function(s){const t=document.getElementById('tbody-'+year+'-'+s);if(t)total+=t.querySelectorAll('tr:not([class^="empty-row"])').length;});
+    const yel=document.getElementById('year-count-'+year); if(yel)yel.textContent=total;
+}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function showToast(msg,type){
+    const colors={success:'bg-green-100 border-green-400 text-green-800',error:'bg-red-100 border-red-400 text-red-800',info:'bg-blue-100 border-blue-400 text-blue-800'};
+    const div=document.createElement('div'); div.className='fixed top-4 right-4 z-[9999] border px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium '+(colors[type]||colors.info);
+    div.innerHTML='<i class="bi bi-check-circle-fill"></i><span>'+esc(msg)+'</span>'; document.body.appendChild(div); setTimeout(function(){div.remove();},3500);
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeAddModal();closeRemoveModal();}});
+</script>
+{% endblock %}

@@ -105,6 +105,10 @@
                             </td>
                             <td class="px-4 py-4">
                                 <div class="flex items-center justify-center space-x-2">
+                                    <a href="{% url 'accounts:subadmin_program_curriculum' program.pk %}"
+                                        class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow text-sm" title="Curriculum">
+                                        <i class="bi bi-layout-text-sidebar"></i>
+                                    </a>
                                     <a href="{% url 'accounts:subadmin_program_detail' program.pk %}"
                                         class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow text-sm" title="View Subjects">
                                         <i class="bi bi-book"></i>
@@ -151,7 +155,11 @@
                     <p class="text-sm text-gray-500 mb-3">{{ program.description|truncatewords:12 }}</p>
                     {% endif %}
                     <p class="text-xs text-gray-500 mb-3">{{ program.subjects.count }} subject{{ program.subjects.count|pluralize }}</p>
-                    <div class="flex space-x-2">
+                    <div class="flex flex-wrap gap-2">
+                        <a href="{% url 'accounts:subadmin_program_curriculum' program.pk %}"
+                            class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
+                            <i class="bi bi-layout-text-sidebar mr-1"></i> Curriculum
+                        </a>
                         <a href="{% url 'accounts:subadmin_program_detail' program.pk %}"
                             class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
                             <i class="bi bi-book mr-1"></i> Subjects

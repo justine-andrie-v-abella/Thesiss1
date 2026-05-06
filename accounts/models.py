@@ -114,6 +114,38 @@ class Program(models.Model):
         super().save(*args, **kwargs)
 
 
+class ProgramCurriculum(models.Model):
+    YEAR_CHOICES = [
+        (1, '1st Year'),
+        (2, '2nd Year'),
+        (3, '3rd Year'),
+        (4, '4th Year'),
+    ]
+    SEMESTER_CHOICES = [
+        (1, '1st Semester'),
+        (2, '2nd Semester'),
+    ]
+
+    program    = models.ForeignKey(Program,  on_delete=models.CASCADE, related_name='curriculum_entries')
+    subject    = models.ForeignKey('Subject', on_delete=models.CASCADE, related_name='curriculum_entries')
+    year_level = models.IntegerField(choices=YEAR_CHOICES)
+    semester   = models.IntegerField(choices=SEMESTER_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering        = ['year_level', 'semester', 'subject__code']
+        unique_together = [['program', 'subject']]   # each subject appears at most once
+        verbose_name        = 'Program Curriculum Entry'
+        verbose_name_plural = 'Program Curriculum Entries'
+
+    def __str__(self):
+        return (
+            f"{self.program.code} › "
+            f"Year {self.year_level} Sem {self.semester} › "
+            f"{self.subject.code}"
+        )
+
+
 class ActivityLog(models.Model):
     ACTIVITY_TYPES = [
         ('teacher_created', 'Teacher Created'),
