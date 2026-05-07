@@ -1025,25 +1025,30 @@
     }
 
     function openDropdown(btn) {
-        var rect = btn.getBoundingClientRect();
+        var zoom   = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+        var rect   = btn.getBoundingClientRect();
+        var left   = rect.left   / zoom;
+        var width  = rect.width  / zoom;
+        var bot    = rect.bottom / zoom;
+        var rectT  = rect.top    / zoom;
         portal.innerHTML      = buildMenuHTML(btn);
         portal.style.display  = 'block';
-        portal.style.left     = rect.left + 'px';
-        portal.style.width    = rect.width + 'px';
+        portal.style.left     = left + 'px';
+        portal.style.width    = width + 'px';
         portal.style.top      = '-9999px';
         portal.style.bottom   = '';
 
         var menuHeight = portal.offsetHeight;
-        var spaceBelow = window.innerHeight - rect.bottom;
-        var spaceAbove = rect.top;
+        var spaceBelow = window.innerHeight - bot;
+        var spaceAbove = rectT;
 
         if (spaceBelow >= menuHeight + 8) {
-            portal.style.top = (rect.bottom + 4) + 'px';
+            portal.style.top = (bot + 4) + 'px';
         } else if (spaceAbove >= menuHeight + 8) {
-            portal.style.top = (rect.top - menuHeight - 4) + 'px';
+            portal.style.top = (rectT - menuHeight - 4) + 'px';
         } else {
             if (spaceBelow >= spaceAbove) {
-                portal.style.top       = (rect.bottom + 4) + 'px';
+                portal.style.top       = (bot + 4) + 'px';
                 portal.style.maxHeight = (spaceBelow - 8) + 'px';
                 portal.style.overflowY = 'auto';
             } else {

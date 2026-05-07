@@ -543,12 +543,17 @@ function buildMenuHTML(btn) {
     return h;
 }
 function openDropdown(btn) {
-    var r = btn.getBoundingClientRect();
+    var zoom   = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+    var r      = btn.getBoundingClientRect();
+    var left   = r.left   / zoom;
+    var width  = r.width  / zoom;
+    var bottom = r.bottom / zoom;
+    var top    = r.top    / zoom;
     portal.innerHTML = buildMenuHTML(btn);
-    portal.style.cssText = 'display:block;position:fixed;z-index:99999;min-width:220px;top:-9999px;left:'+r.left+'px;width:'+r.width+'px;';
+    portal.style.cssText = 'display:block;position:fixed;z-index:99999;min-width:220px;top:-9999px;left:'+left+'px;width:'+width+'px;';
     var mh = portal.offsetHeight;
-    var sb = window.innerHeight - r.bottom;
-    portal.style.top = (sb >= mh+8 ? r.bottom+4 : Math.max(8, r.top-mh-4)) + 'px';
+    var sb = window.innerHeight - bottom;
+    portal.style.top = (sb >= mh+8 ? bottom+4 : Math.max(8, top-mh-4)) + 'px';
     activeBtn = btn;
 }
 function closeDropdown() { portal.style.display='none'; portal.innerHTML=''; activeBtn=null; }
