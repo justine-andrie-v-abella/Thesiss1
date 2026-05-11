@@ -2588,13 +2588,13 @@ def add_curriculum_subject(request, prog_pk):
 @login_required
 @user_passes_test(is_admin)
 def remove_curriculum_subject(request, prog_pk, entry_pk):
-    """Superadmin: AJAX — remove a subject from the curriculum."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
     program = get_object_or_404(Program, pk=prog_pk)
     entry   = get_object_or_404(ProgramCurriculum, pk=entry_pk, program=program)
     code    = entry.subject.code
     name    = entry.subject.name
+    program.subjects.remove(entry.subject)   # ← add this line
     entry.delete()
     log_activity(
         'program_updated',
@@ -2799,7 +2799,6 @@ def subadmin_add_curriculum_subject(request, prog_pk):
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_remove_curriculum_subject(request, prog_pk, entry_pk):
-    """Sub-admin: AJAX — remove a subject from the curriculum."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
     department = request.user.subadmin_profile.department
@@ -2807,6 +2806,7 @@ def subadmin_remove_curriculum_subject(request, prog_pk, entry_pk):
     entry      = get_object_or_404(ProgramCurriculum, pk=entry_pk, program=program)
     code = entry.subject.code
     name = entry.subject.name
+    program.subjects.remove(entry.subject)   # ← add this line
     entry.delete()
     log_activity(
         'program_updated',
