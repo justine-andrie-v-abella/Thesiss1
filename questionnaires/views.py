@@ -1237,7 +1237,10 @@ def browse_questionnaires(request):
     selected_semester      = request.GET.get('semester', '')
     selected_school_year   = request.GET.get('school_year', '')
     selected_question_type = request.GET.get('question_type', '')
+    selected_year_level = request.GET.get('year_level', '')
 
+    if selected_year_level:
+        questionnaires = questionnaires.filter(year_level=selected_year_level)
     if subject_id:
         questionnaires = questionnaires.filter(subject_id=subject_id)
     if exam_type:
@@ -1291,6 +1294,7 @@ def browse_questionnaires(request):
         'school_year_options':   school_year_options,
         'question_type_choices': QUESTION_TYPE_CHOICES,
         'selected_question_type': selected_question_type,
+        'selected_year_level': selected_year_level,
     }
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'teacher_dashboard/browse_questionnaires_partial.html', ctx)
