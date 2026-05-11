@@ -141,7 +141,7 @@
                     </div>
                     <span class="text-gray-600">{{ quest.get_file_size_display }}</span>
                 </div>
-                {% if quest.school_year or quest.semester %}
+                {% if quest.school_year or quest.semester or quest.year_level %}
                 <div class="flex flex-wrap gap-1.5 pt-1">
                     {% if quest.school_year %}
                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-800">
@@ -151,6 +151,11 @@
                     {% if quest.semester %}
                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                         <i class="bi bi-calendar3 mr-1"></i> {{ quest.get_semester_display }}
+                    </span>
+                    {% endif %}
+                    {% if quest.year_level %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-800">
+                        <i class="bi bi-mortarboard mr-1"></i> {{ quest.get_year_level_display }}
                     </span>
                     {% endif %}
                 </div>
