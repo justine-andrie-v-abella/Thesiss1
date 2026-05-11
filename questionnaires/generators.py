@@ -5,7 +5,7 @@
 
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_LINE_SPACING
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 import io
@@ -14,6 +14,10 @@ import re
 from django.conf import settings
 
 TEMPLATE_PATH = r"C:\DJANGO PROJECTS\THESISattempt4\bisu_template.docx"
+
+# ── Shared document formatting constants ─────────────────────────────────────
+FONT_NAME = 'Arial Narrow'
+FONT_SIZE = Pt(12)
 
 
 class BISUQuestionnaireGenerator:
@@ -27,6 +31,39 @@ class BISUQuestionnaireGenerator:
             print(f"⚠️  Template not found at: {path}")
             self.doc = Document()
             self._setup_page_margins()
+
+        # Apply global formatting defaults to the Normal style so every
+        # paragraph and run inherits Arial Narrow 12 pt, single spacing, 0 pt
+        # before/after — this covers both DOCX and the PDF rendered from it.
+        self._setup_default_style()
+
+    # =========================================================================
+    # DOCUMENT-WIDE FORMATTING
+    # =========================================================================
+
+    def _setup_default_style(self):
+        """Set Normal style to Arial Narrow 12pt, single line spacing, 0pt space before/after."""
+        style = self.doc.styles['Normal']
+        style.font.name = FONT_NAME
+        style.font.size = FONT_SIZE
+        pf = style.paragraph_format
+        pf.line_spacing_rule = WD_LINE_SPACING.SINGLE
+        pf.space_before = Pt(0)
+        pf.space_after  = Pt(0)
+
+    @staticmethod
+    def _fmt_para(p):
+        """Apply single line spacing and 0pt before/after to a paragraph."""
+        pf = p.paragraph_format
+        pf.line_spacing_rule = WD_LINE_SPACING.SINGLE
+        pf.space_before = Pt(0)
+        pf.space_after  = Pt(0)
+
+    @staticmethod
+    def _fmt_run(r):
+        """Apply Arial Narrow 12pt to a run."""
+        r.font.name = FONT_NAME
+        r.font.size = FONT_SIZE
 
     def _setup_page_margins(self):
         section = self.doc.sections[0]
@@ -95,15 +132,15 @@ class BISUQuestionnaireGenerator:
 
     PLACEHOLDER_STYLES = {
         '{{TITLE}}': {
-            'font_name': 'Arial narrow',
-            'font_size': Pt(14),
+            'font_name': FONT_NAME,
+            'font_size': FONT_SIZE,
             'bold':      True,
             'italic':    False,
             'underline': False,
         },
         '{{DEPARTMENT}}': {
-            'font_name': 'Arial',
-            'font_size': Pt(10),
+            'font_name': FONT_NAME,
+            'font_size': FONT_SIZE,
             'bold':      False,
             'italic':    False,
             'underline': False,
@@ -143,10 +180,6 @@ class BISUQuestionnaireGenerator:
     # QUESTION SECTIONS
     # =========================================================================
 
-    # =========================================================================
-    # ORDERED SECTIONS (used when section_header entries are present)
-    # =========================================================================
-
     @staticmethod
     def _question_number_from_text(text):
         """Extract the leading question number/range from question_text."""
@@ -170,13 +203,11 @@ class BISUQuestionnaireGenerator:
 
             # ── Section header ──────────────────────────────────────────────
             if header_text:
-                # Separate title from instructions
                 if '\n' in header_text:
                     title_line, _, instructions = header_text.partition('\n')
-                    title_line = title_line.strip()
+                    title_line   = title_line.strip()
                     instructions = instructions.strip()
                 else:
-                    # "Part I. Multiple Choice: Instructions here..."
                     m = re.match(
                         r'^((?:Part|PART)\s+[\w]+\.?\s+[^:]+?):\s*(.+)$',
                         header_text,
@@ -190,20 +221,20 @@ class BISUQuestionnaireGenerator:
                         instructions = ''
 
                 p = self.doc.add_paragraph()
+                self._fmt_para(p)
                 r = p.add_run(title_line)
+                self._fmt_run(r)
                 r.bold = True
-                r.font.size = Pt(12)
-                r.font.name = 'Arial'
 
                 if instructions:
                     p2 = self.doc.add_paragraph()
+                    self._fmt_para(p2)
                     r2 = p2.add_run(instructions)
-                    r2.bold = False
+                    self._fmt_run(r2)
                     r2.italic = True
-                    r2.font.size = Pt(11)
-                    r2.font.name = 'Arial'
 
-                self.doc.add_paragraph()
+                sp = self.doc.add_paragraph()
+                self._fmt_para(sp)
 
             if not questions:
                 continue
@@ -236,7 +267,8 @@ class BISUQuestionnaireGenerator:
                     'answers': section_answers,
                 }
 
-            self.doc.add_paragraph()
+            sp = self.doc.add_paragraph()
+            self._fmt_para(sp)
 
         return answer_key
 
@@ -250,16 +282,16 @@ class BISUQuestionnaireGenerator:
                 continue
 
             # Section header (bold part title + instruction)
-            p  = self.doc.add_paragraph()
+            p = self.doc.add_paragraph()
+            self._fmt_para(p)
             r  = p.add_run(f"{section_data['title']}.")
+            self._fmt_run(r)
             r.bold = True
-            r.font.size = Pt(12)
-            r.font.name = 'Arial'
             r2 = p.add_run(f" {section_data['instruction']}")
-            r2.font.size = Pt(12)
-            r2.font.name = 'Arial'
+            self._fmt_run(r2)
 
-            self.doc.add_paragraph()
+            sp = self.doc.add_paragraph()
+            self._fmt_para(sp)
 
             section_answers = []
             for question in section_data['questions']:
@@ -282,17 +314,13 @@ class BISUQuestionnaireGenerator:
                     'answers': section_answers,
                 }
 
-            self.doc.add_paragraph()
+            sp = self.doc.add_paragraph()
+            self._fmt_para(sp)
 
         return answer_key
 
     def _add_question(self, question, number=None):
-        """Dispatch to the correct renderer based on question type.
-
-        When number is None (ordered-section mode) the question_text already
-        contains the original question number — do NOT prepend another one.
-        When number is an int (legacy by-type mode) prepend it as before.
-        """
+        """Dispatch to the correct renderer based on question type."""
         qtype = question.question_type.name
 
         if qtype == 'matching':
@@ -301,52 +329,48 @@ class BISUQuestionnaireGenerator:
 
         # Build the stem text
         if number is not None:
-            # Legacy mode: generator owns the numbering
             if qtype == 'true_false':
                 stem = f"________ {number}. {question.question_text}"
             else:
                 stem = f"{number}. {question.question_text}"
         else:
-            # Ordered mode: number is already inside question_text
             if qtype == 'true_false':
                 stem = f"________ {question.question_text}"
             else:
                 stem = question.question_text
 
         p = self.doc.add_paragraph()
+        self._fmt_para(p)
         r = p.add_run(stem)
-        r.font.size = Pt(12)
-        r.font.name = 'Arial'
+        self._fmt_run(r)
 
         if qtype == 'multiple_choice':
             self._add_multiple_choice(question)
 
         elif qtype in ('identification', 'fill_blank', 'fill_in_the_blank'):
-            p = self.doc.add_paragraph()
-            r = p.add_run("Answer: ________________________")
-            r.font.size = Pt(12)
-            r.font.name = 'Arial'
+            p2 = self.doc.add_paragraph()
+            self._fmt_para(p2)
+            r2 = p2.add_run("Answer: ________________________")
+            self._fmt_run(r2)
 
         elif qtype == 'enumeration':
-            # Count how many items the student should list from correct_answer
             raw = question.correct_answer or ''
-            # Try newline-split first, then comma-split
             items = [s.strip() for s in raw.splitlines() if s.strip()]
             if len(items) <= 1:
                 items = [s.strip() for s in raw.split(',') if s.strip()]
-            num_lines = max(len(items), 3)  # at least 3 blank lines
+            num_lines = max(len(items), 3)
             for idx in range(num_lines):
-                p = self.doc.add_paragraph()
-                r = p.add_run(f"{idx + 1}. ________________________")
-                r.font.size = Pt(12)
-                r.font.name = 'Arial'
+                p2 = self.doc.add_paragraph()
+                self._fmt_para(p2)
+                r2 = p2.add_run(f"{idx + 1}. ________________________")
+                self._fmt_run(r2)
 
         elif qtype == 'essay':
             for _ in range(4):
-                p = self.doc.add_paragraph()
-                r = p.add_run("_" * 80)
-                r.font.size = Pt(10)
-                r.font.name = 'Arial'
+                p2 = self.doc.add_paragraph()
+                self._fmt_para(p2)
+                r2 = p2.add_run("_" * 80)
+                self._fmt_run(r2)
 
     # =========================================================================
     # MULTIPLE CHOICE
@@ -363,80 +387,59 @@ class BISUQuestionnaireGenerator:
         for i, (letter, text) in enumerate(opts):
             cell = table.rows[i // 2].cells[i % 2]
             p = cell.paragraphs[0]
+            self._fmt_para(p)
             r = p.add_run(f"{letter}. {text or ''}")
-            r.font.size = Pt(12)
-            r.font.name = 'Arial'
-        self.doc.add_paragraph()
+            self._fmt_run(r)
+        sp = self.doc.add_paragraph()
+        self._fmt_para(sp)
 
     # =========================================================================
     # MATCHING TYPE
     # =========================================================================
 
     def _add_matching_question(self, question, start_number):
-        """
-        Render a matching question as a full-width, invisible-border table.
-
-        Layout per row:
-            _____ | 1. Term | Description text
-
-        Columns:
-            Col 0  "Blank"   — answer line  (narrow)
-            Col 1  "Col A"   — numbered term
-            Col 2  "Col B"   — lettered description (widest)
-
-        The entire table is centred and spans the full text width.
-        All borders are invisible (white / no border).
-        A bold column-header row labels each column.
-        """
         md = question.get_matching_data()
 
         if not md:
             p = self.doc.add_paragraph()
+            self._fmt_para(p)
             r = p.add_run(
                 f"   [Could not render matching table. "
                 f"Raw answer key: {question.correct_answer or '(none)'}]"
             )
+            self._fmt_run(r)
             r.italic = True
-            r.font.size = Pt(11)
-            r.font.name = 'Arial'
-            self.doc.add_paragraph()
+            sp = self.doc.add_paragraph()
+            self._fmt_para(sp)
             return
 
-        column_a = md['column_a']   # ["1. CREATE", "2. DROP", ...]
-        column_b = md['column_b']   # ["A. Deletes object", ...]
-        pairs    = md['pairs']      # [{"item": "1. CREATE", "match": "B"}, ...]
+        column_a = md['column_a']
+        column_b = md['column_b']
+        pairs    = md['pairs']
 
         n_rows = max(len(column_a), len(column_b))
         if n_rows == 0:
             return
 
-        # ── Page / content width ──────────────────────────────────────────
-        # Derive from the first section so it works with any template margins.
         section      = self.doc.sections[0]
         page_w       = section.page_width
         left_margin  = section.left_margin
         right_margin = section.right_margin
-        content_w    = page_w - left_margin - right_margin   # in EMUs
-
-        # Convert to DXA (1 DXA = 914400/1440 EMU = 635 EMU)
+        content_w    = page_w - left_margin - right_margin
         content_w_dxa = int(content_w / 635)
 
-        # Column proportions:  blank 10% | ColA 30% | ColB 60%
         col_blank = int(content_w_dxa * 0.10)
         col_a     = int(content_w_dxa * 0.30)
-        col_b     = content_w_dxa - col_blank - col_a   # remainder
+        col_b     = content_w_dxa - col_blank - col_a
 
-        # ── Build table: 1 header row + n data rows ───────────────────────
         table = self.doc.add_table(rows=1 + n_rows, cols=3)
 
-        # Full-width + centred
         tbl    = table._tbl
         tblPr  = tbl.find(qn('w:tblPr'))
         if tblPr is None:
             tblPr = OxmlElement('w:tblPr')
             tbl.insert(0, tblPr)
 
-        # Table width
         tblW = OxmlElement('w:tblW')
         tblW.set(qn('w:w'),    str(content_w_dxa))
         tblW.set(qn('w:type'), 'dxa')
@@ -445,7 +448,6 @@ class BISUQuestionnaireGenerator:
             tblPr.remove(existing)
         tblPr.append(tblW)
 
-        # Horizontal alignment = center
         jc = OxmlElement('w:jc')
         jc.set(qn('w:val'), 'center')
         existing = tblPr.find(qn('w:jc'))
@@ -453,53 +455,48 @@ class BISUQuestionnaireGenerator:
             tblPr.remove(existing)
         tblPr.append(jc)
 
-        # Remove default table borders (make all borders invisible)
         self._set_table_borders_invisible(tblPr)
-
-        # Set column widths
         self._set_col_widths(table, [col_blank, col_a, col_b])
 
-        # ── Header row ────────────────────────────────────────────────────
+        # Header row
         header_labels = ['Ans.', 'Column A', 'Column B']
         for ci, label in enumerate(header_labels):
             cell = table.rows[0].cells[ci]
             p    = cell.paragraphs[0]
+            self._fmt_para(p)
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER if ci == 0 else WD_ALIGN_PARAGRAPH.LEFT
             r    = p.add_run(label)
+            self._fmt_run(r)
             r.bold      = True
             r.underline = True
-            r.font.size = Pt(11)
-            r.font.name = 'Arial'
 
-        # ── Data rows ─────────────────────────────────────────────────────
+        # Data rows
         for i in range(n_rows):
             row = table.rows[i + 1]
 
-            # Col 0 — answer blank, centred
             cell_blank = row.cells[0]
             p = cell_blank.paragraphs[0]
+            self._fmt_para(p)
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             r = p.add_run("_______")
-            r.font.size = Pt(11)
-            r.font.name = 'Arial'
+            self._fmt_run(r)
 
-            # Col 1 — Column A item (e.g. "1. CREATE")
-            a_text  = column_a[i] if i < len(column_a) else ''
-            cell_a  = row.cells[1]
+            a_text = column_a[i] if i < len(column_a) else ''
+            cell_a = row.cells[1]
             p = cell_a.paragraphs[0]
+            self._fmt_para(p)
             r = p.add_run(a_text)
-            r.font.size = Pt(11)
-            r.font.name = 'Arial'
+            self._fmt_run(r)
 
-            # Col 2 — Column B item (e.g. "A. Deletes object")
-            b_text  = column_b[i] if i < len(column_b) else ''
-            cell_b  = row.cells[2]
+            b_text = column_b[i] if i < len(column_b) else ''
+            cell_b = row.cells[2]
             p = cell_b.paragraphs[0]
+            self._fmt_para(p)
             r = p.add_run(b_text)
-            r.font.size = Pt(11)
-            r.font.name = 'Arial'
+            self._fmt_run(r)
 
-        self.doc.add_paragraph()
+        sp = self.doc.add_paragraph()
+        self._fmt_para(sp)
 
     # =========================================================================
     # TABLE HELPERS
@@ -522,11 +519,6 @@ class BISUQuestionnaireGenerator:
 
     @staticmethod
     def _set_table_borders_invisible(tblPr):
-        """
-        Add a <w:tblBorders> element that sets all six border positions to
-        'none' so the table grid lines are completely invisible.
-        """
-        # Remove any existing tblBorders first
         existing = tblPr.find(qn('w:tblBorders'))
         if existing is not None:
             tblPr.remove(existing)
@@ -544,7 +536,6 @@ class BISUQuestionnaireGenerator:
 
     @staticmethod
     def _shade_cell(cell, fill_hex):
-        """Apply a background fill colour to a table cell."""
         tc   = cell._tc
         tcPr = tc.get_or_add_tcPr()
         shd  = OxmlElement('w:shd')
@@ -561,50 +552,45 @@ class BISUQuestionnaireGenerator:
     # =========================================================================
 
     def _add_answer_key_page(self, answer_key_data):
-        """
-        Appends a dedicated Answer Key page at the very end of the document.
-        A hard page-break separates it from the question body so it can be
-        detached before handing out the test.
-        """
-        # ── Hard page break ───────────────────────────────────────────────
+        # Hard page break
         p   = self.doc.add_paragraph()
+        self._fmt_para(p)
         run = p.add_run()
         run.add_break(WD_BREAK.PAGE)
 
-        # ── Page heading ──────────────────────────────────────────────────
+        # Page heading
         p = self.doc.add_paragraph()
+        self._fmt_para(p)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r = p.add_run('ANSWER KEY')
-        r.bold           = True
-        r.font.size      = Pt(16)
-        r.font.name      = 'Arial'
+        self._fmt_run(r)
+        r.bold = True
 
         p = self.doc.add_paragraph()
+        self._fmt_para(p)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r = p.add_run('(For Instructor Use Only — Detach Before Distributing)')
+        self._fmt_run(r)
         r.italic         = True
-        r.font.size      = Pt(10)
-        r.font.name      = 'Arial'
         r.font.color.rgb = RGBColor(100, 100, 100)
 
         self._add_horizontal_rule()
-        self.doc.add_paragraph()
 
-        # ── Answers grouped by section ──────────────────────────────────
+        sp = self.doc.add_paragraph()
+        self._fmt_para(sp)
+
+        # Answers grouped by section
         for section_key, section_data in answer_key_data.items():
             answers = section_data.get('answers', [])
             if not answers:
                 continue
 
-            # Section label
             p = self.doc.add_paragraph()
+            self._fmt_para(p)
             r = p.add_run(section_data['title'] + ':')
-            r.bold      = True
-            r.font.size = Pt(12)
-            r.font.name = 'Arial'
+            self._fmt_run(r)
+            r.bold = True
 
-            # Split by individual qtype so matching/enumeration render correctly
-            # regardless of whether section_key is a string (legacy) or int (ordered).
             matching_answers    = [(n, d) for n, qt, d in answers if qt == 'matching']
             enumeration_answers = [(n, d) for n, qt, d in answers if qt == 'enumeration']
             regular_answers     = [(n, d) for n, qt, d in answers
@@ -615,10 +601,10 @@ class BISUQuestionnaireGenerator:
                     if not pairs:
                         continue
                     p = self.doc.add_paragraph()
+                    self._fmt_para(p)
                     r = p.add_run(f"  {num}.")
+                    self._fmt_run(r)
                     r.bold = True
-                    r.font.size = Pt(11)
-                    r.font.name = 'Arial'
                     parts = []
                     for pair in pairs:
                         item  = pair.get('item', '')
@@ -626,33 +612,31 @@ class BISUQuestionnaireGenerator:
                         n     = item.split('.')[0].strip() if '.' in str(item) else str(item)
                         parts.append(f"{n}→{match}")
                     p = self.doc.add_paragraph()
+                    self._fmt_para(p)
                     r = p.add_run('   '.join(parts))
-                    r.font.size = Pt(11)
-                    r.font.name = 'Arial'
+                    self._fmt_run(r)
 
             if enumeration_answers:
                 for num, answer in enumeration_answers:
                     p = self.doc.add_paragraph()
+                    self._fmt_para(p)
                     r = p.add_run(f"  {num}:")
-                    r.bold      = True
-                    r.font.size = Pt(11)
-                    r.font.name = 'Arial'
+                    self._fmt_run(r)
+                    r.bold = True
                     raw_items = [s.strip() for s in answer.splitlines() if s.strip()]
                     if len(raw_items) <= 1:
                         raw_items = [s.strip() for s in answer.split(',') if s.strip()]
                     for i, item in enumerate(raw_items, 1):
                         p = self.doc.add_paragraph()
+                        self._fmt_para(p)
                         r = p.add_run(f"     {i}. {item}")
-                        r.font.size = Pt(11)
-                        r.font.name = 'Arial'
+                        self._fmt_run(r)
 
             if regular_answers:
-                # Layout as a compact grid (5 answers per row)
                 cols = 5
                 rows_needed = (len(regular_answers) + cols - 1) // cols
                 table = self.doc.add_table(rows=rows_needed, cols=cols)
 
-                # Invisible borders
                 tbl   = table._tbl
                 tblPr = tbl.find(qn('w:tblPr'))
                 if tblPr is None:
@@ -665,18 +649,18 @@ class BISUQuestionnaireGenerator:
                     col_i = idx % cols
                     cell  = table.rows[row_i].cells[col_i]
                     p     = cell.paragraphs[0]
+                    self._fmt_para(p)
                     r     = p.add_run(f"{num}. {answer}")
-                    r.font.size = Pt(11)
-                    r.font.name = 'Arial'
+                    self._fmt_run(r)
 
-            self.doc.add_paragraph()
+            sp = self.doc.add_paragraph()
+            self._fmt_para(sp)
 
     def _add_horizontal_rule(self):
-        """Add a simple decorative rule paragraph."""
         p = self.doc.add_paragraph()
-        r = p.add_run('\u2500' * 55)
-        r.font.size      = Pt(9)
-        r.font.name      = 'Arial'
+        self._fmt_para(p)
+        r = p.add_run('─' * 55)
+        self._fmt_run(r)
         r.font.color.rgb = RGBColor(150, 150, 150)
 
     # =========================================================================
@@ -718,20 +702,12 @@ def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
     """
     Generate BISU questionnaire from database objects using the Word template.
     Returns: tuple (docx_path, pdf_path)  — pdf_path may be None.
-
-    Questions are rendered in the EXACT ORDER they were extracted, using
-    section_header entries as section dividers so Part I / Part II / Part III
-    appear as in the original document.
     """
     from .models import ExtractedQuestion
 
-    # Convert to a plain list so we can extend it.
     selected_list = list(selected_questions)
     selected_ids  = {q.id for q in selected_list}
 
-    # section_header questions are rendered as banners in the review UI —
-    # they have no checkbox, so their IDs are never in the download URL.
-    # Always pull them from the DB and merge them back in creation order.
     section_headers = list(
         questionnaire_obj.extracted_questions
         .filter(question_type__name='section_header')
@@ -741,7 +717,6 @@ def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
     )
 
     if section_headers:
-        # Merge by created_at so the original document order is preserved.
         all_questions = sorted(
             selected_list + section_headers,
             key=lambda q: q.created_at,
@@ -749,8 +724,6 @@ def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
     else:
         all_questions = selected_list
 
-    # Build ordered sections from the question list.
-    # section_header questions become section titles; all others are body questions.
     sections = []
     current_header = None
     current_questions = []
@@ -767,14 +740,12 @@ def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
         else:
             current_questions.append(q)
 
-    # Flush the last section
     if current_questions or current_header is not None:
         sections.append({
             'header':    current_header,
             'questions': current_questions[:],
         })
 
-    # Fallback: no section_headers at all — dump everything into one unlabelled section
     if not sections:
         sections = [{'header': None, 'questions': all_questions}]
 
@@ -792,7 +763,7 @@ def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
         'instructor':  instructor_name,
         'department':  questionnaire_obj.department.name,
         'semester':    '1st Semester, A.Y.2025-2026',
-        'sections':    sections,   # ordered; uses section_header entries as dividers
+        'sections':    sections,
     }
 
     generator = BISUQuestionnaireGenerator()

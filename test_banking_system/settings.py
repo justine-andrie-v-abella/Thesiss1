@@ -10,7 +10,9 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-fallback-key')
 
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['qvrbmzwj-2000.asse.devtunnels.ms/', 'localhost', '127.0.0.1']
+CSRF_TRUSTED_ORIGINS = ['https://qvrbmzwj-2000.asse.devtunnels.ms/']
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
