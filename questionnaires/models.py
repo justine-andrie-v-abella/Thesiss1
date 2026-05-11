@@ -98,6 +98,20 @@ class Questionnaire(models.Model):
     )
     extraction_error = models.TextField(blank=True, null=True)
     is_archived      = models.BooleanField(default=False)
+    
+    YEAR_LEVEL_CHOICES = [
+        (1, '1st Year'),
+        (2, '2nd Year'),
+        (3, '3rd Year'),
+        (4, '4th Year'),
+    ]
+
+    year_level = models.IntegerField(
+        choices=YEAR_LEVEL_CHOICES,
+        null=True,
+        blank=True,
+        help_text='Year level auto-detected from curriculum',
+    )
 
     class Meta:
         ordering = ['-uploaded_at']

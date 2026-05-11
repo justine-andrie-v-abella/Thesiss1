@@ -67,4 +67,5 @@ urlpatterns = [
 
     path('workspace/folders/<int:folder_id>/remove-question/<int:question_id>/',
          views.workspace_remove_question,  name='workspace_remove_question'),
+    path('ajax/subject-curriculum-info/', views.get_subject_curriculum_info, name='subject_curriculum_info'),
 ]

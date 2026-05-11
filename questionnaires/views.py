@@ -183,8 +183,18 @@ def upload_questionnaire(request):
             questionnaire.semester     = form.cleaned_data['semester']
             questionnaire.school_year  = get_current_school_year()
             questionnaire.extraction_status = 'processing'
-            questionnaire.save()
+            
 
+            # ── Auto-detect year level from curriculum ──
+            from accounts.models import ProgramCurriculum
+            curriculum_entry = ProgramCurriculum.objects.filter(
+                subject=questionnaire.subject
+            ).first()
+            if curriculum_entry:
+                questionnaire.year_level = curriculum_entry.year_level
+            
+            questionnaire.save()
+            
             try:
                 type_names = list(
                     QuestionType.objects.filter(is_active=True).values_list('name', flat=True)
@@ -2012,3 +2022,23 @@ def workspace_list_folders(request):
 
     cache.set(cache_key, data, timeout=60)
     return JsonResponse(data)
+
+@login_required
+def get_subject_curriculum_info(request):
+    """Return semester and year_level for a subject from ProgramCurriculum."""
+    subject_id = request.GET.get('subject_id')
+    if not subject_id:
+        return JsonResponse({'found': False})
+
+    from accounts.models import ProgramCurriculum
+    entry = ProgramCurriculum.objects.filter(subject_id=subject_id).first()
+    if not entry:
+        return JsonResponse({'found': False})
+
+    # ProgramCurriculum.semester is 1 or 2 (integer), Questionnaire uses '1st'/'2nd'
+    sem_map = {1: '1st', 2: '2nd'}
+    return JsonResponse({
+        'found':      True,
+        'semester':   sem_map.get(entry.semester, ''),
+        'year_level': entry.year_level,
+    })
