@@ -113,6 +113,61 @@ class Program(models.Model):
         self.code = self.code.upper()
         super().save(*args, **kwargs)
 
+class Curriculum(models.Model):
+    """
+    A versioned curriculum for a program.
+    Each time the curriculum changes, a new Curriculum is created.
+    Old curricula are preserved (students enrolled under them keep their version).
+    Only one curriculum per program can be 'active' at a time.
+    """
+    program     = models.ForeignKey(
+        Program, on_delete=models.CASCADE, related_name='curricula'
+    )
+    code        = models.CharField(
+        max_length=50,
+        help_text='e.g. CUR-001, BSCS-2024. Must be unique within the program.'
+    )
+    school_year = models.CharField(
+        max_length=20,
+        help_text='e.g. 2024-2025'
+    )
+    description = models.TextField(blank=True)
+    is_active   = models.BooleanField(
+        default=False,
+        help_text='Only one curriculum per program should be active at a time.'
+    )
+    is_draft    = models.BooleanField(
+        default=True,
+        help_text='Draft = still being edited. Saved = finalized (but editable until replaced).'
+    )
+    created_by  = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_curricula'
+    )
+    created_at  = models.DateTimeField(auto_now_add=True)
+    saved_at    = models.DateTimeField(null=True, blank=True)
+ 
+    class Meta:
+        ordering        = ['-created_at']
+        unique_together = [['program', 'code']]
+        verbose_name        = 'Curriculum'
+        verbose_name_plural = 'Curricula'
+ 
+    def __str__(self):
+        status = 'Active' if self.is_active else ('Draft' if self.is_draft else 'Archived')
+        return f"{self.program.code} › {self.code} ({self.school_year}) [{status}]"
+ 
+    def save(self, *args, **kwargs):
+        self.code = self.code.upper()
+        super().save(*args, **kwargs)
+ 
+    def activate(self):
+        """Set this curriculum as active, deactivate all others for this program."""
+        Curriculum.objects.filter(program=self.program, is_active=True).update(is_active=False)
+        self.is_active = True
+        self.is_draft  = False
+        self.saved_at  = timezone.now()
+        self.save()
 
 class ProgramCurriculum(models.Model):
     YEAR_CHOICES = [
@@ -125,22 +180,34 @@ class ProgramCurriculum(models.Model):
         (1, '1st Semester'),
         (2, '2nd Semester'),
     ]
-
+ 
+    # NEW: link to a specific curriculum version (nullable so old rows survive migration)
+    curriculum = models.ForeignKey(
+        'Curriculum',
+        on_delete=models.CASCADE,
+        related_name='entries',
+        null=True,
+        blank=True,
+    )
     program    = models.ForeignKey(Program,  on_delete=models.CASCADE, related_name='curriculum_entries')
     subject    = models.ForeignKey('Subject', on_delete=models.CASCADE, related_name='curriculum_entries')
     year_level = models.IntegerField(choices=YEAR_CHOICES)
     semester   = models.IntegerField(choices=SEMESTER_CHOICES)
     created_at = models.DateTimeField(auto_now_add=True)
-
+ 
     class Meta:
         ordering        = ['year_level', 'semester', 'subject__code']
-        unique_together = [['program', 'subject']]   # each subject appears at most once
+        # OLD unique_together was ['program', 'subject'] — one subject per program ever.
+        # NEW: a subject can appear in different curricula for the same program,
+        #       but only once per curriculum.
+        unique_together = [['curriculum', 'subject']]
         verbose_name        = 'Program Curriculum Entry'
         verbose_name_plural = 'Program Curriculum Entries'
-
+ 
     def __str__(self):
+        cur_code = self.curriculum.code if self.curriculum else 'legacy'
         return (
-            f"{self.program.code} › "
+            f"{self.program.code} › {cur_code} › "
             f"Year {self.year_level} Sem {self.semester} › "
             f"{self.subject.code}"
         )

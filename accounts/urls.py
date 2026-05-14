@@ -93,9 +93,25 @@ urlpatterns = [
     path('programs/<int:pk>/subjects/',                               views.program_detail,               name='program_detail'),
 
     # Curriculum Management (superadmin)
-    path('programs/<int:pk>/curriculum/',                                   views.program_curriculum,             name='program_curriculum'),
-    path('programs/<int:prog_pk>/curriculum/add/',                          views.add_curriculum_subject,         name='add_curriculum_subject'),
-    path('programs/<int:prog_pk>/curriculum/<int:entry_pk>/remove/',        views.remove_curriculum_subject,      name='remove_curriculum_subject'),
+    path('programs/<int:pk>/curriculum/',
+        views.program_curriculum,
+        name='program_curriculum'),
+    
+    path('programs/<int:prog_pk>/curriculum/create/',
+        views.create_curriculum,
+        name='create_curriculum'),
+    
+    path('programs/<int:prog_pk>/curriculum/<int:cur_pk>/save/',
+        views.save_curriculum,
+        name='save_curriculum'),
+    
+    path('programs/<int:prog_pk>/curriculum/add/',
+        views.add_curriculum_subject,
+        name='add_curriculum_subject'),
+    
+    path('programs/<int:prog_pk>/curriculum/<int:entry_pk>/remove/',
+        views.remove_curriculum_subject,
+        name='remove_curriculum_subject'),
 
     # ── Program Management (sub-admin) ──────────────────────────────────────
     path('subadmin/programs/',                                        views.subadmin_manage_programs,              name='subadmin_manage_programs'),
@@ -105,9 +121,25 @@ urlpatterns = [
     path('subadmin/programs/<int:pk>/subjects/',                      views.subadmin_program_detail,               name='subadmin_program_detail'),
 
     # Curriculum Management (sub-admin)
-    path('subadmin/programs/<int:pk>/curriculum/',                                  views.subadmin_program_curriculum,           name='subadmin_program_curriculum'),
-    path('subadmin/programs/<int:prog_pk>/curriculum/add/',                         views.subadmin_add_curriculum_subject,        name='subadmin_add_curriculum_subject'),
-    path('subadmin/programs/<int:prog_pk>/curriculum/<int:entry_pk>/remove/',       views.subadmin_remove_curriculum_subject,     name='subadmin_remove_curriculum_subject'),
+    path('subadmin/programs/<int:pk>/curriculum/',
+        views.subadmin_program_curriculum,
+        name='subadmin_program_curriculum'),
+    
+    path('subadmin/programs/<int:prog_pk>/curriculum/create/',
+        views.subadmin_create_curriculum,
+        name='subadmin_create_curriculum'),
+    
+    path('subadmin/programs/<int:prog_pk>/curriculum/<int:cur_pk>/save/',
+        views.subadmin_save_curriculum,
+        name='subadmin_save_curriculum'),
+    
+    path('subadmin/programs/<int:prog_pk>/curriculum/add/',
+        views.subadmin_add_curriculum_subject,
+        name='subadmin_add_curriculum_subject'),
+    
+    path('subadmin/programs/<int:prog_pk>/curriculum/<int:entry_pk>/remove/',
+        views.subadmin_remove_curriculum_subject,
+        name='subadmin_remove_curriculum_subject'),
 
     path('profile/update/', views.update_profile, name='update_profile'),
     path('profile/change-password/', views.change_credentials, name='change_credentials'),

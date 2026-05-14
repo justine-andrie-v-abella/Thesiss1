@@ -17,6 +17,7 @@ from .forms import (
     SubAdminTeacherCreationForm, SubAdminTeacherEditForm,
     ProgramForm,
 )
+from .models import Curriculum
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db import OperationalError
@@ -2477,90 +2478,216 @@ def program_detail(request, pk):
 # SUPERADMIN — CURRICULUM  (year-level / semester slots per program)
 # ============================================================================
 
-def _build_curriculum_grid(program):
-    """Return a list of year dicts with nested semester dicts + entries."""
+def _build_curriculum_grid(curriculum):
+    """
+    Build the year x semester grid for ONE specific curriculum version.
+    Takes a Curriculum object (not a Program).
+    """
     entries = (
         ProgramCurriculum.objects
-        .filter(program=program)
+        .filter(curriculum=curriculum)
         .select_related('subject')
         .order_by('year_level', 'semester', 'subject__code')
     )
-    # index by (year, semester)
-    slot_map = {}
-    year_totals = {}  # Add this to track totals per year
+ 
+    slot_map    = {}
+    year_totals = {}
     for y in range(1, 5):
         for s in range(1, 3):
             slot_map[(y, s)] = []
-        year_totals[y] = 0  # Initialize year total
-    
+        year_totals[y] = 0
+ 
     for e in entries:
         slot_map[(e.year_level, e.semester)].append(e)
-        year_totals[e.year_level] += 1  # Add to year total
-
+        year_totals[e.year_level] += 1
+ 
     grid = []
     for y in range(1, 5):
         semesters = []
         for s in range(1, 3):
             semesters.append({'semester': s, 'entries': slot_map[(y, s)]})
-        grid.append({
-            'year': y, 
-            'semesters': semesters,
-            'total': year_totals[y]  # Add total to the year dict
-        })
+        grid.append({'year': y, 'semesters': semesters, 'total': year_totals[y]})
+ 
     return grid, {e.subject_id for e in entries}
 
-
-@login_required
-@user_passes_test(is_admin)
-def program_curriculum(request, pk):
-    """Superadmin: view/manage curriculum (year-level × semester) for a program."""
-    program    = get_object_or_404(Program, pk=pk)
+def _get_curriculum_context(program, curriculum):
+    """
+    Build the full template context dict for the curriculum page.
+    Called by both superadmin and sub-admin views.
+    """
+    grid, placed_ids = _build_curriculum_grid(curriculum)
     department = program.department
-    grid, placed_ids = _build_curriculum_grid(program)
+ 
     available_subjects = (
         Subject.objects
         .filter(departments=department, is_archived=False)
         .exclude(pk__in=placed_ids)
         .order_by('code')
     )
-    return render(request, 'admin_dashboard/program_curriculum.html', {
+ 
+    all_curricula = (
+        Curriculum.objects
+        .filter(program=program)
+        .order_by('-created_at')
+    )
+ 
+    return {
         'program':            program,
         'department':         department,
         'curriculum_grid':    grid,
         'available_subjects': available_subjects,
+        'current_curriculum': curriculum,
+        'all_curricula':      all_curricula,
+        # is_editable controls whether Add/Remove buttons show in the template
+        'is_editable':        curriculum.is_draft or curriculum.is_active,
+    }
+ 
+def _resolve_curriculum(program, params):
+    """
+    Decide which curriculum version to display.
+    Checks in this order:
+      1. ?curriculum_id=X in the URL  (user clicked a version tab)
+      2. The program's active curriculum
+      3. The most recently created curriculum
+      4. None  (program has no curricula yet)
+ 
+    Pass request.GET for GET views, request.POST for AJAX views.
+    """
+    cid = params.get('curriculum_id')
+    if cid:
+        return Curriculum.objects.filter(pk=cid, program=program).first()
+ 
+    cur = Curriculum.objects.filter(program=program, is_active=True).first()
+    if cur:
+        return cur
+ 
+    return Curriculum.objects.filter(program=program).order_by('-created_at').first()
+
+@login_required
+@user_passes_test(is_admin)
+def program_curriculum(request, pk):
+    program    = get_object_or_404(Program, pk=pk)
+    curriculum = _resolve_curriculum(program, request.GET)
+ 
+    if not curriculum:
+        # Program exists but has zero curriculum versions yet
+        return render(request, 'admin_dashboard/program_curriculum.html', {
+            'program':       program,
+            'department':    program.department,
+            'no_curriculum': True,
+            'all_curricula': [],
+        })
+ 
+    ctx = _get_curriculum_context(program, curriculum)
+    return render(request, 'admin_dashboard/program_curriculum.html', ctx)
+
+@login_required
+@user_passes_test(is_admin)
+def create_curriculum(request, prog_pk):
+    """Superadmin: AJAX — create a new blank curriculum version for a program."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+ 
+    program     = get_object_or_404(Program, pk=prog_pk)
+    code        = request.POST.get('code', '').strip().upper()
+    school_year = request.POST.get('school_year', '').strip()
+    description = request.POST.get('description', '').strip()
+ 
+    if not code:
+        return JsonResponse({'error': 'Curriculum code is required.'}, status=400)
+    if not school_year:
+        return JsonResponse({'error': 'School year is required.'}, status=400)
+    if Curriculum.objects.filter(program=program, code=code).exists():
+        return JsonResponse({'error': f'Code "{code}" already exists for this program.'}, status=400)
+ 
+    curriculum = Curriculum.objects.create(
+        program=program,
+        code=code,
+        school_year=school_year,
+        description=description,
+        is_active=False,
+        is_draft=True,
+        created_by=request.user,
+    )
+ 
+    log_activity(
+        'program_updated',
+        f'New curriculum "{code}" ({school_year}) created for "{program.name}"',
+        user=request.user,
+        metadata={'program_id': program.pk, 'curriculum_id': curriculum.pk},
+    )
+ 
+    return JsonResponse({
+        'success':       True,
+        'curriculum_id': curriculum.pk,
+        'code':          curriculum.code,
+        'school_year':   curriculum.school_year,
+        # The template JS will redirect the browser here after creation
+        'redirect_url':  request.build_absolute_uri(
+            f'/accounts/programs/{program.pk}/curriculum/?curriculum_id={curriculum.pk}'
+        ),
     })
 
+@login_required
+@user_passes_test(is_admin)
+def save_curriculum(request, prog_pk, cur_pk):
+    """Superadmin: AJAX — mark a curriculum as saved and set it as active."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+ 
+    program    = get_object_or_404(Program, pk=prog_pk)
+    curriculum = get_object_or_404(Curriculum, pk=cur_pk, program=program)
+    curriculum.activate()   # deactivates all others, sets this one active+saved
+ 
+    log_activity(
+        'program_updated',
+        f'Curriculum "{curriculum.code}" saved & set as active for "{program.name}"',
+        user=request.user,
+        metadata={'program_id': program.pk, 'curriculum_id': curriculum.pk},
+    )
+    return JsonResponse({'success': True, 'message': f'Curriculum "{curriculum.code}" is now active.'})
 
 @login_required
 @user_passes_test(is_admin)
 def add_curriculum_subject(request, prog_pk):
-    """Superadmin: AJAX — add one or more subjects to a year/semester slot."""
+    """Superadmin: AJAX — add subjects to a year/semester slot."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
-    program     = get_object_or_404(Program, pk=prog_pk)
+ 
+    program    = get_object_or_404(Program, pk=prog_pk)
+    curriculum = _resolve_curriculum(program, request.POST)
+ 
+    if not curriculum:
+        return JsonResponse({'error': 'No curriculum found. Please create one first.'}, status=400)
+    if not (curriculum.is_draft or curriculum.is_active):
+        return JsonResponse({'error': 'This curriculum is archived and cannot be edited.'}, status=403)
+ 
     subject_ids = request.POST.getlist('subject_ids[]') or request.POST.getlist('subject_ids')
     try:
         year_level = int(request.POST.get('year_level', 0))
         semester   = int(request.POST.get('semester', 0))
     except (TypeError, ValueError):
         return JsonResponse({'error': 'Invalid year level or semester.'}, status=400)
+ 
     if year_level not in range(1, 5) or semester not in range(1, 3):
         return JsonResponse({'error': 'Year level must be 1–4; semester must be 1 or 2.'}, status=400)
     if not subject_ids:
         return JsonResponse({'error': 'Please select at least one subject.'}, status=400)
-
-    added   = []
-    skipped = []
+ 
+    added, skipped = [], []
     for sid in subject_ids:
         subject = Subject.objects.filter(pk=sid, departments=program.department, is_archived=False).first()
         if not subject:
             continue
-        if ProgramCurriculum.objects.filter(program=program, subject=subject).exists():
+        if ProgramCurriculum.objects.filter(curriculum=curriculum, subject=subject).exists():
             skipped.append(subject.code)
             continue
         entry = ProgramCurriculum.objects.create(
-            program=program, subject=subject,
-            year_level=year_level, semester=semester,
+            curriculum=curriculum,
+            program=program,
+            subject=subject,
+            year_level=year_level,
+            semester=semester,
         )
         program.subjects.add(subject)
         added.append({
@@ -2572,30 +2699,37 @@ def add_curriculum_subject(request, prog_pk):
             'year_level':          year_level,
             'semester':            semester,
         })
-
+ 
     if added:
         codes = ', '.join(a['subject_code'] for a in added)
         log_activity(
             'program_updated',
-            f'{len(added)} subject(s) added to curriculum of "{program.name}" '
+            f'{len(added)} subject(s) added to curriculum "{curriculum.code}" of "{program.name}" '
             f'— Year {year_level} Sem {semester}: {codes}',
             user=request.user,
-            metadata={'program_id': program.pk},
+            metadata={'program_id': program.pk, 'curriculum_id': curriculum.pk},
         )
     return JsonResponse({'success': True, 'added': added, 'skipped': skipped})
-
-
+ 
+ 
+# <<<< REPLACE — DELETE YOUR OLD remove_curriculum_subject AND PASTE THIS >>>>
+ 
 @login_required
 @user_passes_test(is_admin)
 def remove_curriculum_subject(request, prog_pk, entry_pk):
+    """Superadmin: AJAX — remove a subject from the curriculum."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
+ 
     program = get_object_or_404(Program, pk=prog_pk)
     entry   = get_object_or_404(ProgramCurriculum, pk=entry_pk, program=program)
-    code    = entry.subject.code
-    name    = entry.subject.name
-    program.subjects.remove(entry.subject)   # ← add this line
+ 
+    if entry.curriculum and not (entry.curriculum.is_draft or entry.curriculum.is_active):
+        return JsonResponse({'error': 'This curriculum is archived and cannot be edited.'}, status=403)
+ 
+    code, name = entry.subject.code, entry.subject.name
     entry.delete()
+ 
     log_activity(
         'program_updated',
         f'Subject "{name}" ({code}) removed from curriculum of "{program.name}"',
@@ -2604,23 +2738,94 @@ def remove_curriculum_subject(request, prog_pk, entry_pk):
     )
     return JsonResponse({'success': True})
 
-
 # ============================================================================
 # SUB-ADMIN — PROGRAMS  (their department only)
 # ============================================================================
 
 @login_required
 @user_passes_test(is_subadmin)
-def subadmin_manage_programs(request):
-    """Sub-admin: list programs for their department."""
+def subadmin_program_curriculum(request, pk):
     department = request.user.subadmin_profile.department
-    programs   = Program.objects.filter(department=department).order_by('name')
-    form       = ProgramForm()
-    return render(request, 'subadmin_dashboard/manage_programs.html', {
-        'department': department,
-        'programs':   programs,
-        'form':       form,
+    program    = get_object_or_404(Program, pk=pk, department=department)
+    curriculum = _resolve_curriculum(program, request.GET)
+ 
+    if not curriculum:
+        return render(request, 'subadmin_dashboard/program_curriculum.html', {
+            'program':       program,
+            'department':    department,
+            'no_curriculum': True,
+            'all_curricula': [],
+        })
+ 
+    ctx = _get_curriculum_context(program, curriculum)
+    return render(request, 'subadmin_dashboard/program_curriculum.html', ctx)
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_create_curriculum(request, prog_pk):
+    """Sub-admin: AJAX — create a new blank curriculum version."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+
+    department  = request.user.subadmin_profile.department
+    program     = get_object_or_404(Program, pk=prog_pk, department=department)
+    code        = request.POST.get('code', '').strip().upper()
+    school_year = request.POST.get('school_year', '').strip()
+    description = request.POST.get('description', '').strip()
+
+    if not code:
+        return JsonResponse({'error': 'Curriculum code is required.'}, status=400)
+    if not school_year:
+        return JsonResponse({'error': 'School year is required.'}, status=400)
+    if Curriculum.objects.filter(program=program, code=code).exists():
+        return JsonResponse({'error': f'Code "{code}" already exists for this program.'}, status=400)
+
+    curriculum = Curriculum.objects.create(
+        program=program,
+        code=code,
+        school_year=school_year,
+        description=description,
+        is_active=False,
+        is_draft=True,
+        created_by=request.user,
+    )
+
+    log_activity(
+        'program_updated',
+        f'New curriculum "{code}" ({school_year}) created for "{program.name}" '
+        f'by Sub-Admin {request.user.get_full_name()}',
+        user=request.user,
+        metadata={'program_id': program.pk, 'curriculum_id': curriculum.pk},
+    )
+
+    return JsonResponse({
+        'success':       True,
+        'curriculum_id': curriculum.pk,
+        'code':          curriculum.code,
+        'school_year':   curriculum.school_year,
+        'redirect_url':  f'/accounts/subadmin/programs/{program.pk}/curriculum/?curriculum_id={curriculum.pk}',
     })
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_save_curriculum(request, prog_pk, cur_pk):
+    """Sub-admin: AJAX — mark a curriculum as saved and set it as active."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+ 
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=prog_pk, department=department)
+    curriculum = get_object_or_404(Curriculum, pk=cur_pk, program=program)
+    curriculum.activate()
+ 
+    log_activity(
+        'program_updated',
+        f'Curriculum "{curriculum.code}" saved & set as active for "{program.name}" '
+        f'by Sub-Admin {request.user.get_full_name()}',
+        user=request.user,
+        metadata={'program_id': program.pk, 'curriculum_id': curriculum.pk},
+    )
+    return JsonResponse({'success': True, 'message': f'Curriculum "{curriculum.code}" is now active.'})
 
 
 @login_required
@@ -2712,7 +2917,18 @@ def subadmin_program_detail(request, pk):
         'assigned_subjects': assigned_subjects,
     })
 
-
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_manage_programs(request):
+    """Sub-admin: list programs for their department."""
+    department = request.user.subadmin_profile.department
+    programs   = Program.objects.filter(department=department).order_by('name')
+    form       = ProgramForm()
+    return render(request, 'subadmin_dashboard/manage_programs.html', {
+        'department': department,
+        'programs':   programs,
+        'form':       form,
+    })
 
 
 # ============================================================================
@@ -2721,56 +2937,46 @@ def subadmin_program_detail(request, pk):
 
 @login_required
 @user_passes_test(is_subadmin)
-def subadmin_program_curriculum(request, pk):
-    """Sub-admin: view/manage curriculum for one of their programs."""
-    department = request.user.subadmin_profile.department
-    program    = get_object_or_404(Program, pk=pk, department=department)
-    grid, placed_ids = _build_curriculum_grid(program)
-    available_subjects = (
-        Subject.objects
-        .filter(departments=department, is_archived=False)
-        .exclude(pk__in=placed_ids)
-        .order_by('code')
-    )
-    return render(request, 'subadmin_dashboard/program_curriculum.html', {
-        'program':            program,
-        'department':         department,
-        'curriculum_grid':    grid,
-        'available_subjects': available_subjects,
-    })
-
-
-@login_required
-@user_passes_test(is_subadmin)
 def subadmin_add_curriculum_subject(request, prog_pk):
-    """Sub-admin: AJAX — add one or more subjects to a year/semester slot."""
+    """Sub-admin: AJAX — add subjects to a year/semester slot."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
+ 
     department  = request.user.subadmin_profile.department
     program     = get_object_or_404(Program, pk=prog_pk, department=department)
+    curriculum  = _resolve_curriculum(program, request.POST)
+ 
+    if not curriculum:
+        return JsonResponse({'error': 'No curriculum found. Please create one first.'}, status=400)
+    if not (curriculum.is_draft or curriculum.is_active):
+        return JsonResponse({'error': 'This curriculum is archived and cannot be edited.'}, status=403)
+ 
     subject_ids = request.POST.getlist('subject_ids[]') or request.POST.getlist('subject_ids')
     try:
         year_level = int(request.POST.get('year_level', 0))
         semester   = int(request.POST.get('semester', 0))
     except (TypeError, ValueError):
         return JsonResponse({'error': 'Invalid year level or semester.'}, status=400)
+ 
     if year_level not in range(1, 5) or semester not in range(1, 3):
         return JsonResponse({'error': 'Year level must be 1–4; semester must be 1 or 2.'}, status=400)
     if not subject_ids:
         return JsonResponse({'error': 'Please select at least one subject.'}, status=400)
-
-    added   = []
-    skipped = []
+ 
+    added, skipped = [], []
     for sid in subject_ids:
         subject = Subject.objects.filter(pk=sid, departments=department, is_archived=False).first()
         if not subject:
             continue
-        if ProgramCurriculum.objects.filter(program=program, subject=subject).exists():
+        if ProgramCurriculum.objects.filter(curriculum=curriculum, subject=subject).exists():
             skipped.append(subject.code)
             continue
         entry = ProgramCurriculum.objects.create(
-            program=program, subject=subject,
-            year_level=year_level, semester=semester,
+            curriculum=curriculum,
+            program=program,
+            subject=subject,
+            year_level=year_level,
+            semester=semester,
         )
         program.subjects.add(subject)
         added.append({
@@ -2782,16 +2988,16 @@ def subadmin_add_curriculum_subject(request, prog_pk):
             'year_level':          year_level,
             'semester':            semester,
         })
-
+ 
     if added:
         codes = ', '.join(a['subject_code'] for a in added)
         log_activity(
             'program_updated',
-            f'{len(added)} subject(s) added to curriculum of "{program.name}" '
+            f'{len(added)} subject(s) added to curriculum "{curriculum.code}" of "{program.name}" '
             f'— Year {year_level} Sem {semester}: {codes} '
             f'by Sub-Admin {request.user.get_full_name()}',
             user=request.user,
-            metadata={'program_id': program.pk},
+            metadata={'program_id': program.pk, 'curriculum_id': curriculum.pk},
         )
     return JsonResponse({'success': True, 'added': added, 'skipped': skipped})
 
@@ -2799,15 +3005,20 @@ def subadmin_add_curriculum_subject(request, prog_pk):
 @login_required
 @user_passes_test(is_subadmin)
 def subadmin_remove_curriculum_subject(request, prog_pk, entry_pk):
+    """Sub-admin: AJAX — remove a subject from the curriculum."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
+ 
     department = request.user.subadmin_profile.department
     program    = get_object_or_404(Program, pk=prog_pk, department=department)
     entry      = get_object_or_404(ProgramCurriculum, pk=entry_pk, program=program)
-    code = entry.subject.code
-    name = entry.subject.name
-    program.subjects.remove(entry.subject)   # ← add this line
+ 
+    if entry.curriculum and not (entry.curriculum.is_draft or entry.curriculum.is_active):
+        return JsonResponse({'error': 'This curriculum is archived and cannot be edited.'}, status=403)
+ 
+    code, name = entry.subject.code, entry.subject.name
     entry.delete()
+ 
     log_activity(
         'program_updated',
         f'Subject "{name}" ({code}) removed from curriculum of "{program.name}" '
