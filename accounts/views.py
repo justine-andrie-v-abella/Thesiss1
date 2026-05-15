@@ -2135,8 +2135,12 @@ def subadmin_browse_questionnaires(request):
     department = request.user.subadmin_profile.department
 
     questionnaires = Questionnaire.objects.filter(
-        uploader__department=department
+        uploader__department=department,
+        is_extracted=True,
+        extraction_status='completed',
+        is_archived=False,
     ).select_related('subject', 'uploader__user', 'department')
+
 
     subjects = Subject.objects.filter(departments=department).order_by('code')
     teachers = TeacherProfile.objects.filter(
@@ -2176,6 +2180,9 @@ def subadmin_browse_questionnaires(request):
     school_year_options = list(
         Questionnaire.objects.filter(
             uploader__department=department,
+            is_extracted=True,
+            extraction_status='completed',
+            is_archived=False,
             school_year__gt=''
         ).values_list('school_year', flat=True).distinct().order_by('-school_year')
     )

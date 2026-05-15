@@ -1127,50 +1127,60 @@ def delete_questionnaire(request, pk):
 @login_required
 def archive_questionnaire(request, pk):
     questionnaire = get_object_or_404(Questionnaire, pk=pk, is_archived=False)
+
     if request.user.is_staff:
         can_act = True
+    elif hasattr(request.user, 'subadmin_profile') and request.user.subadmin_profile.is_active:
+        # ↑ Check subadmin BEFORE teacher — a promoted teacher has both profiles
+        can_act = questionnaire.department_id == request.user.subadmin_profile.department_id
     elif hasattr(request.user, 'teacher_profile'):
         can_act = questionnaire.uploader == request.user.teacher_profile
-    elif hasattr(request.user, 'subadmin_profile') and request.user.subadmin_profile.is_active:
-        can_act = questionnaire.department == request.user.subadmin_profile.department
     else:
         can_act = False
+
     if not can_act:
         return JsonResponse({'error': 'Permission denied'}, status=403)
+
     if request.method == 'POST':
         questionnaire.is_archived = True
         questionnaire.save()
-        from accounts.models import ActivityLog
         ActivityLog.objects.create(
             activity_type='questionnaire_archived',
             user=request.user,
             description=f'Archived questionnaire "{questionnaire.title}"',
         )
         return JsonResponse({'success': True, 'message': f'"{questionnaire.title}" archived successfully.'})
+
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
 @login_required
 def unarchive_questionnaire(request, pk):
     questionnaire = get_object_or_404(Questionnaire, pk=pk, is_archived=True)
+
     if request.user.is_staff:
         can_act = True
+    elif hasattr(request.user, 'subadmin_profile') and request.user.subadmin_profile.is_active:
+        # ↑ Same fix — subadmin check before teacher check
+        can_act = questionnaire.department_id == request.user.subadmin_profile.department_id
     elif hasattr(request.user, 'teacher_profile'):
         can_act = questionnaire.uploader == request.user.teacher_profile
     else:
         can_act = False
+
     if not can_act:
         return JsonResponse({'error': 'Permission denied'}, status=403)
+
     if request.method == 'POST':
         questionnaire.is_archived = False
         questionnaire.save()
-        from accounts.models import ActivityLog
         ActivityLog.objects.create(
             activity_type='questionnaire_restored',
             user=request.user,
             description=f'Restored questionnaire "{questionnaire.title}"',
         )
         return JsonResponse({'success': True, 'message': f'"{questionnaire.title}" restored successfully.'})
+
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
