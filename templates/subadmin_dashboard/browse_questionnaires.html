@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load questionnaire_filters %}
 
 {% block title %}Browse Questionnaires - {{ department.name }}{% endblock %}
 {% block header_title %}Browse Questionnaires{% endblock %}
@@ -118,90 +119,26 @@
     </form>
 </div>
 
-<script>
-(function () {
-    var form    = document.getElementById('filterForm');
-    var btn     = document.getElementById('filterSubmitBtn');
-    var btnHTML = btn ? btn.innerHTML : '';
-    if (!form) return;
-
-    var _currentXHR = null;   // active AbortController for the in-flight request
-    var _syncing    = false;   // true while we programmatically sync selects from a chip/link click
-
-    function ajaxFilter(qs) {
-        // Cancel any previous in-flight request to prevent race conditions
-        if (_currentXHR) { try { _currentXHR.abort(); } catch(e) {} }
-        _currentXHR = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-
-        var container = document.getElementById('results-container');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Filtering…';
-        }
-        if (container) { container.style.opacity = '0.4'; container.style.pointerEvents = 'none'; }
-
-        var fetchOpts = { headers: { 'X-Requested-With': 'XMLHttpRequest' } };
-        if (_currentXHR) fetchOpts.signal = _currentXHR.signal;
-
-        fetch(window.location.pathname + '?' + qs, fetchOpts)
-            .then(function (r) { return r.text(); })
-            .then(function (html) {
-                if (container) { container.innerHTML = html; container.style.opacity = ''; container.style.pointerEvents = ''; }
-                history.pushState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
-                if (btn) { btn.disabled = false; btn.innerHTML = btnHTML; }
-                _currentXHR = null;
-                if (window.initSubadminCards) window.initSubadminCards();
-                if (window.initSubadminDocPreview) window.initSubadminDocPreview();
-            })
-            .catch(function (err) {
-                // Ignore aborted requests — a newer request is already running
-                if (err && err.name === 'AbortError') return;
-                if (container) { container.style.opacity = ''; container.style.pointerEvents = ''; }
-                if (btn) { btn.disabled = false; btn.innerHTML = btnHTML; }
-                _currentXHR = null;
-            });
-    }
-
-    function submitFilter() {
-        ajaxFilter(new URLSearchParams(new FormData(form)).toString());
-    }
-
-    form.querySelectorAll('select').forEach(function (sel) {
-        sel.addEventListener('change', function () {
-            if (_syncing) return; // ignore programmatic value changes from chip/link sync
-            submitFilter();
-        });
-    });
-    var searchInput = form.querySelector('input[name="search"]');
-    var debounceTimer;
-    if (searchInput) {
-        searchInput.addEventListener('input', function () {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(submitFilter, 500);
-        });
-    }
-
-    /* Intercept all links inside the results container (chips, pagination, reset) */
-    document.addEventListener('click', function (e) {
-        var link = e.target.closest('#results-container a');
-        if (!link) return;
-        var href = link.getAttribute('href');
-        if (!href || href === '#') return;
-        e.preventDefault();
-        var qs = href.indexOf('?') !== -1 ? href.slice(href.indexOf('?') + 1) : '';
-        /* Sync filter form selects — use _syncing flag to suppress the change handlers */
-        var params = new URLSearchParams(qs);
-        _syncing = true;
-        form.querySelectorAll('select[name]').forEach(function (sel) {
-            sel.value = params.get(sel.name) || '';
-        });
-        var si = form.querySelector('input[name="search"]');
-        if (si) si.value = params.get('search') || '';
-        _syncing = false;
-        ajaxFilter(qs);
-    });
-})();
-</script>
+<!-- ==================== ARCHIVE TOGGLE TABS ==================== -->
+<div class="bg-white rounded-xl shadow-lg mb-6 overflow-hidden">
+    <div class="flex border-b border-gray-200">
+        <button id="activeTabBtn" 
+            onclick="switchArchiveTab('active')"
+            class="flex-1 px-6 py-3 text-center font-semibold transition-all
+                   bg-white text-purple-600 border-b-2 border-purple-600">
+            <i class="bi bi-archive mr-2"></i> Active Questionnaires
+        </button>
+        <button id="archivedTabBtn"
+            onclick="switchArchiveTab('archived')"
+            class="flex-1 px-6 py-3 text-center font-semibold transition-all
+                   bg-gray-50 text-gray-500 hover:text-gray-700">
+            <i class="bi bi-archive-fill mr-2"></i> Archived Questionnaires
+            <span id="archivedCountBadge" class="ml-2 px-2 py-0.5 bg-gray-200 text-gray-600 rounded-full text-xs">
+                0
+            </span>
+        </button>
+    </div>
+</div>
 
 <!-- Results Container (swapped by AJAX filter) -->
 <div id="results-container">
@@ -236,15 +173,10 @@
     </div>
 </div>
 
-
-<!-- ══════════════════════════════════════════════════════
-     VIEW QUESTIONS MODAL  (read-only)
-═══════════════════════════════════════════════════════ -->
+<!-- VIEW QUESTIONS MODAL (read-only) -->
 <div id="viewQuestionsModal"
     class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden items-start justify-center p-4 overflow-y-auto">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
-
-        <!-- Modal Header -->
         <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5 rounded-t-2xl flex items-center justify-between">
             <div>
                 <h2 class="text-xl font-bold text-white" id="viewModalTitle">Questions</h2>
@@ -255,8 +187,6 @@
                 <i class="bi bi-x-lg text-xl"></i>
             </button>
         </div>
-
-        <!-- Stats Row -->
         <div class="grid grid-cols-3 gap-0 border-b border-gray-200">
             <div class="p-4 text-center border-r border-gray-200">
                 <div class="text-2xl font-bold text-blue-600" id="viewModalTotal">0</div>
@@ -271,8 +201,6 @@
                 <div class="text-xs text-gray-500">Total Points</div>
             </div>
         </div>
-
-        <!-- Filters Row -->
         <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
             <select id="viewFilterType"
                 class="px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
@@ -289,11 +217,7 @@
                 <i class="bi bi-eye text-indigo-400"></i> View only — no downloads
             </span>
         </div>
-
-        <!-- Questions List -->
         <div id="viewModalQuestionsList" class="p-6 space-y-3 max-h-[55vh] overflow-y-auto"></div>
-
-        <!-- Modal Footer -->
         <div class="px-6 py-4 bg-gray-50 rounded-b-2xl border-t border-gray-200 flex justify-end">
             <button type="button" id="closeViewModalFooter"
                 class="px-5 py-2.5 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold rounded-lg text-sm transition-colors">
@@ -303,12 +227,96 @@
     </div>
 </div>
 
+<!-- ARCHIVE CONFIRMATION MODAL -->
+<style>
+.sa-modal-overlay{display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1rem;overflow-y:auto;}
+.sa-modal-overlay.is-open{display:flex !important;}
+.sa-modal-panel{position:relative;background:#fff;border-radius:1rem;box-shadow:0 25px 60px rgba(0,0,0,0.3);width:100%;max-width:520px;animation:saModalIn 0.25s cubic-bezier(0.34,1.56,0.64,1) both;}
+@keyframes saModalIn{from{opacity:0;transform:scale(0.92) translateY(-16px);}to{opacity:1;transform:scale(1) translateY(0);}}
+</style>
+
+<div id="saArchiveModal" class="sa-modal-overlay" onclick="if(event.target===this)closeArchiveModal()">
+    <div class="sa-modal-panel" style="border:2px solid #d1d5db;">
+        <div class="bg-gradient-to-r from-gray-600 to-gray-700 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-archive-fill text-2xl mr-3"></i> Archive Questionnaire
+            </h2>
+            <button onclick="closeArchiveModal()" class="text-white/80 hover:text-white transition-colors text-xl">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <p class="text-lg text-gray-700 mb-5 font-semibold">Archive this questionnaire?</p>
+            <div class="bg-gray-50 rounded-xl p-5 mb-5 border-l-4 border-gray-500 space-y-3">
+                <div class="flex items-center"><i class="bi bi-card-heading text-gray-500 text-xl mr-3"></i><div><p class="text-xs text-gray-500">Title</p><p id="saArchiveTitle" class="font-bold text-gray-800"></p></div></div>
+                <div class="flex items-center"><i class="bi bi-building text-gray-500 text-xl mr-3"></i><div><p class="text-xs text-gray-500">Department</p><p id="saArchiveDepartment" class="text-gray-700"></p></div></div>
+                <div class="flex items-center"><i class="bi bi-book text-gray-500 text-xl mr-3"></i><div><p class="text-xs text-gray-500">Subject</p><p id="saArchiveSubject" class="text-gray-700"></p></div></div>
+                <div class="flex items-center"><i class="bi bi-file-earmark text-gray-500 text-xl mr-3"></i><div><p class="text-xs text-gray-500">File</p><p id="saArchiveFileInfo" class="text-gray-700"></p></div></div>
+                <div class="flex items-center"><i class="bi bi-calendar text-gray-500 text-xl mr-3"></i><div><p class="text-xs text-gray-500">Uploaded</p><p id="saArchiveUploadedAt" class="text-gray-700"></p></div></div>
+            </div>
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-5 rounded-lg flex items-start">
+                <i class="bi bi-info-circle-fill text-yellow-500 text-2xl mr-3 mt-0.5"></i>
+                <div><p class="font-bold text-yellow-800 mb-1">This questionnaire will be hidden from the list.</p><p class="text-sm text-yellow-700">Subadmins can restore it from the Archived section.</p></div>
+            </div>
+            <div class="flex space-x-3">
+                <button type="button" id="saArchiveConfirmBtn" onclick="confirmArchive()"
+                    class="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all shadow-lg">
+                    <i class="bi bi-archive-fill mr-2"></i> Yes, Archive
+                </button>
+                <button type="button" onclick="closeArchiveModal()" class="flex-1 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-bold py-3 px-6 rounded-lg transition-all">
+                    <i class="bi bi-x-circle mr-2"></i> Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PERMANENT DELETE MODAL -->
+<div id="saPermanentDeleteModal" class="sa-modal-overlay" onclick="if(event.target===this)closePermanentDeleteModal()">
+    <div class="sa-modal-panel" style="border:2px solid #d1d5db;">
+        <div class="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="bi bi-exclamation-triangle-fill text-2xl mr-3"></i> Permanent Delete
+            </h2>
+            <button onclick="closePermanentDeleteModal()" class="text-white/80 hover:text-white transition-colors text-xl">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <p class="text-lg text-gray-700 mb-4 font-semibold">Delete this questionnaire permanently?</p>
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-5 rounded-lg flex items-start">
+                <i class="bi bi-exclamation-circle-fill text-red-500 text-2xl mr-3 mt-0.5"></i>
+                <div>
+                    <p class="font-bold text-red-800 mb-1">This action cannot be undone!</p>
+                    <p class="text-sm text-red-700">The questionnaire and all its questions will be permanently removed from the system.</p>
+                </div>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-4 mb-5">
+                <div class="flex items-center">
+                    <i class="bi bi-card-heading text-gray-500 text-xl mr-3"></i>
+                    <div>
+                        <p class="text-xs text-gray-500">Questionnaire</p>
+                        <p id="saPermanentDeleteTitle" class="font-bold text-gray-800">—</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex space-x-3">
+                <button type="button" id="saPermanentDeleteConfirm"
+                    class="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold py-3 px-6 rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-lg">
+                    <i class="bi bi-trash-fill mr-2"></i> Yes, Permanently Delete
+                </button>
+                <button type="button" onclick="closePermanentDeleteModal()" class="flex-1 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-bold py-3 px-6 rounded-lg transition-all">
+                    <i class="bi bi-x-circle mr-2"></i> Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <style>
 .line-clamp-2 { display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
 .line-clamp-3 { display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden; }
 @keyframes spin { to { transform: rotate(360deg); } }
-/* ── Document Preview ── */
 .doc-preview-overlay{display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1.5rem;}.doc-preview-overlay.dp-open{display:flex;}
 .doc-preview-wrapper{max-width:860px;width:100%;max-height:90vh;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.5);animation:aqModalIn 0.25s cubic-bezier(0.34,1.56,0.64,1) both;}
 .doc-preview-toolbar{background:rgba(17,24,39,.97);backdrop-filter:blur(8px);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
@@ -342,7 +350,6 @@
 .dp-ak-hd{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#9CA3AF;margin-bottom:6px;font-family:Arial,sans-serif;}
 .dp-ak-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:3px;}
 .dp-ak-item{font-size:11px;color:#374151;font-family:Arial,sans-serif;}
-/* ── DOCX-matching additions ── */
 .dp-dept{text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#4B5563;margin-bottom:6px;font-family:Arial,sans-serif;}
 .dp-part-label{font-size:13px;font-weight:900;color:#111827;font-family:Arial,sans-serif;}
 .dp-sec-instr{font-size:12px;font-style:italic;color:#4B5563;font-family:Arial,sans-serif;}
@@ -365,7 +372,6 @@ var filterType    = document.getElementById('viewFilterType');
 var filterDiff    = document.getElementById('viewFilterDiff');
 var allQuestions  = [];
 
-/* ── Open modal on "View Questions" click ── */
 function initSubadminCards() {
     document.querySelectorAll('.view-questions-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -409,7 +415,6 @@ document.getElementById('closeViewModalFooter').addEventListener('click', closeM
 modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
 document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 
-/* ── Fetch questions from the existing endpoint ── */
 function loadQuestions(qid) {
     modalList.innerHTML =
         '<div class="flex items-center justify-center py-12 text-gray-400">' +
@@ -437,7 +442,6 @@ function loadQuestions(qid) {
         });
 }
 
-/* ── Build type filter dropdown from actual data ── */
 function buildTypeFilter(questions) {
     var types = {};
     questions.forEach(function (q) { types[q.type] = q.type_display; });
@@ -448,7 +452,6 @@ function buildTypeFilter(questions) {
     filterType.innerHTML = h;
 }
 
-/* ── Filter change handlers ── */
 filterType.addEventListener('change', applyFilters);
 filterDiff.addEventListener('change', applyFilters);
 
@@ -462,7 +465,6 @@ function applyFilters() {
     renderQuestions(visible);
 }
 
-/* ── Render questions (read-only, no checkboxes) ── */
 function renderQuestions(questions) {
     if (!questions || !questions.length) {
         modalList.innerHTML =
@@ -492,7 +494,6 @@ function renderQuestions(questions) {
                 '</div>' +
                 '<p class="text-gray-800 font-medium text-sm mb-3">' + (i + 1) + '. ' + esc(q.question_text) + '</p>';
 
-        /* Multiple choice options */
         if (q.type === 'multiple_choice' && q.options && q.options.length) {
             html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-1 ml-2">';
             q.options.forEach(function (opt, idx) {
@@ -508,7 +509,6 @@ function renderQuestions(questions) {
             });
             html += '</div>';
         } else if (q.correct_answer) {
-            /* Short answer / identification / etc. */
             html +=
                 '<div class="bg-green-50 border-l-4 border-green-400 p-2 rounded text-xs mt-1">' +
                     '<span class="text-gray-500">Answer: </span>' +
@@ -522,7 +522,6 @@ function renderQuestions(questions) {
                 '</div>';
         }
 
-        /* Explanation */
         if (q.explanation) {
             html +=
                 '<div class="mt-2 p-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300">' +
@@ -530,7 +529,7 @@ function renderQuestions(questions) {
                 '</div>';
         }
 
-        html += '</div>'; /* close card */
+        html += '</div>';
     });
 
     modalList.innerHTML = html;
@@ -543,7 +542,6 @@ function updateStats(visible, pts) {
     document.getElementById('viewModalPoints').textContent  = pts;
 }
 
-/* ── HTML escape helper ── */
 function esc(s) {
     if (!s) return '';
     return String(s)
@@ -555,15 +553,12 @@ function esc(s) {
 
 })();
 
-/* ══════════════════════════════════════════════════
-   DOCUMENT PREVIEW  (exam-paper format)
-════════════════════════════════════════════════ */
+/* DOCUMENT PREVIEW */
 (function(){
 'use strict';
 var dpOverlay=document.getElementById('docPreviewModal');
 var dpPaper=document.getElementById('dpPaper');
 if(!dpOverlay||!dpPaper)return;
-/* Order matches generators.py section_config */
 var DP_TYPE_ORDER=['identification','multiple_choice','true_false','essay','fill_blank','matching','enumeration'];
 var DP_TYPE_DISPLAY={identification:'Identification',multiple_choice:'Multiple Choice',true_false:'True or False',essay:'Essay',fill_blank:'Fill in the Blanks',fill_in_the_blank:'Fill in the Blanks',matching:'Matching Type',enumeration:'Enumeration'};
 var DP_INSTRUCTIONS={identification:'Read carefully and identify what is being asked.',multiple_choice:'Write the CAPITAL LETTER of the best response.',true_false:'Write TRUE if the statement is correct, otherwise write FALSE.',essay:'Answer the following questions comprehensively.',fill_blank:'Complete the following statements.',fill_in_the_blank:'Complete the following statements.',matching:'Match the items in Column A with their correct description in Column B. Write the letter of your answer in the blank provided.',enumeration:'List all the correct items being asked in each question.'};
@@ -623,7 +618,6 @@ function renderDP(data,titleOverride,subjectOverride,examTypeOverride){
     var subject=subjectOverride||data.questionnaire_subject||'';
     var examType=examTypeOverride||data.exam_type_display||'';
     var department=data.department||'';
-    /* Merge fill_in_the_blank into fill_blank so they form one section */
     var groups={};
     questions.forEach(function(q){
         var t=q.type==='fill_in_the_blank'?'fill_blank':q.type;
@@ -652,7 +646,6 @@ function renderDP(data,titleOverride,subjectOverride,examTypeOverride){
         var displayName=DP_TYPE_DISPLAY[type]||type;
         var instruction=DP_INSTRUCTIONS[type]||'';
         html+='<div class="dp-section">';
-        /* Format matches generators.py: "PART 1. Multiple Choice. Write the CAPITAL LETTER..." */
         html+='<div class="dp-sec-head">';
         html+='<span class="dp-part-label">PART '+partNum+'.&nbsp;</span>';
         html+='<span class="dp-sec-title">'+dpEsc(displayName)+'.&nbsp;</span>';
@@ -699,14 +692,11 @@ function renderDPQ(q,num,type){
         }
         html+='</div>';
     }else if(type==='true_false'){
-        /* DOCX format: ________ N. question_text */
         html='<div class="dp-q"><span class="dp-tf-pre">________&nbsp;</span><span class="dp-qn">'+num+'.</span>&nbsp;'+dpEsc(q.question_text)+'</div>';
     }else if(type==='identification'||type==='fill_blank'||type==='fill_in_the_blank'){
-        /* DOCX format: N. question_text  then "Answer: ____" on next line */
         html='<div class="dp-q"><span class="dp-qn">'+num+'.</span>&nbsp;'+dpEsc(q.question_text)+'</div>';
         html+='<div class="dp-q-ans">Answer:&nbsp;<span class="dp-ans-blank">________________________</span></div>';
     }else if(type==='matching'){
-        /* DOCX format: 3-col table \u2014 Ans. | Column A | Column B */
         html='<div class="dp-match-section">';
         if(q.column_a&&q.column_a.length&&q.column_b&&q.column_b.length){
             html+='<div class="dp-match-grid3">';
@@ -729,7 +719,6 @@ function renderDPQ(q,num,type){
         html+='</div>';
     }else if(type==='enumeration'){
         html='<div class="dp-q"><span class="dp-qn">'+num+'.</span>&nbsp;'+dpEsc(q.question_text)+'</div>';
-        /* Determine number of blank lines from the correct_answer list */
         var raw=q.correct_answer||'';
         var enumItems=raw.split('\n').map(function(s){return s.trim();}).filter(Boolean);
         if(enumItems.length<=1)enumItems=raw.split(',').map(function(s){return s.trim();}).filter(Boolean);
@@ -746,55 +735,8 @@ function renderDPQ(q,num,type){
 }
 
 })();
-</script>
 
-<!-- ══════════════════════════════════════════════════════
-     ARCHIVE CONFIRMATION MODAL
-═══════════════════════════════════════════════════════ -->
-<style>
-.sa-modal-overlay{display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1rem;overflow-y:auto;}
-.sa-modal-overlay.is-open{display:flex !important;}
-.sa-modal-panel{position:relative;background:#fff;border-radius:1rem;box-shadow:0 25px 60px rgba(0,0,0,0.3);width:100%;max-width:520px;animation:saModalIn 0.25s cubic-bezier(0.34,1.56,0.64,1) both;}
-@keyframes saModalIn{from{opacity:0;transform:scale(0.92) translateY(-16px);}to{opacity:1;transform:scale(1) translateY(0);}}
-</style>
-
-<div id="saArchiveModal" class="sa-modal-overlay" onclick="if(event.target===this)closeArchiveModal()">
-    <div class="sa-modal-panel" style="border:2px solid #d1d5db;">
-        <div class="bg-gradient-to-r from-gray-600 to-gray-700 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-            <h2 class="text-xl font-bold text-white flex items-center">
-                <i class="bi bi-archive-fill text-2xl mr-3"></i> Archive Questionnaire
-            </h2>
-            <button onclick="closeArchiveModal()" class="text-white/80 hover:text-white transition-colors text-xl">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
-        <div class="p-6">
-            <p class="text-lg text-gray-700 mb-5 font-semibold">Archive this questionnaire?</p>
-            <div class="bg-gray-50 rounded-xl p-5 mb-5 border-l-4 border-gray-500 space-y-3">
-                <div class="flex items-center"><i class="bi bi-card-heading text-gray-500 text-xl mr-3"></i><div><p class="text-xs text-gray-500">Title</p><p id="saArchiveTitle" class="font-bold text-gray-800"></p></div></div>
-                <div class="flex items-center"><i class="bi bi-building text-gray-500 text-xl mr-3"></i><div><p class="text-xs text-gray-500">Department</p><p id="saArchiveDepartment" class="text-gray-700"></p></div></div>
-                <div class="flex items-center"><i class="bi bi-book text-gray-500 text-xl mr-3"></i><div><p class="text-xs text-gray-500">Subject</p><p id="saArchiveSubject" class="text-gray-700"></p></div></div>
-                <div class="flex items-center"><i class="bi bi-file-earmark text-gray-500 text-xl mr-3"></i><div><p class="text-xs text-gray-500">File</p><p id="saArchiveFileInfo" class="text-gray-700"></p></div></div>
-                <div class="flex items-center"><i class="bi bi-calendar text-gray-500 text-xl mr-3"></i><div><p class="text-xs text-gray-500">Uploaded</p><p id="saArchiveUploadedAt" class="text-gray-700"></p></div></div>
-            </div>
-            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-5 rounded-lg flex items-start">
-                <i class="bi bi-info-circle-fill text-yellow-500 text-2xl mr-3 mt-0.5"></i>
-                <div><p class="font-bold text-yellow-800 mb-1">This questionnaire will be hidden from the list.</p><p class="text-sm text-yellow-700">Only the admin can restore it from the Archived section.</p></div>
-            </div>
-            <div class="flex space-x-3">
-                <button type="button" id="saArchiveConfirmBtn" onclick="confirmArchive()"
-                    class="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-bold py-3 px-6 rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all shadow-lg">
-                    <i class="bi bi-archive-fill mr-2"></i> Yes, Archive
-                </button>
-                <button type="button" onclick="closeArchiveModal()" class="flex-1 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-bold py-3 px-6 rounded-lg transition-all">
-                    <i class="bi bi-x-circle mr-2"></i> Cancel
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
+/* ARCHIVE MODAL FUNCTIONS */
 (function () {
 'use strict';
 var _archivePk = null;
@@ -822,7 +764,6 @@ window.confirmArchive = function () {
     var btn = document.getElementById('saArchiveConfirmBtn');
     if (btn) { btn.disabled = true; btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Archiving…'; }
 
-    /* Read CSRF from cookie (Django default) or DOM input as fallback */
     function getCookie(name) {
         var v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
         return v ? v.pop() : '';
@@ -841,7 +782,12 @@ window.confirmArchive = function () {
     .then(function (data) {
         if (data.success) {
             closeArchiveModal();
-            window.location.reload();
+            // Reload the current view (active or archived)
+            if (typeof loadArchivedPage !== 'undefined') {
+                loadArchivedPage(1, window.currentTab === 'archived');
+            } else {
+                window.location.reload();
+            }
         } else {
             alert(data.error || 'Failed to archive questionnaire.');
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-archive-fill mr-2"></i> Yes, Archive'; }
@@ -853,5 +799,222 @@ window.confirmArchive = function () {
     });
 };
 })();
+
+/* TAB SWITCHING AND ARCHIVE MANAGEMENT */
+(function () {
+let currentTab = 'active';
+
+window.currentTab = currentTab;
+
+window.switchArchiveTab = function(tab) {
+    currentTab = tab;
+    const activeBtn = document.getElementById('activeTabBtn');
+    const archivedBtn = document.getElementById('archivedTabBtn');
+    
+    if (tab === 'active') {
+        activeBtn.className = 'flex-1 px-6 py-3 text-center font-semibold transition-all bg-white text-purple-600 border-b-2 border-purple-600';
+        archivedBtn.className = 'flex-1 px-6 py-3 text-center font-semibold transition-all bg-gray-50 text-gray-500 hover:text-gray-700';
+        loadArchivedPage(1, false);
+    } else {
+        archivedBtn.className = 'flex-1 px-6 py-3 text-center font-semibold transition-all bg-white text-purple-600 border-b-2 border-purple-600';
+        activeBtn.className = 'flex-1 px-6 py-3 text-center font-semibold transition-all bg-gray-50 text-gray-500 hover:text-gray-700';
+        loadArchivedPage(1, true);
+    }
+};
+
+window.loadArchivedPage = function(page, showArchived) {
+    const container = document.getElementById('results-container');
+    if (!container) return;
+    
+    container.style.opacity = '0.4';
+    container.style.pointerEvents = 'none';
+    
+    // Get current filter params from the form
+    const filterForm = document.getElementById('filterForm');
+    let params = new URLSearchParams();
+    if (filterForm) {
+        const formData = new FormData(filterForm);
+        for (let [key, value] of formData.entries()) {
+            if (value) params.append(key, value);
+        }
+    }
+    params.append('archived', showArchived);
+    params.append('page', page);
+    
+    fetch(window.location.pathname + '?' + params.toString(), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.text())
+    .then(html => {
+        container.innerHTML = html;
+        container.style.opacity = '';
+        container.style.pointerEvents = '';
+        
+        if (showArchived) {
+            initArchiveCards();
+        } else {
+            if (window.initSubadminCards) window.initSubadminCards();
+            if (window.initSubadminDocPreview) window.initSubadminDocPreview();
+        }
+    })
+    .catch(() => {
+        container.style.opacity = '';
+        container.style.pointerEvents = '';
+    });
+};
+
+window.initArchiveCards = function() {
+    // Restore buttons
+    document.querySelectorAll('.restore-btn').forEach(btn => {
+        btn.removeEventListener('click', btn._restoreHandler);
+        btn._restoreHandler = function() { restoreQuestionnaire(this.getAttribute('data-quest-id')); };
+        btn.addEventListener('click', btn._restoreHandler);
+    });
+    // Permanent delete buttons
+    document.querySelectorAll('.permanent-delete-btn').forEach(btn => {
+        btn.removeEventListener('click', btn._deleteHandler);
+        btn._deleteHandler = function() {
+            const pk = this.getAttribute('data-quest-id');
+            const title = this.getAttribute('data-quest-title');
+            openPermanentDeleteModal(pk, title);
+        };
+        btn.addEventListener('click', btn._deleteHandler);
+    });
+};
+
+window.restoreQuestionnaire = function(pk) {
+    if (!confirm('Restore this questionnaire? It will reappear in the active list.')) return;
+    
+    fetch('/accounts/subadmin/questionnaires/' + pk + '/restore/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Questionnaire restored successfully!', 'success');
+            loadArchivedPage(1, true);
+            updateArchiveCount();
+        } else {
+            showToast(data.error || 'Failed to restore.', 'error');
+        }
+    })
+    .catch(() => showToast('Network error.', 'error'));
+};
+
+window.openPermanentDeleteModal = function(pk, title) {
+    const modal = document.getElementById('saPermanentDeleteModal');
+    if (!modal) return;
+    
+    document.getElementById('saPermanentDeleteTitle').textContent = title;
+    const confirmBtn = document.getElementById('saPermanentDeleteConfirm');
+    confirmBtn.onclick = () => permanentDeleteQuestionnaire(pk);
+    modal.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+};
+
+window.closePermanentDeleteModal = function() {
+    const modal = document.getElementById('saPermanentDeleteModal');
+    if (modal) {
+        modal.classList.remove('is-open');
+        document.body.style.overflow = '';
+    }
+};
+
+window.permanentDeleteQuestionnaire = function(pk) {
+    closePermanentDeleteModal();
+    
+    fetch('/accounts/subadmin/questionnaires/' + pk + '/permanent-delete/', {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Questionnaire permanently deleted.', 'success');
+            loadArchivedPage(1, true);
+            updateArchiveCount();
+        } else {
+            showToast(data.error || 'Failed to delete.', 'error');
+        }
+    })
+    .catch(() => showToast('Network error.', 'error'));
+};
+
+window.updateArchiveCount = function() {
+    fetch('/accounts/subadmin/archive-count/')
+        .then(r => r.json())
+        .then(data => {
+            const badge = document.getElementById('archivedCountBadge');
+            if (badge) badge.textContent = data.count || 0;
+        })
+        .catch(() => {});
+};
+
+function getCookie(name) {
+    let v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return v ? v.pop() : '';
+}
+
+function showToast(message, type) {
+    const colors = { success: 'bg-green-500', info: 'bg-blue-500', warning: 'bg-amber-500', error: 'bg-red-500' };
+    const icons = { success: 'bi-check-circle-fill', info: 'bi-info-circle-fill', warning: 'bi-exclamation-triangle-fill', error: 'bi-x-circle-fill' };
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-6 right-6 z-[99999] flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl text-white font-semibold text-sm transition-all duration-300 opacity-0 translate-y-4 ${colors[type] || colors.info}`;
+    toast.innerHTML = `<i class="bi ${icons[type] || icons.info} text-lg"></i><span>${message}</span>`;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            toast.classList.remove('opacity-0', 'translate-y-4');
+        });
+    });
+    setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-4');
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+}
+
+// Initial load
+updateArchiveCount();
+})();
+
+// Intercept filter form submission for AJAX
+(function() {
+    const filterForm = document.getElementById('filterForm');
+    if (filterForm) {
+        filterForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const params = new URLSearchParams(new FormData(filterForm));
+            const isArchived = window.currentTab === 'archived';
+            params.append('archived', isArchived);
+            params.append('page', '1');
+            
+            fetch(window.location.pathname + '?' + params.toString(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.text())
+            .then(html => {
+                const container = document.getElementById('results-container');
+                if (container) {
+                    container.innerHTML = html;
+                    if (isArchived) {
+                        if (window.initArchiveCards) window.initArchiveCards();
+                    } else {
+                        if (window.initSubadminCards) window.initSubadminCards();
+                        if (window.initSubadminDocPreview) window.initSubadminDocPreview();
+                    }
+                }
+                history.pushState(null, '', window.location.pathname + '?' + params.toString());
+            });
+        });
+    }
+})();
 </script>
+
 {% endblock %}
