@@ -4,6 +4,11 @@
 
 from django.urls import path
 from . import views
+from questionnaires.views import (
+    subadmin_restore_questionnaire,
+    subadmin_permanent_delete_questionnaire,
+    subadmin_archive_count,
+)
 
 app_name = 'accounts'
 
@@ -146,4 +151,8 @@ urlpatterns = [
 
     # ── AJAX helpers ─────────────────────────────────────────────────────────
     path('ajax/subjects-by-dept/', views.get_subjects_by_department, name='get_subjects_by_department'),
+    path('subadmin/questionnaires/<int:pk>/restore/', subadmin_restore_questionnaire, name='subadmin_restore_questionnaire'),
+    path('subadmin/questionnaires/<int:pk>/permanent-delete/', subadmin_permanent_delete_questionnaire, name='subadmin_permanent_delete_questionnaire'),
+    path('subadmin/archive-count/', subadmin_archive_count, name='subadmin_archive_count'),
+    
 ]

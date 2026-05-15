@@ -2133,14 +2133,25 @@ def subadmin_browse_questionnaires(request):
     from django.core.paginator import Paginator
 
     department = request.user.subadmin_profile.department
+    
+    # Check if showing archived
+    show_archived = request.GET.get('archived', 'false').lower() == 'true'
 
-    questionnaires = Questionnaire.objects.filter(
-        uploader__department=department,
-        is_extracted=True,
-        extraction_status='completed',
-        is_archived=False,
-    ).select_related('subject', 'uploader__user', 'department')
-
+    # Base queryset - include archived based on parameter
+    if show_archived:
+        # Show archived questionnaires (no extraction filters needed)
+        questionnaires = Questionnaire.objects.filter(
+            uploader__department=department,
+            is_archived=True,
+        ).select_related('subject', 'uploader__user', 'department')
+    else:
+        # Show active questionnaires
+        questionnaires = Questionnaire.objects.filter(
+            uploader__department=department,
+            is_extracted=True,
+            extraction_status='completed',
+            is_archived=False,
+        ).select_related('subject', 'uploader__user', 'department')
 
     subjects = Subject.objects.filter(departments=department).order_by('code')
     teachers = TeacherProfile.objects.filter(
@@ -2165,7 +2176,8 @@ def subadmin_browse_questionnaires(request):
         questionnaires = questionnaires.filter(semester=selected_semester)
     if selected_school_year:
         questionnaires = questionnaires.filter(school_year=selected_school_year)
-    if selected_question_type:
+    if selected_question_type and not show_archived:
+        # Only apply question type filter for active questionnaires
         questionnaires = questionnaires.filter(
             extracted_questions__question_type__name=selected_question_type
         ).distinct()
@@ -2177,15 +2189,26 @@ def subadmin_browse_questionnaires(request):
             Q(subject__code__icontains=search_query)
         )
 
-    school_year_options = list(
-        Questionnaire.objects.filter(
-            uploader__department=department,
-            is_extracted=True,
-            extraction_status='completed',
-            is_archived=False,
-            school_year__gt=''
-        ).values_list('school_year', flat=True).distinct().order_by('-school_year')
-    )
+    # School year options - based on active or archived status
+    if not show_archived:
+        school_year_options = list(
+            Questionnaire.objects.filter(
+                uploader__department=department,
+                is_extracted=True,
+                extraction_status='completed',
+                is_archived=False,
+                school_year__gt=''
+            ).values_list('school_year', flat=True).distinct().order_by('-school_year')
+        )
+    else:
+        school_year_options = list(
+            Questionnaire.objects.filter(
+                uploader__department=department,
+                is_archived=True,
+                school_year__gt=''
+            ).values_list('school_year', flat=True).distinct().order_by('-school_year')
+        )
+    
     paginator   = Paginator(questionnaires, 9)
     page_number = request.GET.get('page', 1)
     page_obj    = paginator.get_page(page_number)
@@ -2214,7 +2237,9 @@ def subadmin_browse_questionnaires(request):
             ('enumeration',     'Enumeration'),
         ],
         'selected_question_type': selected_question_type,
+        'is_archived': show_archived,  # Add this to context for the template
     }
+    
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'subadmin_dashboard/browse_questionnaires_partial.html', context)
     return render(request, 'subadmin_dashboard/browse_questionnaires.html', context)
