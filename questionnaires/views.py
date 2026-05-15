@@ -2056,3 +2056,56 @@ def get_subject_curriculum_info(request):
         'semester':   sem_map.get(entry.semester, ''),
         'year_level': entry.year_level,
     })
+    
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+
+def subadmin_restore_questionnaire(request, pk):
+    """Restore an archived questionnaire"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Not authenticated'}, status=401)
+    
+    try:
+        subadmin = request.user.subadmin_profile
+        questionnaire = get_object_or_404(Questionnaire, pk=pk, department=subadmin.department, is_archived=True)
+        questionnaire.is_archived = False
+        questionnaire.save()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+def subadmin_permanent_delete_questionnaire(request, pk):
+    """Permanently delete a questionnaire and its questions"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Not authenticated'}, status=401)
+    
+    if request.method != 'DELETE':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        subadmin = request.user.subadmin_profile
+        questionnaire = get_object_or_404(Questionnaire, pk=pk, department=subadmin.department, is_archived=True)
+        
+        # Delete related questions first
+        questionnaire.extracted_questions.all().delete()
+        # Delete the questionnaire
+        questionnaire.delete()
+        
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+def subadmin_archive_count(request):
+    """Get count of archived questionnaires for the subadmin's department"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'count': 0})
+    
+    try:
+        subadmin = request.user.subadmin_profile
+        count = Questionnaire.objects.filter(
+            department=subadmin.department,
+            is_archived=True
+        ).count()
+        return JsonResponse({'count': count})
+    except:
+        return JsonResponse({'count': 0})

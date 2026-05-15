@@ -68,4 +68,8 @@ urlpatterns = [
     path('workspace/folders/<int:folder_id>/remove-question/<int:question_id>/',
          views.workspace_remove_question,  name='workspace_remove_question'),
     path('ajax/subject-curriculum-info/', views.get_subject_curriculum_info, name='subject_curriculum_info'),
+    # Subadmin URLs
+path('subadmin/questionnaires/<int:pk>/restore/', views.subadmin_restore_questionnaire, name='subadmin_restore_questionnaire'),
+path('subadmin/questionnaires/<int:pk>/permanent-delete/', views.subadmin_permanent_delete_questionnaire, name='subadmin_permanent_delete_questionnaire'),
+path('subadmin/archive-count/', views.subadmin_archive_count, name='subadmin_archive_count'),
 ]
