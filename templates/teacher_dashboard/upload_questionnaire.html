@@ -116,7 +116,19 @@
                     </div>
 
                 </div>
-
+                <!-- Curriculum Tag -->
+                <div id="curriculumPickerWrapper" class="hidden">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="bi bi-journal-bookmark-fill text-indigo-500 mr-1"></i> Curriculum Version
+                    </label>
+                    <select name="curriculum_id" id="id_curriculum_id"
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors">
+                        <option value="">-- Select Curriculum --</option>
+                    </select>
+                    <p class="text-xs text-gray-400 mt-1">
+                        Tag this questionnaire to a specific curriculum version so others can filter by it.
+                    </p>
+                </div>
                 <!-- Term + Sub-category -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
@@ -480,14 +492,17 @@
 
     function autoFillSemester(subjectId) {
         if (!subjectId) return;
-        var semSelect = document.getElementById('id_semester');
-        var infoEl    = document.getElementById('curriculumYearInfo');
-
+        var semSelect        = document.getElementById('id_semester');
+        var infoEl           = document.getElementById('curriculumYearInfo');
+        var curWrapper       = document.getElementById('curriculumPickerWrapper');
+        var curSelect        = document.getElementById('id_curriculum_id');
+    
         fetch('/questionnaires/ajax/subject-curriculum-info/?subject_id=' + subjectId, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
+            // ── Semester auto-fill ──
             if (data.found) {
                 if (semSelect && data.semester) {
                     semSelect.value = data.semester;
@@ -498,11 +513,32 @@
                     infoEl.textContent = 'Auto-detected: ' + yearLabels[data.year_level] + ', ' + data.semester + ' Semester';
                     infoEl.classList.remove('hidden');
                 }
+    
+                // ── Curriculum picker ──
+                if (data.curricula && data.curricula.length > 0 && curWrapper && curSelect) {
+                    curSelect.innerHTML = '<option value="">-- No tag (unlinked) --</option>';
+                    data.curricula.forEach(function(cur) {
+                        var opt = document.createElement('option');
+                        opt.value = cur.id;
+                        opt.textContent = cur.label;
+                        // Pre-select the active curriculum
+                        if (cur.is_active) opt.selected = true;
+                        curSelect.appendChild(opt);
+                    });
+                    curWrapper.classList.remove('hidden');
+                } else {
+                    if (curWrapper) curWrapper.classList.add('hidden');
+                    if (curSelect)  curSelect.innerHTML = '<option value="">-- Select Curriculum --</option>';
+                }
             } else {
-                if (infoEl) infoEl.classList.add('hidden');
+                if (infoEl)    infoEl.classList.add('hidden');
+                if (curWrapper) curWrapper.classList.add('hidden');
+                if (curSelect)  curSelect.innerHTML = '<option value="">-- Select Curriculum --</option>';
             }
         })
-        .catch(function() { /* silently ignore */ });
+        .catch(function() {
+            if (curWrapper) curWrapper.classList.add('hidden');
+        });
     }
 
     // ── File input + preview + clear button ─────────────────────────────────

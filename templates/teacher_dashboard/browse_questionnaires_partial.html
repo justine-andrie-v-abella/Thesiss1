@@ -51,7 +51,14 @@
         class="ml-1 hover:opacity-75 chip-clear"><i class="bi bi-x-lg text-xs"></i></a>
     </span>
     {% endif %}
-
+    {% if selected_curriculum_id %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-600 text-white">
+        <i class="bi bi-journal-bookmark-fill"></i>
+        {% for cur in curriculum_options %}{% if cur.id|stringformat:"s" == selected_curriculum_id %}{{ cur.code }}{% endif %}{% endfor %}
+        <a href="?{% if selected_subject %}subject={{ selected_subject }}&{% endif %}{% if exam_type %}exam_type={{ exam_type }}&{% endif %}{% if selected_school_year %}school_year={{ selected_school_year }}&{% endif %}{% if selected_semester %}semester={{ selected_semester }}&{% endif %}{% if selected_year_level %}year_level={{ selected_year_level }}&{% endif %}{% if selected_question_type %}question_type={{ selected_question_type }}&{% endif %}{% if search_query %}search={{ search_query }}{% endif %}"
+        class="ml-1 hover:opacity-75 chip-clear"><i class="bi bi-x-lg text-xs"></i></a>
+    </span>
+    {% endif %}
     {% if selected_question_type %}
     <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-pink-600 text-white">
         <i class="bi bi-list-check"></i>
@@ -170,6 +177,27 @@
                         <i class="bi bi-mortarboard mr-1"></i> {{ quest.get_year_level_display }}
                     </span>
                     {% endif %}
+                </div>
+                {% endif %}
+                {% if quest.curriculum %}
+                <div class="flex items-center gap-2 pt-1">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
+                        {% if quest.curriculum.is_active %}
+                            bg-indigo-100 text-indigo-800
+                        {% elif quest.curriculum.is_draft %}
+                            bg-amber-100 text-amber-800
+                        {% else %}
+                            bg-gray-100 text-gray-600
+                        {% endif %}">
+                        <i class="bi bi-journal-bookmark-fill mr-1"></i>
+                        {{ quest.curriculum.code }}
+                        <span class="ml-1 opacity-60 font-normal">{{ quest.curriculum.school_year }}</span>
+                        {% if quest.curriculum.is_active %}
+                        <span class="ml-1.5 w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>
+                        {% elif quest.curriculum.is_draft %}
+                        <span class="ml-1.5 text-amber-500" style="font-size:9px;">Draft</span>
+                        {% endif %}
+                    </span>
                 </div>
                 {% endif %}
                 <div class="flex items-center text-sm">
