@@ -42,9 +42,13 @@ class QuestionnaireUploadForm(forms.ModelForm):
         }),
     )
 
+    # Semester is now auto-detected from the curriculum via JS.
+    # It arrives as a hidden input value, not a user-facing dropdown.
+    # We keep required=False here so Django doesn't reject the form if
+    # the subject has no curriculum entry; the view falls back gracefully.
     semester = forms.ChoiceField(
         choices=[('', '-- Select Semester --')] + Questionnaire.SEMESTER_CHOICES,
-        required=True,
+        required=False,
         label="Semester",
         widget=forms.Select(attrs={
             'id': 'id_semester',
@@ -81,13 +85,11 @@ class QuestionnaireUploadForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         if self.user and hasattr(self.user, 'teacher_profile'):
-            teacher = self.user.teacher_profile
+            teacher  = self.user.teacher_profile
             assigned = teacher.subjects.all()
             if assigned.exists():
-                # Only show the subjects explicitly assigned to this teacher
                 self.fields['subject'].queryset = assigned
             else:
-                # Fall back to all subjects in their department if none are assigned yet
                 self.fields['subject'].queryset = Subject.objects.filter(
                     departments=teacher.department
                 )
@@ -102,8 +104,8 @@ class QuestionnaireUploadForm(forms.ModelForm):
         return value
 
     def clean_sub_category(self):
-        value    = self.cleaned_data.get('sub_category')
-        term     = self.cleaned_data.get('exam_type')
+        value = self.cleaned_data.get('sub_category')
+        term  = self.cleaned_data.get('exam_type')
         if not value:
             raise forms.ValidationError('Please select a sub-category.')
         allowed = Questionnaire.TERM_SUB_CATEGORIES.get(term, [])
@@ -113,11 +115,13 @@ class QuestionnaireUploadForm(forms.ModelForm):
 
     def clean_semester(self):
         value = self.cleaned_data.get('semester')
-        if not value:
-            raise forms.ValidationError('Please select a semester.')
-        valid = [k for k, _ in Questionnaire.SEMESTER_CHOICES]
-        if value not in valid:
-            raise forms.ValidationError('Invalid semester selected.')
+        # Semester is auto-filled by JS from the curriculum.
+        # If the subject has no curriculum entry the field may be blank —
+        # the view will handle that gracefully, so we only validate when present.
+        if value:
+            valid = [k for k, _ in Questionnaire.SEMESTER_CHOICES]
+            if value not in valid:
+                raise forms.ValidationError('Invalid semester value.')
         return value
 
     def clean_file(self):

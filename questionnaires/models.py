@@ -27,17 +27,17 @@ class Questionnaire(models.Model):
     ]
 
     SUB_CATEGORY_CHOICES = [
-        ('short_quiz',  'Short Quiz'),
-        ('long_quiz',   'Long Quiz'),
-        ('prelim',      'Prelim'),
-        ('semi_final',  'Semi-Final'),
-        ('final_exam',  'Final Exam'),
+        ('short_quiz',   'Short Quiz'),
+        ('long_quiz',    'Long Quiz'),
+        ('prelim',       'Prelim'),
+        ('semi_final',   'Semi-Final'),
+        ('midterm_exam', 'Midterm Exam'),   # ← new (replaces 'final_exam' in midterm)
+        ('final_exam',   'Final Exam'),
     ]
-
-    # Which sub-categories belong to which term (used in validation + JS).
+ 
     TERM_SUB_CATEGORIES = {
-        'midterm':    ['short_quiz', 'long_quiz', 'prelim',     'final_exam'],
-        'final_term': ['short_quiz', 'long_quiz', 'semi_final', 'final_exam'],
+        'midterm':    ['short_quiz', 'long_quiz', 'prelim',      'midterm_exam'],
+        'final_term': ['short_quiz', 'long_quiz', 'semi_final',  'final_exam'],
     }
 
     SEMESTER_CHOICES = [
