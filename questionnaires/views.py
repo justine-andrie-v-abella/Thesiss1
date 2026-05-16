@@ -2076,8 +2076,8 @@ def workspace_list_folders(request):
 @login_required
 def get_subject_curriculum_info(request):
     """
-    Return semester, year_level, AND all curriculum versions for a subject.
-    Called by the upload form JS when the teacher picks a subject.
+    Return semester, year_level, and ONLY the curriculum versions
+    that actually contain this subject.
     """
     subject_id = request.GET.get('subject_id')
     if not subject_id:
@@ -2085,53 +2085,60 @@ def get_subject_curriculum_info(request):
  
     from accounts.models import ProgramCurriculum, Curriculum
  
-    # Find the latest active curriculum entry for this subject
-    entry = (
+    # Get ALL curriculum entries for this subject (one subject can appear
+    # in multiple curriculum versions of the same program)
+    entries = (
         ProgramCurriculum.objects
         .filter(subject_id=subject_id)
         .select_related('curriculum')
         .order_by('-curriculum__created_at')
-        .first()
     )
  
-    if not entry:
+    if not entries.exists():
         return JsonResponse({'found': False})
  
-    # All curriculum versions that contain this subject's program
-    program = entry.program
-    curricula = (
-        Curriculum.objects
-        .filter(program=program)
-        .order_by('-created_at')
-        .values('id', 'code', 'school_year', 'is_active', 'is_draft')
-    )
+    # Use the most recent entry for semester / year_level
+    latest_entry = entries.first()
  
+    # Build the curricula list from ONLY the entries that contain this subject
     curricula_list = []
-    active_id = None
-    for cur in curricula:
-        label = cur['code'] + ' (' + cur['school_year'] + ')'
-        if cur['is_active']:
+    for entry in entries:
+        cur = entry.curriculum
+        if cur is None:
+            continue
+        label = cur.code + ' (' + cur.school_year + ')'
+        if cur.is_active:
             label += ' — Latest'
-            active_id = cur['id']
-        elif cur['is_draft']:
+        elif cur.is_draft:
             label += ' — Draft'
         else:
             label += ' — Archived'
         curricula_list.append({
-            'id':         cur['id'],
-            'label':      label,
-            'is_active':  cur['is_active'],
-            'is_draft':   cur['is_draft'],
+            'id':        cur.id,
+            'label':     label,
+            'is_active': cur.is_active,
+            'is_draft':  cur.is_draft,
         })
+ 
+    # Remove duplicates (same curriculum id) while preserving order
+    seen = set()
+    unique_curricula = []
+    for cur in curricula_list:
+        if cur['id'] not in seen:
+            seen.add(cur['id'])
+            unique_curricula.append(cur)
  
     sem_map = {1: '1st', 2: '2nd'}
     return JsonResponse({
-        'found':       True,
-        'semester':    sem_map.get(entry.semester, ''),
-        'year_level':  entry.year_level,
-        'curricula':   curricula_list,
-        'active_id':   active_id,
+        'found':      True,
+        'semester':   sem_map.get(latest_entry.semester, ''),
+        'year_level': latest_entry.year_level,
+        'curricula':  unique_curricula,
+        'active_id':  next(
+            (c['id'] for c in unique_curricula if c['is_active']), None
+        ),
     })
+ 
     
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
