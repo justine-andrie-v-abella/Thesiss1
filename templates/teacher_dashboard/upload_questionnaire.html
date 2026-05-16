@@ -16,7 +16,6 @@
                 Upload Questionnaire
             </h2>
             <div class="flex items-center gap-3">
-                <!-- Step Indicator -->
                 <div class="flex items-center gap-2 text-white text-sm">
                     <span class="w-7 h-7 rounded-full bg-white text-blue-600 font-bold flex items-center justify-center text-xs">1</span>
                     <span class="opacity-70">→</span>
@@ -62,7 +61,7 @@
                         placeholder="Brief description of this questionnaire...">{{ form.description.value|default:'' }}</textarea>
                 </div>
 
-                <!-- Subject — auto-filtered to teacher's department -->
+                <!-- Subject -->
                 <div>
                     <label for="id_subject" class="block text-sm font-semibold text-gray-700 mb-2">
                         <i class="bi bi-book text-purple-500 mr-1"></i> Subject *
@@ -71,18 +70,16 @@
                     {% if form.subject.errors %}
                         <p class="text-red-500 text-sm mt-1">{{ form.subject.errors.0 }}</p>
                     {% endif %}
-
-                    <!-- Auto-assigned department notice -->
                     <div class="mt-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                         <i class="bi bi-building text-blue-500 text-sm flex-shrink-0"></i>
                         <p class="text-xs text-blue-700">
                             <strong>Department auto-assigned:</strong> The questionnaire will be tagged to your department
-                            (<strong>{{ request.user.teacher.department.code }}</strong>) based on the subject you choose.
+                            (<strong>{{ request.user.teacher_profile.department.code }}</strong>) based on the subject you choose.
                         </p>
                     </div>
                 </div>
 
-                <!-- School Year + Semester row -->
+                <!-- School Year + Semester row — both auto-detected -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                     <!-- School Year (auto-detected, read-only) -->
@@ -98,17 +95,24 @@
                         <p class="text-xs text-gray-400 mt-1">Based on the current date (June–May cycle)</p>
                     </div>
 
-                    <!-- Semester -->
+                    <!-- Semester (auto-detected from curriculum, read-only display) -->
                     <div>
-                        <label for="id_semester" class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="bi bi-calendar3 text-blue-500 mr-1"></i> Semester *
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="bi bi-calendar3 text-blue-500 mr-1"></i> Semester
                         </label>
-                        <select name="semester" id="id_semester" required onchange="checkUploadBtn()"
-                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors">
-                            <option value="" disabled {% if not form.semester.value %}selected{% endif %}>-- Select Semester --</option>
-                            <option value="1st" {% if form.semester.value == '1st' %}selected{% endif %}>1st Semester</option>
-                            <option value="2nd" {% if form.semester.value == '2nd' %}selected{% endif %}>2nd Semester</option>
-                        </select>
+                        <!-- Hidden input that actually submits the value -->
+                        <input type="hidden" name="semester" id="id_semester_hidden" value="{{ form.semester.value|default:'' }}">
+                        <!-- Read-only display box — updated by JS -->
+                        <div id="semesterDisplay"
+                            class="flex items-center gap-2 px-4 py-3 bg-blue-50 border-2 border-blue-200 rounded-lg min-h-[50px]">
+                            <i class="bi bi-calendar3 text-blue-500 text-lg"></i>
+                            <span id="semesterDisplayText" class="font-bold text-blue-800 text-base tracking-wide">
+                                {% if form.semester.value == '1st' %}1st Semester
+                                {% elif form.semester.value == '2nd' %}2nd Semester
+                                {% else %}— select a subject first —{% endif %}
+                            </span>
+                            <span class="text-xs text-blue-400 ml-auto">auto-detected</span>
+                        </div>
                         <p id="curriculumYearInfo" class="hidden mt-1 text-xs font-semibold text-indigo-600"></p>
                         {% if form.semester.errors %}
                             <p class="text-red-500 text-sm mt-1"><i class="bi bi-exclamation-circle mr-1"></i>{{ form.semester.errors.0 }}</p>
@@ -116,19 +120,22 @@
                     </div>
 
                 </div>
-                <!-- Curriculum Tag -->
+
+                <!-- Curriculum Tag (hidden until subject chosen) -->
                 <div id="curriculumPickerWrapper" class="hidden">
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         <i class="bi bi-journal-bookmark-fill text-indigo-500 mr-1"></i> Curriculum Version
                     </label>
                     <select name="curriculum_id" id="id_curriculum_id"
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors">
-                        <option value="">-- Select Curriculum --</option>
+                        <option value="">-- No tag (unlinked) --</option>
                     </select>
                     <p class="text-xs text-gray-400 mt-1">
                         Tag this questionnaire to a specific curriculum version so others can filter by it.
+                        The latest curriculum is pre-selected.
                     </p>
                 </div>
+
                 <!-- Term + Sub-category -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
@@ -158,12 +165,13 @@
                             onchange="updateBadgePreview(); checkUploadBtn();"
                             class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-400 transition-colors">
                             <option value="">-- Select Sub-category --</option>
-                            {% comment %}Options are populated by JS; on re-render keep server value{% endcomment %}
-                            <option value="short_quiz"  {% if form.sub_category.value == 'short_quiz'  %}selected{% endif %}>Short Quiz</option>
-                            <option value="long_quiz"   {% if form.sub_category.value == 'long_quiz'   %}selected{% endif %}>Long Quiz</option>
-                            <option value="prelim"      {% if form.sub_category.value == 'prelim'      %}selected{% endif %}>Prelim</option>
-                            <option value="semi_final"  {% if form.sub_category.value == 'semi_final'  %}selected{% endif %}>Semi-Final</option>
-                            <option value="final_exam"  {% if form.sub_category.value == 'final_exam'  %}selected{% endif %}>Final Exam</option>
+                            {# Options populated by JS; keep server value on re-render #}
+                            <option value="short_quiz"   {% if form.sub_category.value == 'short_quiz'   %}selected{% endif %}>Short Quiz</option>
+                            <option value="long_quiz"    {% if form.sub_category.value == 'long_quiz'    %}selected{% endif %}>Long Quiz</option>
+                            <option value="prelim"       {% if form.sub_category.value == 'prelim'       %}selected{% endif %}>Prelim</option>
+                            <option value="semi_final"   {% if form.sub_category.value == 'semi_final'   %}selected{% endif %}>Semi-Final</option>
+                            <option value="midterm_exam" {% if form.sub_category.value == 'midterm_exam' %}selected{% endif %}>Midterm Exam</option>
+                            <option value="final_exam"   {% if form.sub_category.value == 'final_exam'   %}selected{% endif %}>Final Exam</option>
                         </select>
                         {% if form.sub_category.errors %}
                             <p class="text-red-500 text-sm mt-1"><i class="bi bi-exclamation-circle mr-1"></i>{{ form.sub_category.errors.0 }}</p>
@@ -172,7 +180,7 @@
 
                 </div>
 
-                <!-- Badge preview (appears when both term + sub-category are chosen) -->
+                <!-- Badge preview -->
                 <div id="examTypePreview" class="hidden">
                     <div id="examTypeBadge" class="inline-flex items-center px-3 py-1.5 rounded-full text-white text-xs font-semibold">
                         <i class="bi bi-tag-fill mr-1.5"></i>
@@ -194,7 +202,6 @@
                             required accept=".pdf,.docx,.doc,.xlsx,.xls,.txt">
                     </div>
 
-                    <!-- Chosen file preview with X button -->
                     <div id="filePreview" style="display:none;" class="mt-3 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
                         <i class="bi bi-file-earmark-check text-green-500 text-xl flex-shrink-0"></i>
                         <span id="filePreviewName" class="text-sm font-semibold text-gray-800 flex-1 truncate"></span>
@@ -216,7 +223,6 @@
                 </div>
 
                 {% if no_answer_key %}
-                <!-- No-answer-key alert -->
                 <div class="bg-red-50 border-2 border-red-400 rounded-xl p-5 flex items-start gap-4">
                     <div class="w-11 h-11 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
                         <i class="bi bi-key-fill text-red-500 text-xl"></i>
@@ -328,7 +334,7 @@
                 </li>
                 <li class="flex items-start">
                     <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
-                    <span>The department is automatically set based on your subject and teacher profile</span>
+                    <span>Semester is auto-detected from the curriculum when you pick a subject</span>
                 </li>
                 <li class="flex items-start">
                     <i class="bi bi-check-circle-fill text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
@@ -352,73 +358,71 @@
 <script>
 (function () {
 
-    // ── Sub-category options per term ────────────────────────────────────────
+    // ── Sub-category options per term ─────────────────────────────────────────
+    // "midterm_exam" for Midterm, "final_exam" for Final Term (4th slot differs)
     var TERM_SUBS = {
-        midterm:    [
-            { value: 'short_quiz', label: 'Short Quiz' },
-            { value: 'long_quiz',  label: 'Long Quiz'  },
-            { value: 'prelim',     label: 'Prelim'     },
-            { value: 'final_exam', label: 'Final Exam' },
+        midterm: [
+            { value: 'short_quiz',   label: 'Short Quiz'   },
+            { value: 'long_quiz',    label: 'Long Quiz'    },
+            { value: 'prelim',       label: 'Prelim'       },
+            { value: 'midterm_exam', label: 'Midterm Exam' },
         ],
         final_term: [
-            { value: 'short_quiz', label: 'Short Quiz' },
-            { value: 'long_quiz',  label: 'Long Quiz'  },
-            { value: 'semi_final', label: 'Semi-Final' },
-            { value: 'final_exam', label: 'Final Exam' },
+            { value: 'short_quiz',  label: 'Short Quiz'  },
+            { value: 'long_quiz',   label: 'Long Quiz'   },
+            { value: 'semi_final',  label: 'Semi-Final'  },
+            { value: 'final_exam',  label: 'Final Exam'  },
         ],
     };
 
-    // Badge colors keyed by sub_category value
     var SUB_COLORS = {
-        short_quiz: { bg: '#0891b2', label: 'Short Quiz'  },
-        long_quiz:  { bg: '#2563eb', label: 'Long Quiz'   },
-        prelim:     { bg: '#d97706', label: 'Prelim'      },
-        semi_final: { bg: '#9f1239', label: 'Semi-Final'  },
-        final_exam: { bg: '#7c3aed', label: 'Final Exam'  },
+        short_quiz:   { bg: '#0891b2', label: 'Short Quiz'   },
+        long_quiz:    { bg: '#2563eb', label: 'Long Quiz'    },
+        prelim:       { bg: '#d97706', label: 'Prelim'       },
+        semi_final:   { bg: '#9f1239', label: 'Semi-Final'   },
+        midterm_exam: { bg: '#b45309', label: 'Midterm Exam' },
+        final_exam:   { bg: '#7c3aed', label: 'Final Exam'   },
     };
 
-    var termSelect      = document.getElementById('id_exam_type');
-    var subWrapper      = document.getElementById('subCategoryWrapper');
-    var subSelect       = document.getElementById('id_sub_category');
-    var examTypePreview = document.getElementById('examTypePreview');
-    var examTypeBadge   = document.getElementById('examTypeBadge');
+    var termSelect        = document.getElementById('id_exam_type');
+    var subWrapper        = document.getElementById('subCategoryWrapper');
+    var subSelect         = document.getElementById('id_sub_category');
+    var examTypePreview   = document.getElementById('examTypePreview');
+    var examTypeBadge     = document.getElementById('examTypeBadge');
     var examTypeBadgeText = document.getElementById('examTypeBadgeText');
 
-    // Called when the term dropdown changes.
+    // ── Term change → rebuild sub-category options ───────────────────────────
     function onTermChange() {
         var term = termSelect ? termSelect.value : '';
         var subs = TERM_SUBS[term] || [];
 
         if (!subWrapper || !subSelect) return;
 
-        // Rebuild sub-category options
         subSelect.innerHTML = '<option value="">-- Select Sub-category --</option>';
         subs.forEach(function (s) {
             var opt = document.createElement('option');
-            opt.value = s.value;
+            opt.value       = s.value;
             opt.textContent = s.label;
             subSelect.appendChild(opt);
         });
-        subSelect.value = '';   // reset selection
+        subSelect.value = '';
 
-        // Show/hide the wrapper
         if (subs.length > 0) {
             subWrapper.classList.remove('hidden');
         } else {
             subWrapper.classList.add('hidden');
         }
 
-        // Hide badge when term changes (sub-category not yet chosen)
         if (examTypePreview) examTypePreview.classList.add('hidden');
     }
     window.onTermChange = onTermChange;
 
-    // Called when sub-category changes — update badge preview.
+    // ── Sub-category change → update badge preview ───────────────────────────
     function updateBadgePreview() {
         var sub = subSelect ? subSelect.value : '';
         if (sub && SUB_COLORS[sub]) {
             examTypeBadge.style.backgroundColor = SUB_COLORS[sub].bg;
-            examTypeBadgeText.textContent = SUB_COLORS[sub].label;
+            examTypeBadgeText.textContent       = SUB_COLORS[sub].label;
             examTypePreview.classList.remove('hidden');
         } else {
             examTypePreview.classList.add('hidden');
@@ -426,53 +430,51 @@
     }
     window.updateBadgePreview = updateBadgePreview;
 
-    // ── On page load: restore state if form re-rendered with values ──────────
+    // ── Restore state on form re-render (validation error) ───────────────────
     (function initTermState() {
         if (!termSelect || !termSelect.value) return;
-        var term      = termSelect.value;
-        var savedSub  = subSelect ? subSelect.value : '';
-        var subs      = TERM_SUBS[term] || [];
+        var term     = termSelect.value;
+        var savedSub = subSelect ? subSelect.value : '';
+        var subs     = TERM_SUBS[term] || [];
 
-        // Rebuild options first
         subSelect.innerHTML = '<option value="">-- Select Sub-category --</option>';
         subs.forEach(function (s) {
             var opt = document.createElement('option');
-            opt.value = s.value;
+            opt.value       = s.value;
             opt.textContent = s.label;
             subSelect.appendChild(opt);
         });
 
-        // Restore server-supplied value (form re-render after validation error)
         if (savedSub) subSelect.value = savedSub;
-
-        // Show sub-category wrapper
         if (subs.length > 0) subWrapper.classList.remove('hidden');
-
-        // Show badge if sub already selected
         updateBadgePreview();
     })();
 
-    // ── Button validation ────────────────────────────────────────────────────
+    // ── Submit button gate ────────────────────────────────────────────────────
     function checkUploadBtn() {
         var btn     = document.getElementById('submitBtn');
         var title   = document.getElementById('id_title');
         var subject = document.getElementById('id_subject');
-        var sem     = document.getElementById('id_semester');
+        var semHid  = document.getElementById('id_semester_hidden');
         var term    = document.getElementById('id_exam_type');
         var sub     = document.getElementById('id_sub_category');
         var file    = document.getElementById('id_file');
 
-        // sub_category is required only when sub-category wrapper is visible
         var subOk = !subWrapper || subWrapper.classList.contains('hidden')
                     ? true
                     : (sub && sub.value !== '');
 
-        var ok = (title   && title.value.trim() !== '')  &&
-                 (subject && subject.value      !== '')  &&
-                 (sem     && sem.value          !== '')  &&
-                 (term    && term.value         !== '')  &&
-                 subOk                                   &&
+        // Semester is auto-detected; only block if it's still empty
+        // (subject not yet chosen or subject has no curriculum entry)
+        var semOk = semHid && semHid.value !== '';
+
+        var ok = (title   && title.value.trim() !== '') &&
+                 (subject && subject.value      !== '') &&
+                 semOk                                  &&
+                 (term    && term.value         !== '') &&
+                 subOk                                  &&
                  (file    && file.files && file.files.length > 0);
+
         if (!btn) return;
         btn.disabled = !ok;
         btn.classList.toggle('opacity-50',        !ok);
@@ -480,68 +482,90 @@
     }
     window.checkUploadBtn = checkUploadBtn;
 
-    // Style subject select and hook its change event
+    // ── Subject select styling + AJAX on change ───────────────────────────────
     var subjSelect = document.getElementById('id_subject');
     if (subjSelect) {
         subjSelect.className = 'w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors';
         subjSelect.addEventListener('change', function () {
+            autoFillFromSubject(this.value);
             checkUploadBtn();
-            autoFillSemester(this.value);
         });
     }
 
-    function autoFillSemester(subjectId) {
-        if (!subjectId) return;
-        var semSelect        = document.getElementById('id_semester');
-        var infoEl           = document.getElementById('curriculumYearInfo');
-        var curWrapper       = document.getElementById('curriculumPickerWrapper');
-        var curSelect        = document.getElementById('id_curriculum_id');
-    
+    // ── AJAX: fill semester + curriculum from selected subject ────────────────
+    function autoFillFromSubject(subjectId) {
+        var semHid      = document.getElementById('id_semester_hidden');
+        var semDisplay  = document.getElementById('semesterDisplayText');
+        var infoEl      = document.getElementById('curriculumYearInfo');
+        var curWrapper  = document.getElementById('curriculumPickerWrapper');
+        var curSelect   = document.getElementById('id_curriculum_id');
+
+        if (!subjectId) {
+            // Reset semester display
+            if (semHid)     semHid.value       = '';
+            if (semDisplay) semDisplay.textContent = '— select a subject first —';
+            if (infoEl)     infoEl.classList.add('hidden');
+            if (curWrapper) curWrapper.classList.add('hidden');
+            checkUploadBtn();
+            return;
+        }
+
         fetch('/questionnaires/ajax/subject-curriculum-info/?subject_id=' + subjectId, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            // ── Semester auto-fill ──
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
             if (data.found) {
-                if (semSelect && data.semester) {
-                    semSelect.value = data.semester;
-                    checkUploadBtn();
+                // ── Update hidden semester input + display box ──
+                var semValue = data.semester || '';  // '1st' or '2nd'
+                if (semHid) semHid.value = semValue;
+                if (semDisplay) {
+                    semDisplay.textContent = semValue === '1st' ? '1st Semester'
+                                          : semValue === '2nd' ? '2nd Semester'
+                                          : '—';
                 }
+
+                // ── Year level info label ──
                 if (infoEl && data.year_level) {
-                    var yearLabels = { 1: '1st Year', 2: '2nd Year', 3: '3rd Year', 4: '4th Year' };
-                    infoEl.textContent = 'Auto-detected: ' + yearLabels[data.year_level] + ', ' + data.semester + ' Semester';
+                    var yLabels = { 1: '1st Year', 2: '2nd Year', 3: '3rd Year', 4: '4th Year' };
+                    infoEl.textContent = 'Curriculum: ' + yLabels[data.year_level] + ', ' + semValue + ' Semester';
                     infoEl.classList.remove('hidden');
                 }
-    
+
                 // ── Curriculum picker ──
                 if (data.curricula && data.curricula.length > 0 && curWrapper && curSelect) {
                     curSelect.innerHTML = '<option value="">-- No tag (unlinked) --</option>';
-                    data.curricula.forEach(function(cur) {
+                    data.curricula.forEach(function (cur) {
                         var opt = document.createElement('option');
-                        opt.value = cur.id;
+                        opt.value       = cur.id;
                         opt.textContent = cur.label;
-                        // Pre-select the active curriculum
                         if (cur.is_active) opt.selected = true;
                         curSelect.appendChild(opt);
                     });
                     curWrapper.classList.remove('hidden');
                 } else {
                     if (curWrapper) curWrapper.classList.add('hidden');
-                    if (curSelect)  curSelect.innerHTML = '<option value="">-- Select Curriculum --</option>';
+                    if (curSelect)  curSelect.innerHTML = '<option value="">-- No tag (unlinked) --</option>';
                 }
             } else {
-                if (infoEl)    infoEl.classList.add('hidden');
+                // Subject not in any curriculum
+                if (semHid)     semHid.value       = '';
+                if (semDisplay) semDisplay.textContent = '— not in curriculum —';
+                if (infoEl)     infoEl.classList.add('hidden');
                 if (curWrapper) curWrapper.classList.add('hidden');
-                if (curSelect)  curSelect.innerHTML = '<option value="">-- Select Curriculum --</option>';
+                if (curSelect)  curSelect.innerHTML = '<option value="">-- No tag (unlinked) --</option>';
             }
+            checkUploadBtn();
         })
-        .catch(function() {
+        .catch(function () {
+            if (semHid)     semHid.value       = '';
+            if (semDisplay) semDisplay.textContent = '— error loading —';
             if (curWrapper) curWrapper.classList.add('hidden');
+            checkUploadBtn();
         });
     }
 
-    // ── File input + preview + clear button ─────────────────────────────────
+    // ── File input + preview ──────────────────────────────────────────────────
     var fileInput       = document.getElementById('id_file');
     var filePreview     = document.getElementById('filePreview');
     var filePreviewName = document.getElementById('filePreviewName');
@@ -552,8 +576,8 @@
     var fileName        = document.getElementById('fileName');
 
     function formatSize(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        if (bytes < 1024)           return bytes + ' B';
+        if (bytes < 1024 * 1024)   return (bytes / 1024).toFixed(1) + ' KB';
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
@@ -565,26 +589,26 @@
     }
 
     function clearFile() {
-        fileInput.value = '';
-        filePreview.style.display = 'none';
-        dropZone.style.display    = 'block';
-        fileIcon.className  = 'bi bi-cloud-upload text-5xl text-gray-400 mb-3 block';
-        fileName.textContent = 'Click to browse or drag & drop your file here';
-        fileName.className   = 'text-sm text-gray-500 mb-2';
+        fileInput.value              = '';
+        filePreview.style.display   = 'none';
+        dropZone.style.display      = 'block';
+        fileIcon.className          = 'bi bi-cloud-upload text-5xl text-gray-400 mb-3 block';
+        fileName.textContent        = 'Click to browse or drag & drop your file here';
+        fileName.className          = 'text-sm text-gray-500 mb-2';
         fileInput.setAttribute('required', '');
         checkUploadBtn();
     }
 
     if (fileInput) {
         fileInput.addEventListener('change', function () {
-            if (this.files.length > 0) { showFilePreview(this.files[0]); }
-            else { clearFile(); }
+            if (this.files.length > 0) showFilePreview(this.files[0]);
+            else clearFile();
             checkUploadBtn();
         });
     }
     if (clearFileBtn) clearFileBtn.addEventListener('click', clearFile);
 
-    // ── Loading overlay on submit ────────────────────────────────────────────
+    // ── Loading overlay on submit ─────────────────────────────────────────────
     var form      = document.getElementById('uploadForm');
     var loading   = document.getElementById('loadingOverlay');
     var submitBtn = document.getElementById('submitBtn');
@@ -598,16 +622,16 @@
         });
     }
 
-    // ── Initial button state ─────────────────────────────────────────────────
+    // ── Initial state ─────────────────────────────────────────────────────────
     checkUploadBtn();
 
-    // ── Guidelines Modal ─────────────────────────────────────────────────────
+    // ── Guidelines Modal ──────────────────────────────────────────────────────
     var guidelinesBtn = document.getElementById('guidelinesBtn');
     var modal         = document.getElementById('guidelinesModal');
     var closeModal    = document.getElementById('closeModal');
     var closeModalBtn = document.getElementById('closeModalBtn');
     function openModal() { modal.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
-    function closeM()    { modal.style.display = 'none';  document.body.style.overflow = 'auto'; }
+    function closeM()    { modal.style.display = 'none';  document.body.style.overflow = 'auto';   }
     if (guidelinesBtn) guidelinesBtn.addEventListener('click', function (e) { e.preventDefault(); openModal(); });
     if (closeModal)    closeModal.addEventListener('click', closeM);
     if (closeModalBtn) closeModalBtn.addEventListener('click', closeM);
