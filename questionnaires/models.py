@@ -112,6 +112,15 @@ class Questionnaire(models.Model):
         blank=True,
         help_text='Year level auto-detected from curriculum',
     )
+    
+    curriculum = models.ForeignKey(
+    'accounts.Curriculum',
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name='questionnaires',
+    help_text='Curriculum version this questionnaire is tagged to',
+)
 
     class Meta:
         ordering = ['-uploaded_at']

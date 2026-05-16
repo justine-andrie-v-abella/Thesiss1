@@ -155,16 +155,14 @@ def upload_questionnaire(request):
     if request.user.is_staff:
         messages.error(request, 'Admins cannot upload questionnaires')
         return redirect('accounts:admin_dashboard')
-
+ 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
-
+ 
     if request.method == 'POST':
         form = QuestionnaireUploadForm(request.POST, request.FILES, user=request.user)
-
+ 
         if form.is_valid():
-            # Server-side guard: ensure the chosen subject is actually assigned to
-            # this teacher (or, if no subjects assigned, belongs to their department).
-            chosen_subject = form.cleaned_data.get('subject')
+            chosen_subject    = form.cleaned_data.get('subject')
             assigned_subjects = teacher.subjects.all()
             if assigned_subjects.exists():
                 if chosen_subject not in assigned_subjects:
@@ -174,7 +172,7 @@ def upload_questionnaire(request):
                         'teacher_dashboard/upload_questionnaire.html',
                         {'form': form, 'current_school_year': get_current_school_year()},
                     )
-
+ 
             questionnaire              = form.save(commit=False)
             questionnaire.uploader     = teacher
             questionnaire.department   = teacher.department
@@ -183,28 +181,43 @@ def upload_questionnaire(request):
             questionnaire.semester     = form.cleaned_data['semester']
             questionnaire.school_year  = get_current_school_year()
             questionnaire.extraction_status = 'processing'
-            
-
-            # ── Auto-detect year level from curriculum ──
-            from accounts.models import ProgramCurriculum
-            curriculum_entry = ProgramCurriculum.objects.filter(
+ 
+            # ── Attach curriculum tag ────────────────────────────────────────
+            from accounts.models import ProgramCurriculum, Curriculum
+            curriculum_id = request.POST.get('curriculum_id', '').strip()
+            if curriculum_id:
+                try:
+                    curriculum = Curriculum.objects.get(pk=curriculum_id)
+                    questionnaire.curriculum = curriculum
+                except Curriculum.DoesNotExist:
+                    questionnaire.curriculum = None
+            else:
+                # Auto-fallback: use the active curriculum for the subject's program
+                entry = ProgramCurriculum.objects.filter(
+                    subject=chosen_subject
+                ).select_related('curriculum').first()
+                if entry and entry.curriculum:
+                    questionnaire.curriculum = entry.curriculum
+ 
+            # ── Auto-detect year level from curriculum ──────────────────────
+            entry = ProgramCurriculum.objects.filter(
                 subject=questionnaire.subject
             ).first()
-            if curriculum_entry:
-                questionnaire.year_level = curriculum_entry.year_level
-            
+            if entry:
+                questionnaire.year_level = entry.year_level
+ 
             questionnaire.save()
-            
+ 
             try:
                 type_names = list(
                     QuestionType.objects.filter(is_active=True).values_list('name', flat=True)
                 )
-
-                extractor = get_extractor()
+ 
+                extractor         = get_extractor()
                 created_questions = extractor.process_questionnaire(
                     questionnaire, type_names, mode='extract'
                 )
-
+ 
                 if not created_questions:
                     questionnaire.file.delete(save=False)
                     questionnaire.delete()
@@ -218,9 +231,7 @@ def upload_questionnaire(request):
                         'teacher_dashboard/upload_questionnaire.html',
                         {'form': form, 'current_school_year': get_current_school_year()},
                     )
-
-                # ── Answer-key check ────────────────────────────────────────
-                # Essays legitimately have no answer key; all others should.
+ 
                 non_essay_qs = [
                     q for q in created_questions
                     if q.question_type and q.question_type.name not in ('essay', 'section_header')
@@ -241,46 +252,46 @@ def upload_questionnaire(request):
                     return render(
                         request,
                         'teacher_dashboard/upload_questionnaire.html',
-                        {'form': form, 'no_answer_key': True, 'current_school_year': get_current_school_year()},
+                        {'form': form, 'no_answer_key': True,
+                         'current_school_year': get_current_school_year()},
                     )
-
-                # Keep the file and questionnaire — store only PK in session
+ 
                 questionnaire.extraction_status = 'pending_review'
                 questionnaire.save()
-
+ 
                 request.session['pending_questionnaire_pk'] = questionnaire.pk
                 request.session['pending_source']           = 'extract'
                 request.session.modified = True
-
+ 
                 messages.success(
                     request,
                     f'Extracted {len(created_questions)} questions! '
                     f'Now select the ones you want to keep.',
                 )
                 return redirect('questionnaires:review_extracted')
-
+ 
             except Exception as e:
                 try:
                     questionnaire.file.delete(save=False)
                     questionnaire.delete()
                 except Exception:
                     pass
-
+ 
                 ActivityLog.objects.create(
                     activity_type='extraction_failed',
                     user=request.user,
                     description='Extraction failed — file was not saved.',
                 )
-
+ 
                 err = str(e)
-                if 'credit balance is too low' in err or 'credit' in err.lower() and 'low' in err.lower():
+                if 'credit balance is too low' in err or ('credit' in err.lower() and 'low' in err.lower()):
                     user_msg = (
                         'The AI service account has run out of credits. '
                         'Please contact the administrator to top up the API credits.'
                     )
-                elif any(code in err for code in ('503', '429', 'UNAVAILABLE',
-                                                   'RESOURCE_EXHAUSTED',
-                                                   'rate limit', 'overloaded')):
+                elif any(code in err for code in (
+                    '503', '429', 'UNAVAILABLE', 'RESOURCE_EXHAUSTED', 'rate limit', 'overloaded'
+                )):
                     user_msg = (
                         'The AI service is temporarily unavailable due to high demand. '
                         'Your file was not saved. Please wait a moment and try again.'
@@ -298,10 +309,10 @@ def upload_questionnaire(request):
                 )
         else:
             messages.error(request, 'Please correct the errors below.')
-
+ 
     else:
         form = QuestionnaireUploadForm(user=request.user)
-
+ 
     return render(
         request,
         'teacher_dashboard/upload_questionnaire.html',
@@ -1217,14 +1228,13 @@ def permanent_delete_questionnaire(request, pk):
 def browse_questionnaires(request):
     if request.user.is_staff:
         return redirect('questionnaires:all_questionnaires')
-
+ 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
-
-    # Filter by assigned subjects; fall back to whole department if none assigned yet
+ 
     assigned_subjects = teacher.subjects.all()
     if assigned_subjects.exists():
         questionnaires = Questionnaire.objects.select_related(
-            'department', 'subject', 'uploader__user'
+            'department', 'subject', 'uploader__user', 'curriculum'
         ).filter(
             subject__in=assigned_subjects,
             is_extracted=True,
@@ -1233,22 +1243,23 @@ def browse_questionnaires(request):
         )
     else:
         questionnaires = Questionnaire.objects.select_related(
-            'department', 'subject', 'uploader__user'
+            'department', 'subject', 'uploader__user', 'curriculum'
         ).filter(
             subject__departments=teacher.department,
             is_extracted=True,
             extraction_status='completed',
             is_archived=False,
         )
-
-    subject_id             = request.GET.get('subject', '')
-    exam_type              = request.GET.get('exam_type', '')
-    search_query           = request.GET.get('search', '')
-    selected_semester      = request.GET.get('semester', '')
-    selected_school_year   = request.GET.get('school_year', '')
-    selected_question_type = request.GET.get('question_type', '')
-    selected_year_level = request.GET.get('year_level', '')
-
+ 
+    subject_id              = request.GET.get('subject', '')
+    exam_type               = request.GET.get('exam_type', '')
+    search_query            = request.GET.get('search', '')
+    selected_semester       = request.GET.get('semester', '')
+    selected_school_year    = request.GET.get('school_year', '')
+    selected_question_type  = request.GET.get('question_type', '')
+    selected_year_level     = request.GET.get('year_level', '')
+    selected_curriculum_id  = request.GET.get('curriculum', '')
+ 
     if selected_year_level:
         questionnaires = questionnaires.filter(year_level=selected_year_level)
     if subject_id:
@@ -1263,6 +1274,8 @@ def browse_questionnaires(request):
         questionnaires = questionnaires.filter(
             extracted_questions__question_type__name=selected_question_type
         ).distinct()
+    if selected_curriculum_id:
+        questionnaires = questionnaires.filter(curriculum_id=selected_curriculum_id)
     if search_query:
         questionnaires = questionnaires.filter(
             Q(title__icontains=search_query)         |
@@ -1270,13 +1283,32 @@ def browse_questionnaires(request):
             Q(subject__name__icontains=search_query) |
             Q(subject__code__icontains=search_query)
         )
-
+ 
+    # ── Build curriculum filter options scoped to this teacher's programs ───
+    from accounts.models import Curriculum, ProgramCurriculum
+    if assigned_subjects.exists():
+        program_ids = ProgramCurriculum.objects.filter(
+            subject__in=assigned_subjects
+        ).values_list('program_id', flat=True).distinct()
+    else:
+        program_ids = ProgramCurriculum.objects.filter(
+            subject__departments=teacher.department
+        ).values_list('program_id', flat=True).distinct()
+ 
+    curriculum_options = (
+        Curriculum.objects
+        .filter(program_id__in=program_ids)
+        .order_by('-created_at')
+        .values('id', 'code', 'school_year', 'is_active', 'is_draft')
+    )
+ 
     if assigned_subjects.exists():
         subjects = assigned_subjects.order_by('code')
         school_year_options = list(
             Questionnaire.objects.filter(
                 subject__in=assigned_subjects,
-                is_extracted=True, extraction_status='completed', is_archived=False, school_year__gt=''
+                is_extracted=True, extraction_status='completed',
+                is_archived=False, school_year__gt=''
             ).values_list('school_year', flat=True).distinct().order_by('-school_year')
         )
     else:
@@ -1284,27 +1316,31 @@ def browse_questionnaires(request):
         school_year_options = list(
             Questionnaire.objects.filter(
                 subject__departments=teacher.department,
-                is_extracted=True, extraction_status='completed', is_archived=False, school_year__gt=''
+                is_extracted=True, extraction_status='completed',
+                is_archived=False, school_year__gt=''
             ).values_list('school_year', flat=True).distinct().order_by('-school_year')
         )
+ 
     paginator   = Paginator(questionnaires, 12)
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)
-
+ 
     ctx = {
-        'page_obj':              page_obj,
-        'subjects':              subjects,
-        'selected_subject':      subject_id,
-        'search_query':          search_query,
-        'exam_type':             exam_type,
-        'exam_type_choices':     Questionnaire.EXAM_TYPE_CHOICES,
-        'semester_choices':      Questionnaire.SEMESTER_CHOICES,
-        'selected_semester':     selected_semester,
-        'selected_school_year':  selected_school_year,
-        'school_year_options':   school_year_options,
-        'question_type_choices': QUESTION_TYPE_CHOICES,
+        'page_obj':               page_obj,
+        'subjects':               subjects,
+        'selected_subject':       subject_id,
+        'search_query':           search_query,
+        'exam_type':              exam_type,
+        'exam_type_choices':      Questionnaire.EXAM_TYPE_CHOICES,
+        'semester_choices':       Questionnaire.SEMESTER_CHOICES,
+        'selected_semester':      selected_semester,
+        'selected_school_year':   selected_school_year,
+        'school_year_options':    school_year_options,
+        'question_type_choices':  QUESTION_TYPE_CHOICES,
         'selected_question_type': selected_question_type,
-        'selected_year_level': selected_year_level,
+        'selected_year_level':    selected_year_level,
+        'curriculum_options':     list(curriculum_options),
+        'selected_curriculum_id': selected_curriculum_id,
     }
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'teacher_dashboard/browse_questionnaires_partial.html', ctx)
@@ -2039,22 +2075,62 @@ def workspace_list_folders(request):
 
 @login_required
 def get_subject_curriculum_info(request):
-    """Return semester and year_level for a subject from ProgramCurriculum."""
+    """
+    Return semester, year_level, AND all curriculum versions for a subject.
+    Called by the upload form JS when the teacher picks a subject.
+    """
     subject_id = request.GET.get('subject_id')
     if not subject_id:
         return JsonResponse({'found': False})
-
-    from accounts.models import ProgramCurriculum
-    entry = ProgramCurriculum.objects.filter(subject_id=subject_id).first()
+ 
+    from accounts.models import ProgramCurriculum, Curriculum
+ 
+    # Find the latest active curriculum entry for this subject
+    entry = (
+        ProgramCurriculum.objects
+        .filter(subject_id=subject_id)
+        .select_related('curriculum')
+        .order_by('-curriculum__created_at')
+        .first()
+    )
+ 
     if not entry:
         return JsonResponse({'found': False})
-
-    # ProgramCurriculum.semester is 1 or 2 (integer), Questionnaire uses '1st'/'2nd'
+ 
+    # All curriculum versions that contain this subject's program
+    program = entry.program
+    curricula = (
+        Curriculum.objects
+        .filter(program=program)
+        .order_by('-created_at')
+        .values('id', 'code', 'school_year', 'is_active', 'is_draft')
+    )
+ 
+    curricula_list = []
+    active_id = None
+    for cur in curricula:
+        label = cur['code'] + ' (' + cur['school_year'] + ')'
+        if cur['is_active']:
+            label += ' — Latest'
+            active_id = cur['id']
+        elif cur['is_draft']:
+            label += ' — Draft'
+        else:
+            label += ' — Archived'
+        curricula_list.append({
+            'id':         cur['id'],
+            'label':      label,
+            'is_active':  cur['is_active'],
+            'is_draft':   cur['is_draft'],
+        })
+ 
     sem_map = {1: '1st', 2: '2nd'}
     return JsonResponse({
-        'found':      True,
-        'semester':   sem_map.get(entry.semester, ''),
-        'year_level': entry.year_level,
+        'found':       True,
+        'semester':    sem_map.get(entry.semester, ''),
+        'year_level':  entry.year_level,
+        'curricula':   curricula_list,
+        'active_id':   active_id,
     })
     
 from django.http import JsonResponse
