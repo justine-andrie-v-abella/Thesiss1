@@ -423,14 +423,28 @@ let availableSubjects = [
 let modalYear = null, modalSem = null;
 
 // ── New Curriculum Modal ──────────────────────────────────────────────────
+const PROGRAM_CODE = '{{ program.code|escapejs }}';
+
+document.getElementById('newCurCode').addEventListener('input', function () {
+    const prefix = PROGRAM_CODE + '-';
+    if (!this.value.startsWith(prefix)) {
+        this.value = prefix;
+        this.setSelectionRange(prefix.length, prefix.length);
+    }
+});
+
 function openNewCurriculumModal() {
-    document.getElementById('newCurCode').value = '';
+    const prefix = PROGRAM_CODE + '-';
+    const input = document.getElementById('newCurCode');
+    input.value = prefix;
     document.getElementById('newCurYear').value = '';
     document.getElementById('newCurDesc').value = '';
     document.getElementById('newCurError').classList.add('hidden');
     const m = document.getElementById('newCurriculumModal');
     m.classList.remove('hidden'); m.classList.add('flex');
-    document.getElementById('newCurCode').focus();
+    // Place cursor at the end so user types right after the prefix
+    input.focus();
+    input.setSelectionRange(prefix.length, prefix.length);
 }
 function closeNewCurriculumModal() {
     const m = document.getElementById('newCurriculumModal');
