@@ -2999,6 +2999,68 @@ def subadmin_delete_program(request, pk):
         messages.success(request, f'Program "{prog_name}" deleted successfully.')
     return redirect('accounts:subadmin_manage_programs')
 
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_archive_program(request, pk):
+    """Sub-admin: archive a program (soft delete)."""
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=pk, department=department, is_archived=False)
+    if request.method == 'POST':
+        program.is_archived = True
+        program.save()
+        log_activity(
+            'program_updated',
+            f'Program "{program.name}" ({program.code}) archived in {department.name} by Sub-Admin {request.user.get_full_name()}',
+            user=request.user,
+            metadata={'program_id': program.pk, 'department_id': department.pk},
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Program "{program.name}" has been archived.')
+        return redirect('accounts:subadmin_manage_programs')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_unarchive_program(request, pk):
+    """Sub-admin: restore an archived program."""
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=pk, department=department, is_archived=True)
+    if request.method == 'POST':
+        program.is_archived = False
+        program.save()
+        log_activity(
+            'program_updated',
+            f'Program "{program.name}" ({program.code}) restored in {department.name} by Sub-Admin {request.user.get_full_name()}',
+            user=request.user,
+            metadata={'program_id': program.pk, 'department_id': department.pk},
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Program "{program.name}" has been restored.')
+        return redirect('accounts:subadmin_manage_programs')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_subadmin)
+def subadmin_permanent_delete_program(request, pk):
+    """Sub-admin: permanently delete an archived program."""
+    department = request.user.subadmin_profile.department
+    program    = get_object_or_404(Program, pk=pk, department=department, is_archived=True)
+    if request.method == 'POST':
+        prog_name = program.name
+        prog_code = program.code
+        program.delete()
+        log_activity(
+            'program_deleted',
+            f'Program "{prog_name}" ({prog_code}) permanently deleted from {department.name} by Sub-Admin {request.user.get_full_name()}',
+            user=request.user,
+            metadata={'department_id': department.pk},
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Program "{prog_name}" has been permanently deleted.')
+        return redirect('accounts:subadmin_manage_programs')
+    return JsonResponse({'error': 'Invalid request'}, status=400)
 
 @login_required
 @user_passes_test(is_subadmin)
@@ -3017,13 +3079,15 @@ def subadmin_program_detail(request, pk):
 @user_passes_test(is_subadmin)
 def subadmin_manage_programs(request):
     """Sub-admin: list programs for their department."""
-    department = request.user.subadmin_profile.department
-    programs   = Program.objects.filter(department=department).order_by('name')
-    form       = ProgramForm()
+    department        = request.user.subadmin_profile.department
+    programs          = Program.objects.filter(department=department, is_archived=False).order_by('name')
+    archived_programs = Program.objects.filter(department=department, is_archived=True).order_by('name')
+    form              = ProgramForm()
     return render(request, 'subadmin_dashboard/manage_programs.html', {
-        'department': department,
-        'programs':   programs,
-        'form':       form,
+        'department':        department,
+        'programs':          programs,
+        'archived_programs': archived_programs,
+        'form':              form,
     })
 
 

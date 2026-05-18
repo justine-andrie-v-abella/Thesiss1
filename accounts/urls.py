@@ -90,7 +90,7 @@ urlpatterns = [
     # Browse Questionnaires (sub-admin — department-scoped)
     path('subadmin/questionnaires/',                    views.subadmin_browse_questionnaires, name='subadmin_browse_questionnaires'),
 
-# ── Program Management (superadmin) ─────────────────────────────────────
+    # ── Program Management (superadmin) ─────────────────────────────────────
     path('departments/<int:pk>/programs/',                            views.department_detail,            name='department_detail'),
     path('departments/<int:dept_pk>/programs/add/',                   views.add_program,                  name='add_program'),
     path('programs/<int:pk>/edit/',                                   views.edit_program,                 name='edit_program'),
@@ -126,8 +126,11 @@ urlpatterns = [
     path('subadmin/programs/add/',                                    views.subadmin_add_program,                  name='subadmin_add_program'),
     path('subadmin/programs/<int:pk>/edit/',                          views.subadmin_edit_program,                 name='subadmin_edit_program'),
     path('subadmin/programs/<int:pk>/delete/',                        views.subadmin_delete_program,               name='subadmin_delete_program'),
+    path('subadmin/programs/<int:pk>/archive/',                       views.subadmin_archive_program,              name='subadmin_archive_program'),
+    path('subadmin/programs/<int:pk>/unarchive/',                     views.subadmin_unarchive_program,            name='subadmin_unarchive_program'),
+    path('subadmin/programs/<int:pk>/permanent-delete/',              views.subadmin_permanent_delete_program,     name='subadmin_permanent_delete_program'),
     path('subadmin/programs/<int:pk>/subjects/',                      views.subadmin_program_detail,               name='subadmin_program_detail'),
-
+    
     # Curriculum Management (sub-admin)
     path('subadmin/programs/<int:pk>/curriculum/',
         views.subadmin_program_curriculum,
