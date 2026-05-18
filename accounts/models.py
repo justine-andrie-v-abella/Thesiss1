@@ -100,6 +100,7 @@ class Program(models.Model):
     department  = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='programs')
     subjects    = models.ManyToManyField('Subject', blank=True, related_name='programs')
     is_active   = models.BooleanField(default=True)
+    is_archived = models.BooleanField(default=False)
     created_at  = models.DateTimeField(auto_now_add=True)
 
     class Meta:

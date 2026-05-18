@@ -90,13 +90,16 @@ urlpatterns = [
     # Browse Questionnaires (sub-admin — department-scoped)
     path('subadmin/questionnaires/',                    views.subadmin_browse_questionnaires, name='subadmin_browse_questionnaires'),
 
-    # ── Program Management (superadmin) ─────────────────────────────────────
+# ── Program Management (superadmin) ─────────────────────────────────────
     path('departments/<int:pk>/programs/',                            views.department_detail,            name='department_detail'),
     path('departments/<int:dept_pk>/programs/add/',                   views.add_program,                  name='add_program'),
     path('programs/<int:pk>/edit/',                                   views.edit_program,                 name='edit_program'),
     path('programs/<int:pk>/delete/',                                 views.delete_program,               name='delete_program'),
+    path('programs/<int:pk>/archive/',                                views.archive_program,              name='archive_program'),
+    path('programs/<int:pk>/unarchive/',                              views.unarchive_program,            name='unarchive_program'),
+    path('programs/<int:pk>/permanent-delete/',                       views.permanent_delete_program,     name='permanent_delete_program'),
     path('programs/<int:pk>/subjects/',                               views.program_detail,               name='program_detail'),
-
+    
     # Curriculum Management (superadmin)
     path('programs/<int:pk>/curriculum/',
         views.program_curriculum,

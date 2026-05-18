@@ -2403,13 +2403,15 @@ If you did not make these changes, please contact your administrator immediately
 @user_passes_test(is_admin)
 def department_detail(request, pk):
     """Superadmin: view programs inside a department."""
-    department = get_object_or_404(Department, pk=pk, is_archived=False)
-    programs   = Program.objects.filter(department=department).order_by('name')
-    form       = ProgramForm()
+    department       = get_object_or_404(Department, pk=pk, is_archived=False)
+    programs         = Program.objects.filter(department=department, is_archived=False).order_by('name')
+    archived_programs = Program.objects.filter(department=department, is_archived=True).order_by('name')
+    form             = ProgramForm()
     return render(request, 'admin_dashboard/department_detail.html', {
-        'department': department,
-        'programs':   programs,
-        'form':       form,
+        'department':        department,
+        'programs':          programs,
+        'archived_programs': archived_programs,
+        'form':              form,
     })
 
 
@@ -2489,6 +2491,68 @@ def delete_program(request, pk):
         messages.success(request, f'Program "{prog_name}" deleted successfully.')
     return redirect('accounts:department_detail', pk=department.pk)
 
+@login_required
+@user_passes_test(is_admin)
+def archive_program(request, pk):
+    """Superadmin: archive a program (soft delete)."""
+    program    = get_object_or_404(Program, pk=pk, is_archived=False)
+    department = program.department
+    if request.method == 'POST':
+        program.is_archived = True
+        program.save()
+        log_activity(
+            'program_updated',
+            f'Program "{program.name}" ({program.code}) archived in {department.name}',
+            user=request.user,
+            metadata={'program_id': program.pk, 'department_id': department.pk},
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Program "{program.name}" has been archived.')
+        return redirect('accounts:department_detail', pk=department.pk)
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def unarchive_program(request, pk):
+    """Superadmin: restore an archived program."""
+    program    = get_object_or_404(Program, pk=pk, is_archived=True)
+    department = program.department
+    if request.method == 'POST':
+        program.is_archived = False
+        program.save()
+        log_activity(
+            'program_updated',
+            f'Program "{program.name}" ({program.code}) restored in {department.name}',
+            user=request.user,
+            metadata={'program_id': program.pk, 'department_id': department.pk},
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Program "{program.name}" has been restored.')
+        return redirect('accounts:department_detail', pk=department.pk)
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+@user_passes_test(is_admin)
+def permanent_delete_program(request, pk):
+    """Superadmin: permanently delete an archived program."""
+    program    = get_object_or_404(Program, pk=pk, is_archived=True)
+    department = program.department
+    if request.method == 'POST':
+        prog_name = program.name
+        prog_code = program.code
+        program.delete()
+        log_activity(
+            'program_deleted',
+            f'Program "{prog_name}" ({prog_code}) permanently deleted from {department.name}',
+            user=request.user,
+            metadata={'department_id': department.pk},
+        )
+        bust_dashboard_cache()
+        messages.success(request, f'Program "{prog_name}" has been permanently deleted.')
+        return redirect('accounts:department_detail', pk=department.pk)
+    return JsonResponse({'error': 'Invalid request'}, status=400)
 
 @login_required
 @user_passes_test(is_admin)
