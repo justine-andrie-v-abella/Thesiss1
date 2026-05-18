@@ -23,6 +23,17 @@
     </div>
     {% endif %}
 
+    <!-- Ajax Flash -->
+    <div id="ajaxFlash" class="hidden mb-4 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded-xl flex items-center justify-between">
+        <div class="flex items-center">
+            <i class="bi bi-check-circle-fill text-green-500 text-lg mr-2"></i>
+            <span id="ajaxFlashMessage"></span>
+        </div>
+        <button onclick="document.getElementById('ajaxFlash').classList.add('hidden')" class="text-green-600 hover:text-green-800">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
@@ -34,11 +45,21 @@
                 <span class="ml-2">{{ department.name }}</span>
             </p>
         </div>
-        <button onclick="openAddModal()"
-            class="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg flex items-center">
-            <i class="bi bi-plus-circle text-xl mr-2"></i>
-            Add Program
-        </button>
+        <div class="flex items-center space-x-3">
+            {% if archived_programs %}
+            <button onclick="openModal('archivedModal')"
+                class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-lg transition-all shadow flex items-center border border-gray-300">
+                <i class="bi bi-archive text-lg mr-2"></i>
+                Archived
+                <span class="ml-2 bg-gray-400 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ archived_programs.count }}</span>
+            </button>
+            {% endif %}
+            <button onclick="openAddModal()"
+                class="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg flex items-center">
+                <i class="bi bi-plus-circle text-xl mr-2"></i>
+                Add Program
+            </button>
+        </div>
     </div>
 
     <!-- Programs Table -->
@@ -117,9 +138,9 @@
                                         class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow text-sm" title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
-                                    <button onclick="openDeleteModal({{ program.pk }}, '{{ program.name|escapejs }}')"
-                                        class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow text-sm" title="Delete">
-                                        <i class="bi bi-trash3"></i>
+                                    <button onclick="openArchiveModal({{ program.pk }}, '{{ program.name|escapejs }}', '{{ program.code|escapejs }}')"
+                                        class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow text-sm" title="Archive">
+                                        <i class="bi bi-archive"></i>
                                     </button>
                                 </div>
                             </td>
@@ -168,9 +189,9 @@
                             class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
                             <i class="bi bi-pencil-square mr-1"></i> Edit
                         </button>
-                        <button onclick="openDeleteModal({{ program.pk }}, '{{ program.name|escapejs }}')"
-                            class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
-                            <i class="bi bi-trash3 mr-1"></i> Delete
+                        <button onclick="openArchiveModal({{ program.pk }}, '{{ program.name|escapejs }}', '{{ program.code|escapejs }}')"
+                            class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
+                            <i class="bi bi-archive mr-1"></i> Archive
                         </button>
                     </div>
                 </div>
@@ -310,40 +331,170 @@
 </div>
 
 
-<!-- ===================== DELETE CONFIRM MODAL ===================== -->
-<div id="deleteModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+<!-- ===================== ARCHIVE CONFIRM MODAL ===================== -->
+<div id="archiveModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
     <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeModals();">
-    <div id="deleteModalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0">
+    <div id="archiveModalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0">
+
+        <div class="bg-gradient-to-r from-gray-500 to-gray-600 px-8 py-6 rounded-t-2xl text-center relative">
+            <button onclick="closeModals()" class="absolute top-4 right-4 text-white hover:text-gray-200 transition-colors">
+                <i class="bi bi-x-lg text-xl"></i>
+            </button>
+            <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="bi bi-archive text-white text-3xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Archive Program?</h2>
+            <p class="text-gray-200 text-sm mt-1">Program will be hidden but data is preserved</p>
+        </div>
+
+        <div class="p-6">
+            <div class="bg-gray-50 border-2 border-gray-200 rounded-xl p-5 mb-5 flex items-center space-x-4">
+                <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="bi bi-mortarboard text-gray-500 text-2xl"></i>
+                </div>
+                <div>
+                    <p id="archiveProgName" class="font-bold text-gray-800 text-lg"></p>
+                    <span id="archiveProgCode" class="font-mono text-sm bg-gray-100 px-2 py-0.5 rounded text-gray-600 inline-block mt-1"></span>
+                </div>
+            </div>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-5">
+                <div class="flex items-start space-x-3">
+                    <i class="bi bi-info-circle-fill text-yellow-500 text-lg flex-shrink-0 mt-0.5"></i>
+                    <ul class="text-sm text-yellow-700 space-y-1">
+                        <li>• Program will no longer appear in the active list</li>
+                        <li>• Associated subjects and curriculum are preserved</li>
+                        <li>• Can be restored at any time</li>
+                    </ul>
+                </div>
+            </div>
+            <form id="archiveForm" method="post" action="">
+                {% csrf_token %}
+                <div class="flex items-center space-x-4">
+                    <button type="button" onclick="closeModals()"
+                        class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium text-center">Cancel</button>
+                    <button type="submit"
+                        class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-gray-500 to-gray-600 text-white px-6 py-3 rounded-xl hover:from-gray-600 hover:to-gray-700 shadow-md font-medium">
+                        <i class="bi bi-archive"></i><span>Yes, Archive</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    </div>
+</div>
+
+
+<!-- ===================== ARCHIVED PROGRAMS MODAL ===================== -->
+<div id="archivedModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeModals();">
+    <div id="archivedModalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl transform transition-all duration-200 scale-95 opacity-0">
+
+        <div class="bg-gradient-to-r from-gray-500 to-gray-600 px-8 py-5 rounded-t-2xl">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                        <i class="bi bi-archive text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Archived Programs</h2>
+                        <p class="text-gray-200 text-xs">Hidden from the active list</p>
+                    </div>
+                </div>
+                <button onclick="closeModals()" class="text-white hover:text-gray-200 transition-colors">
+                    <i class="bi bi-x-lg text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="p-6">
+            {% if archived_programs %}
+            <div class="space-y-3 max-h-96 overflow-y-auto pr-1">
+                {% for program in archived_programs %}
+                <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-5 py-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="bi bi-mortarboard text-gray-400"></i>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-gray-600">{{ program.name }}</p>
+                            <span class="font-mono text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">{{ program.code }}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2 flex-shrink-0">
+                        <form method="post" action="{% url 'accounts:subadmin_unarchive_program' program.pk %}">
+                            {% csrf_token %}
+                            <button type="submit"
+                                class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow flex items-center space-x-1 text-sm">
+                                <i class="bi bi-arrow-counterclockwise"></i><span>Restore</span>
+                            </button>
+                        </form>
+                        <button onclick="openPermDeleteModal('{{ program.pk }}', '{{ program.name|escapejs }}', '{{ program.code|escapejs }}')"
+                            class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-3 rounded-lg transition-all shadow flex items-center space-x-1 text-sm">
+                            <i class="bi bi-trash3"></i><span>Delete</span>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-10">
+                <i class="bi bi-archive text-4xl text-gray-300 block mb-2"></i>
+                <p class="text-gray-500">No archived programs</p>
+            </div>
+            {% endif %}
+            <div class="flex justify-end pt-4 border-t border-gray-200 mt-4">
+                <button type="button" onclick="closeModals()"
+                    class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Close</button>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+
+<!-- ===================== PERMANENT DELETE MODAL ===================== -->
+<div id="permDeleteModal" class="fixed inset-0 overflow-y-auto hidden" style="z-index:60;">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closePermDeleteModal();">
+    <div id="permDeleteModalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0">
 
         <div class="bg-gradient-to-r from-red-500 to-red-600 px-8 py-6 rounded-t-2xl text-center relative">
-            <button onclick="closeModals()" class="absolute top-4 right-4 text-white hover:text-red-200">
+            <button onclick="closePermDeleteModal()" class="absolute top-4 right-4 text-white hover:text-red-200 transition-colors">
                 <i class="bi bi-x-lg text-xl"></i>
             </button>
             <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-3">
                 <i class="bi bi-trash3 text-white text-3xl"></i>
             </div>
-            <h2 class="text-2xl font-bold text-white">Delete Program?</h2>
-            <p class="text-red-200 text-sm mt-1">This action cannot be undone</p>
+            <h2 class="text-2xl font-bold text-white">Permanently Delete?</h2>
+            <p class="text-red-200 text-sm mt-1">This cannot be undone</p>
         </div>
 
         <div class="p-6">
-            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-5">
-                <p id="deleteProgName" class="font-bold text-gray-800 text-center text-lg"></p>
-            </div>
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-5">
-                <div class="flex items-start space-x-2">
-                    <i class="bi bi-exclamation-triangle-fill text-yellow-500 flex-shrink-0 mt-0.5"></i>
-                    <p class="text-sm text-yellow-700">The program will be permanently removed. Subject assignments within it will also be removed.</p>
+            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-5 flex items-center space-x-3">
+                <div class="w-10 h-10 bg-red-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="bi bi-mortarboard text-red-700 text-xl"></i>
+                </div>
+                <div>
+                    <p id="permDeleteName" class="font-bold text-gray-800"></p>
+                    <span id="permDeleteCode" class="font-mono text-xs text-gray-500"></span>
                 </div>
             </div>
-            <form id="deleteForm" method="post" action="">
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-5">
+                <div class="flex items-start space-x-3">
+                    <i class="bi bi-exclamation-triangle-fill text-red-500 text-lg flex-shrink-0 mt-0.5"></i>
+                    <ul class="text-sm text-red-700 space-y-1">
+                        <li>• Permanently removes the program from your department</li>
+                        <li>• Subject assignments within it will also be removed</li>
+                    </ul>
+                </div>
+            </div>
+            <form id="permDeleteForm" method="post" action="">
                 {% csrf_token %}
                 <div class="flex items-center space-x-3">
-                    <button type="button" onclick="closeModals()"
+                    <button type="button" onclick="closePermDeleteModal()"
                         class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium text-center">Cancel</button>
                     <button type="submit"
-                        class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-md font-medium">
-                        <i class="bi bi-trash3"></i><span>Delete</span>
+                        class="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-red-700 shadow-md font-medium">
+                        <i class="bi bi-trash3"></i><span>Delete Permanently</span>
                     </button>
                 </div>
             </form>
@@ -354,22 +505,25 @@
 
 
 <script>
-const EDIT_URL   = "{% url 'accounts:subadmin_edit_program' pk=0 %}";
-const DELETE_URL = "{% url 'accounts:subadmin_delete_program' pk=0 %}";
+const EDIT_URL          = "{% url 'accounts:subadmin_edit_program' pk=0 %}";
+const ARCHIVE_URL       = "{% url 'accounts:subadmin_archive_program' pk=0 %}";
+const PERM_DELETE_URL   = "{% url 'accounts:subadmin_permanent_delete_program' pk=0 %}";
 
-const MODALS = ['addModal', 'editModal', 'deleteModal'];
+const MODALS = ['addModal', 'editModal', 'archiveModal', 'archivedModal'];
 
 function openModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
-    MODALS.forEach(m => {
-        const el = document.getElementById(m);
+    MODALS.forEach(function (m) {
+        var el = document.getElementById(m);
         if (m === id) {
             el.classList.remove('hidden');
-            const c = document.getElementById(m + 'Content');
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-                c.classList.remove('scale-95', 'opacity-0');
-                c.classList.add('scale-100', 'opacity-100');
-            }));
+            var c = document.getElementById(m + 'Content');
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    c.classList.remove('scale-95', 'opacity-0');
+                    c.classList.add('scale-100', 'opacity-100');
+                });
+            });
         } else {
             el.classList.add('hidden');
         }
@@ -377,13 +531,13 @@ function openModal(id) {
 }
 
 function closeModals() {
-    MODALS.forEach(m => {
-        const c = document.getElementById(m + 'Content');
+    MODALS.forEach(function (m) {
+        var c = document.getElementById(m + 'Content');
         c.classList.remove('scale-100', 'opacity-100');
         c.classList.add('scale-95', 'opacity-0');
     });
-    setTimeout(() => {
-        MODALS.forEach(m => document.getElementById(m).classList.add('hidden'));
+    setTimeout(function () {
+        MODALS.forEach(function (m) { document.getElementById(m).classList.add('hidden'); });
         document.getElementById('modalBackdrop').classList.add('hidden');
     }, 200);
 }
@@ -391,8 +545,8 @@ function closeModals() {
 function openAddModal() {
     document.getElementById('addForm').reset();
     document.getElementById('add_is_active').checked = true;
-    ['add_name_error', 'add_code_error'].forEach(id => {
-        const el = document.getElementById(id);
+    ['add_name_error', 'add_code_error'].forEach(function (id) {
+        var el = document.getElementById(id);
         if (el) { el.textContent = ''; el.classList.add('hidden'); }
     });
     openModal('addModal');
@@ -404,23 +558,47 @@ function openEditModal(pk, name, code, description, isActive) {
     document.getElementById('edit_description').value = description;
     document.getElementById('edit_is_active').checked = isActive;
     document.getElementById('editForm').action        = EDIT_URL.replace('/0/', '/' + pk + '/');
-    ['edit_name_error', 'edit_code_error'].forEach(id => {
-        const el = document.getElementById(id);
+    ['edit_name_error', 'edit_code_error'].forEach(function (id) {
+        var el = document.getElementById(id);
         if (el) { el.textContent = ''; el.classList.add('hidden'); }
     });
     openModal('editModal');
 }
 
-function openDeleteModal(pk, name) {
-    document.getElementById('deleteProgName').textContent = name;
-    document.getElementById('deleteForm').action          = DELETE_URL.replace('/0/', '/' + pk + '/');
-    openModal('deleteModal');
+function openArchiveModal(pk, name, code) {
+    document.getElementById('archiveProgName').textContent = name;
+    document.getElementById('archiveProgCode').textContent = code;
+    document.getElementById('archiveForm').action          = ARCHIVE_URL.replace('/0/', '/' + pk + '/');
+    openModal('archiveModal');
+}
+
+function openPermDeleteModal(pk, name, code) {
+    document.getElementById('permDeleteName').textContent = name;
+    document.getElementById('permDeleteCode').textContent = code;
+    document.getElementById('permDeleteForm').action      = PERM_DELETE_URL.replace('/0/', '/' + pk + '/');
+    var modal   = document.getElementById('permDeleteModal');
+    var content = document.getElementById('permDeleteModalContent');
+    modal.classList.remove('hidden');
+    requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+        });
+    });
+}
+
+function closePermDeleteModal() {
+    var modal   = document.getElementById('permDeleteModal');
+    var content = document.getElementById('permDeleteModalContent');
+    content.classList.remove('scale-100', 'opacity-100');
+    content.classList.add('scale-95', 'opacity-0');
+    setTimeout(function () { modal.classList.add('hidden'); }, 200);
 }
 
 function getCookie(name) {
-    let val = null;
+    var val = null;
     if (document.cookie) {
-        document.cookie.split(';').forEach(c => {
+        document.cookie.split(';').forEach(function (c) {
             c = c.trim();
             if (c.startsWith(name + '=')) val = decodeURIComponent(c.substring(name.length + 1));
         });
@@ -429,45 +607,52 @@ function getCookie(name) {
 }
 
 function submitAjax(formId, prefix) {
-    const form = document.getElementById(formId);
-    const data = new FormData(form);
+    var form = document.getElementById(formId);
+    var data = new FormData(form);
+    var cb   = form.querySelector('[type=checkbox][name=is_active]');
+    if (cb && !cb.checked) data.set('is_active', '');
 
     fetch(form.action, {
         method: 'POST',
         headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': getCookie('csrftoken') },
         body: data,
     })
-    .then(r => r.json())
-    .then(res => {
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
         if (res.success) {
             sessionStorage.setItem('flashMsg', res.message);
             window.location.reload();
         } else {
-            Object.entries(res.errors || {}).forEach(([field, msgs]) => {
-                const el = document.getElementById(`${prefix}_${field}_error`);
+            Object.entries(res.errors || {}).forEach(function ([field, msgs]) {
+                var el = document.getElementById(prefix + '_' + field + '_error');
                 if (el) { el.textContent = msgs[0]; el.classList.remove('hidden'); }
             });
         }
     })
-    .catch(() => alert('An unexpected error occurred. Please try again.'));
+    .catch(function () { alert('An unexpected error occurred. Please try again.'); });
 }
 
-window.addEventListener('load', () => {
-    const msg = sessionStorage.getItem('flashMsg');
+window.addEventListener('load', function () {
+    var msg = sessionStorage.getItem('flashMsg');
     if (msg) {
         sessionStorage.removeItem('flashMsg');
-        const div = document.createElement('div');
-        div.className = 'fixed top-4 right-4 z-50 bg-green-100 border border-green-400 text-green-800 px-5 py-3 rounded-xl shadow-lg flex items-center space-x-2';
-        div.innerHTML = `<i class="bi bi-check-circle-fill text-green-500"></i><span>${msg}</span>`;
-        document.body.appendChild(div);
-        setTimeout(() => div.remove(), 4000);
+        var flash    = document.getElementById('ajaxFlash');
+        var flashMsg = document.getElementById('ajaxFlashMessage');
+        if (flash && flashMsg) {
+            flashMsg.textContent = msg;
+            flash.classList.remove('hidden');
+            setTimeout(function () { flash.classList.add('hidden'); }, 4000);
+        }
     }
 });
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(); });
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeModals(); closePermDeleteModal(); }
+});
 </script>
 
 <style>
     input[name="code"] { text-transform: uppercase; }
+    #edit_code { text-transform: uppercase; }
 </style>
 {% endblock %}
