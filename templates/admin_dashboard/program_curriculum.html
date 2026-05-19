@@ -358,11 +358,12 @@
             </div>
         </div>
     </div>
+    <!-- noSubjectsMsg is now OUTSIDE subjectCheckList so innerHTML='' won't destroy it -->
+    <p class="text-center text-gray-400 py-8 text-sm" id="noSubjectsMsg" style="display:none;">
+        <i class="bi bi-check2-all text-3xl block mb-2 text-green-400"></i>
+        All available subjects are already in this curriculum.
+    </p>
     <div class="flex-1 overflow-y-auto px-5 py-3 min-h-0" id="subjectCheckList">
-        <p class="text-center text-gray-400 py-8 text-sm" id="noSubjectsMsg" style="display:none;">
-            <i class="bi bi-check2-all text-3xl block mb-2 text-green-400"></i>
-            All available subjects are already in this curriculum.
-        </p>
     </div>
     <div class="px-5 flex-shrink-0">
         <p id="modal_error" class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3 hidden"></p>
@@ -528,6 +529,12 @@ function openAddModal(year, sem) {
     document.getElementById('addModalSlot').textContent = 'Year ' + year + '  —  ' + SN[sem] + ' Semester';
     document.getElementById('subjectSearch').value = '';
     document.getElementById('modal_error').classList.add('hidden');
+
+    // ✅ Always restore button to clean state before building the list
+    const btn = document.getElementById('modal_submit_btn');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-plus-circle"></i> <span id="submitBtnLabel">Add to Curriculum</span>';
+
     buildCheckList('');
     updateSelectedCount();
     const m = document.getElementById('addModal');
@@ -545,12 +552,17 @@ function buildCheckList(query) {
     const noMsg     = document.getElementById('noSubjectsMsg');
     const q = query.toLowerCase();
     const filtered = availableSubjects.filter(s => s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
+
     if (availableSubjects.length === 0) {
-        container.innerHTML = ''; noMsg.style.display = 'block';
-        document.getElementById('modal_submit_btn').disabled = true; return;
+        container.innerHTML = ''; 
+        noMsg.style.display = 'block';
+        document.getElementById('modal_submit_btn').disabled = true; 
+        return;
     }
+
     noMsg.style.display = 'none';
-    document.getElementById('modal_submit_btn').disabled = false;
+    document.getElementById('modal_submit_btn').disabled = false; // ✅ always re-enable here
+
     if (filtered.length === 0) {
         container.innerHTML = '<p class="text-center text-gray-400 py-6 text-sm"><i class="bi bi-search block text-2xl mb-1 opacity-40"></i>No subjects match your search.</p>';
         return;
@@ -568,10 +580,11 @@ function buildCheckList(query) {
 }
 function filterSubjects(){ buildCheckList(document.getElementById('subjectSearch').value); updateSelectedCount(); }
 function getChecked(){ return Array.from(document.querySelectorAll('#subjectCheckList .subject-cb:checked')).map(cb => cb.value); }
-function updateSelectedCount(){
+function updateSelectedCount() {
     const n = getChecked().length;
     document.getElementById('selectedCountLabel').textContent = n + ' selected';
-    document.getElementById('submitBtnLabel').textContent = n > 0 ? 'Add ' + n + ' Subject' + (n>1?'s':'') : 'Add to Curriculum';
+    const lbl = document.getElementById('submitBtnLabel');
+    if (lbl) lbl.textContent = n > 0 ? 'Add ' + n + ' Subject' + (n > 1 ? 's' : '') : 'Add to Curriculum';
 }
 function selectAll(){ document.querySelectorAll('#subjectCheckList .subject-cb').forEach(cb => cb.checked = true); updateSelectedCount(); }
 function deselectAll(){ document.querySelectorAll('#subjectCheckList .subject-cb').forEach(cb => cb.checked = false); updateSelectedCount(); }
@@ -596,12 +609,17 @@ function submitAdd() {
     })
     .then(r => r.json())
     .then(data => {
+        // ✅ Always restore button fully — never let innerHTML diverge
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-plus-circle"></i> <span id="submitBtnLabel">Add to Curriculum</span>';
+
         if (data.success) {
-            data.added.forEach(item => { addRowToTable(item); availableSubjects = availableSubjects.filter(s => s.id !== item.subject_id); });
-            closeAddModal();
+            data.added.forEach(item => {
+                addRowToTable(item);
+                availableSubjects = availableSubjects.filter(s => s.id !== item.subject_id);
+            });
             const n = data.added.length;
+            closeAddModal();  // ✅ close AFTER restoring button so DOM is clean
             if (n > 0) showToast(n + ' subject' + (n>1?'s':'') + ' added to Year ' + modalYear + ' Sem ' + modalSem + '.', 'success');
             if (data.skipped && data.skipped.length > 0) showToast(data.skipped.length + ' already placed: ' + data.skipped.join(', '), 'info');
         } else {
