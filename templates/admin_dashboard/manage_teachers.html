@@ -16,244 +16,301 @@
     </button>
 </div>
 
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
+<!-- ══════════════════════ SCHOOL YEAR BANNER ══════════════════════ -->
+<div class="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+            <i class="bi bi-calendar-range text-indigo-600 text-lg"></i>
+        </div>
         <div>
-            <h1 class="text-2xl font-bold text-gray-800">All Teachers</h1>
-            <p class="text-gray-600 text-sm">Manage teacher accounts and information</p>
-        </div>
-        <div class="flex items-center space-x-3">
-            {% if archived_teachers %}
-            <button onclick="openModal('archivedModal')"
-                class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-lg transition-all shadow flex items-center border border-gray-300">
-                <i class="bi bi-archive text-lg mr-2"></i>
-                Archived
-                <span class="ml-2 bg-gray-400 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ archived_teachers.count }}</span>
-            </button>
-            {% endif %}
-            <button onclick="openAddModal()"
-                class="bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-lg flex items-center">
-                <i class="bi bi-person-plus text-xl mr-2"></i>
-                Add New Teacher
-            </button>
-        </div>
-    </div>
-
-    <!-- Search -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-        <form method="get" class="w-full">
-            <div class="relative">
-                <input type="text" name="search"
-                    placeholder="Search by name, email, or employee ID..."
-                    value="{{ search_query }}"
-                    class="w-full pl-12 pr-32 py-3.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 transition-all text-gray-700">
-                <i class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
-                <button type="submit"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md font-medium transition-colors">
-                    Search
-                </button>
-            </div>
-        </form>
-    </div>
-
-    <!-- Teachers Table -->
-    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-bold text-gray-800 flex items-center">
-                    <i class="bi bi-people text-2xl text-green-500 mr-3"></i>
-                    Registered Teachers
-                    <span class="ml-3 bg-green-100 text-green-700 text-sm font-semibold px-3 py-1 rounded-full">
-                        {{ teachers|length }}
-                    </span>
-                </h2>
-            </div>
-        </div>
-
-        <div class="p-6">
-            {% if teachers %}
-            <!-- Desktop View -->
-            <div class="hidden md:block overflow-x-auto">
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b-2 border-gray-200">
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Employee ID</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Name</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Department</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Subjects</th>
-                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        {% for teacher in teachers %}
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-4 py-4">
-                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800">
-                                    {{ teacher.employee_id }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-4">
-                                <div class="flex items-center">
-                                    <div class="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center mr-3 text-white font-semibold">
-                                        {{ teacher.user.first_name|first }}{{ teacher.user.last_name|first }}
-                                    </div>
-                                    <span class="font-semibold text-gray-800">{{ teacher.user.get_full_name }}</span>
-                                </div>
-                            </td>
-                            <td class="px-4 py-4 text-gray-600 text-sm">
-                                <div class="flex items-center">
-                                    <i class="bi bi-envelope text-gray-400 mr-2"></i>
-                                    {{ teacher.user.email }}
-                                </div>
-                            </td>
-                            <td class="px-4 py-4">
-                                <span class="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-700">
-                                    <i class="bi bi-building mr-1"></i>
-                                    {{ teacher.department.name }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-4">
-                                <div class="flex flex-wrap gap-1">
-                                    {% for subj in teacher.subjects.all %}
-                                        {% if forloop.counter <= 3 %}
-                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 font-mono" title="{{ subj.name }}">{{ subj.code }}</span>
-                                        {% elif forloop.counter == 4 %}
-                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-600 cursor-default"
-                                              title="{% for s in teacher.subjects.all %}{% if forloop.counter > 3 %}{{ s.code }}{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}">+{{ teacher.subjects.count|add:"-3" }} more</span>
-                                        {% endif %}
-                                    {% empty %}
-                                    <span class="text-xs text-gray-400 italic">None</span>
-                                    {% endfor %}
-                                </div>
-                            </td>
-                            <td class="px-4 py-4">
-                                <div class="flex items-center justify-center space-x-2">
-                                    <button onclick="openEditModal(
-                                                '{{ teacher.pk }}',
-                                                '{{ teacher.user.first_name|escapejs }}',
-                                                '{{ teacher.user.last_name|escapejs }}',
-                                                '{{ teacher.user.email|escapejs }}',
-                                                '{{ teacher.employee_id|escapejs }}',
-                                                '{{ teacher.department.pk }}',
-                                                '{{ teacher.phone|default:''|escapejs }}',
-                                                '{{ teacher.user.username|escapejs }}'
-                                            )"
-                                        class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow flex items-center" title="Edit Teacher">
-                                        <i class="bi bi-pencil-square"></i>
-                                    </button>
-                                    <button onclick="openArchiveModal(
-                                                '{{ teacher.pk }}',
-                                                '{{ teacher.user.get_full_name|escapejs }}',
-                                                '{{ teacher.employee_id|escapejs }}',
-                                                '{{ teacher.user.email|escapejs }}',
-                                                '{{ teacher.department.name|escapejs }}'
-                                            )"
-                                        class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow flex items-center" title="Archive Teacher">
-                                        <i class="bi bi-archive"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Mobile View -->
-            <div class="md:hidden space-y-4">
-                {% for teacher in teachers %}
-                <div class="bg-gray-50 rounded-xl p-4 border-l-4 border-green-500 hover:shadow-md transition-shadow">
-                    <div class="flex items-start justify-between mb-3">
-                        <div class="flex items-center">
-                            <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center mr-3 text-white font-semibold text-lg">
-                                {{ teacher.user.first_name|first }}{{ teacher.user.last_name|first }}
-                            </div>
-                            <div>
-                                <h3 class="font-bold text-gray-800">{{ teacher.user.get_full_name }}</h3>
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">
-                                    {{ teacher.employee_id }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="space-y-2 mb-3 text-sm">
-                        <div class="flex items-center text-gray-600">
-                            <i class="bi bi-envelope text-gray-400 mr-2"></i>{{ teacher.user.email }}
-                        </div>
-                        <div class="flex items-center">
-                            <i class="bi bi-building text-blue-500 mr-2"></i>
-                            <span class="text-blue-700 font-medium">{{ teacher.department.name }}</span>
-                        </div>
-                    </div>
-                    <div class="flex space-x-2">
-                        <button onclick="openEditModal(
-                                    '{{ teacher.pk }}',
-                                    '{{ teacher.user.first_name|escapejs }}',
-                                    '{{ teacher.user.last_name|escapejs }}',
-                                    '{{ teacher.user.email|escapejs }}',
-                                    '{{ teacher.employee_id|escapejs }}',
-                                    '{{ teacher.department.pk }}',
-                                    '{{ teacher.phone|default:''|escapejs }}',
-                                    '{{ teacher.user.username|escapejs }}'
-                                )"
-                            class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-center">
-                            <i class="bi bi-pencil-square mr-1"></i> Edit
-                        </button>
-                        <button onclick="openArchiveModal(
-                                    '{{ teacher.pk }}',
-                                    '{{ teacher.user.get_full_name|escapejs }}',
-                                    '{{ teacher.employee_id|escapejs }}',
-                                    '{{ teacher.user.email|escapejs }}',
-                                    '{{ teacher.department.name|escapejs }}'
-                                )"
-                            class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-center">
-                            <i class="bi bi-archive mr-1"></i> Archive
-                        </button>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
+            <p class="text-xs font-semibold text-indigo-500 uppercase tracking-wider">Current School Year</p>
+            {% if current_year %}
+            <p class="text-lg font-bold text-indigo-800">{{ current_year.name }}</p>
             {% else %}
-            <!-- Empty State -->
-            <div class="text-center py-16">
-                <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="bi bi-people text-5xl text-gray-400"></i>
-                </div>
-                <h3 class="text-xl font-bold text-gray-700 mb-2">No Teachers Found</h3>
-                <p class="text-gray-500 mb-6">
-                    {% if search_query %}No teachers match your search criteria{% else %}Get started by adding your first teacher{% endif %}
-                </p>
-                <button onclick="openAddModal()"
-                    class="inline-flex items-center px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all">
-                    <i class="bi bi-person-plus mr-2"></i> Add Teacher
-                </button>
-            </div>
+            <p class="text-sm font-semibold text-red-600">⚠ No current school year set</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="flex items-center gap-3">
+        <!-- School year switcher (view past years, read-only) -->
+        {% if all_years %}
+        <form method="get" id="yearSwitchForm" class="flex items-center gap-2">
+            {% if request.GET.search %}<input type="hidden" name="search" value="{{ request.GET.search }}">{% endif %}
+            <label class="text-xs font-semibold text-gray-600">Viewing:</label>
+            <select name="year" onchange="document.getElementById('yearSwitchForm').submit()"
+                    class="text-sm border-2 border-indigo-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-indigo-400 transition-colors">
+                <option value="">Current ({{ current_year.name|default:"None" }})</option>
+                {% for sy in all_years %}
+                <option value="{{ sy.pk }}" {% if view_year and view_year.pk == sy.pk and not request.GET.year == "" %}selected{% endif %}>
+                    {{ sy.name }}{% if sy.is_current %} ★{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+        {% endif %}
+        {% if view_year and not view_year.is_current %}
+        <span class="inline-flex items-center gap-1.5 bg-amber-100 text-amber-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-amber-200">
+            <i class="bi bi-eye"></i> Read-only — past year
+        </span>
+        {% endif %}
+        <a href="{% url 'accounts:manage_school_years' %}"
+           class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors shadow">
+            <i class="bi bi-gear"></i> Manage School Years
+        </a>
+    </div>
+</div>
+
+<!-- Header -->
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">All Teachers</h1>
+        <p class="text-gray-600 text-sm">Manage teacher accounts and subject assignments</p>
+    </div>
+    <div class="flex items-center space-x-3">
+        {% if archived_teachers %}
+        <button onclick="openModal('archivedModal')"
+            class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-lg transition-all shadow flex items-center border border-gray-300">
+            <i class="bi bi-archive text-lg mr-2"></i>
+            Archived
+            <span class="ml-2 bg-gray-400 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ archived_teachers.count }}</span>
+        </button>
+        {% endif %}
+        <button onclick="openAddModal()"
+            class="bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-lg flex items-center">
+            <i class="bi bi-person-plus text-xl mr-2"></i>
+            Add New Teacher
+        </button>
+    </div>
+</div>
+
+<!-- Search -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <form method="get" class="w-full">
+        {% if view_year %}<input type="hidden" name="year" value="{{ view_year.pk }}">{% endif %}
+        <div class="relative">
+            <input type="text" name="search"
+                placeholder="Search by name, email, or employee ID..."
+                value="{{ search_query }}"
+                class="w-full pl-12 pr-32 py-3.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 transition-all text-gray-700">
+            <i class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
+            <button type="submit"
+                class="absolute right-2 top-1/2 -translate-y-1/2 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md font-medium transition-colors">
+                Search
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Teachers Table -->
+<div class="bg-white rounded-xl shadow-lg overflow-hidden">
+    <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                <i class="bi bi-people text-2xl text-green-500 mr-3"></i>
+                Registered Teachers
+                <span class="ml-3 bg-green-100 text-green-700 text-sm font-semibold px-3 py-1 rounded-full">
+                    {{ teachers|length }}
+                </span>
+            </h2>
+            {% if view_year %}
+            <span class="text-sm text-gray-500">
+                Showing subjects for <strong class="text-indigo-700">{{ view_year.name }}</strong>
+                {% if not view_year.is_current %}<span class="ml-2 text-amber-600 font-semibold">(read-only)</span>{% endif %}
+            </span>
             {% endif %}
         </div>
     </div>
 
-    {% if teachers %}
-    <div class="mt-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-        <div class="flex items-center justify-between">
-            <div>
-                <h3 class="text-lg font-bold text-gray-800 mb-2">Teacher Summary</h3>
-                <div class="flex items-center space-x-6 text-sm">
+    <div class="p-6">
+        {% if teachers %}
+        <!-- Desktop View -->
+        <div class="hidden md:block overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b-2 border-gray-200">
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Employee ID</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Name</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Department</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            Subjects
+                            {% if view_year %}<span class="text-indigo-500 font-normal normal-case">({{ view_year.name }})</span>{% endif %}
+                        </th>
+                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for teacher in teachers %}
+                    {% with sy_subjects=teacher_subjects_json|default:"{}" %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-4">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800">
+                                {{ teacher.employee_id }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-4">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center mr-3 text-white font-semibold">
+                                    {{ teacher.user.first_name|first }}{{ teacher.user.last_name|first }}
+                                </div>
+                                <span class="font-semibold text-gray-800">{{ teacher.user.get_full_name }}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-4 text-gray-600 text-sm">
+                            <div class="flex items-center">
+                                <i class="bi bi-envelope text-gray-400 mr-2"></i>
+                                {{ teacher.user.email }}
+                            </div>
+                        </td>
+                        <td class="px-4 py-4">
+                            <span class="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-700">
+                                <i class="bi bi-building mr-1"></i>
+                                {{ teacher.department.name }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-4" id="subj-cell-{{ teacher.pk }}">
+                            <!-- Rendered by JS from teacher_subjects_json -->
+                            <span class="text-xs text-gray-400 italic subj-loading">Loading…</span>
+                        </td>
+                        <td class="px-4 py-4">
+                            <div class="flex items-center justify-center space-x-2">
+                                <button onclick="openEditModal(
+                                            '{{ teacher.pk }}',
+                                            '{{ teacher.user.first_name|escapejs }}',
+                                            '{{ teacher.user.last_name|escapejs }}',
+                                            '{{ teacher.user.email|escapejs }}',
+                                            '{{ teacher.employee_id|escapejs }}',
+                                            '{{ teacher.department.pk }}',
+                                            '{{ teacher.phone|default:''|escapejs }}',
+                                            '{{ teacher.user.username|escapejs }}'
+                                        )"
+                                    class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow flex items-center" title="Edit Teacher">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                <button onclick="openArchiveModal(
+                                            '{{ teacher.pk }}',
+                                            '{{ teacher.user.get_full_name|escapejs }}',
+                                            '{{ teacher.employee_id|escapejs }}',
+                                            '{{ teacher.user.email|escapejs }}',
+                                            '{{ teacher.department.name|escapejs }}'
+                                        )"
+                                    class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow flex items-center" title="Archive Teacher">
+                                    <i class="bi bi-archive"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endwith %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Mobile View -->
+        <div class="md:hidden space-y-4">
+            {% for teacher in teachers %}
+            <div class="bg-gray-50 rounded-xl p-4 border-l-4 border-green-500 hover:shadow-md transition-shadow">
+                <div class="flex items-start justify-between mb-3">
                     <div class="flex items-center">
-                        <i class="bi bi-people text-green-600 text-xl mr-2"></i>
-                        <span class="text-gray-600">Total: <strong class="text-gray-800">{{ teachers|length }}</strong></span>
+                        <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center mr-3 text-white font-semibold text-lg">
+                            {{ teacher.user.first_name|first }}{{ teacher.user.last_name|first }}
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-gray-800">{{ teacher.user.get_full_name }}</h3>
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">
+                                {{ teacher.employee_id }}
+                            </span>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="hidden sm:block">
-                <div class="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center">
-                    <i class="bi bi-person-badge text-white text-2xl"></i>
+                <div class="space-y-2 mb-3 text-sm">
+                    <div class="flex items-center text-gray-600">
+                        <i class="bi bi-envelope text-gray-400 mr-2"></i>{{ teacher.user.email }}
+                    </div>
+                    <div class="flex items-center">
+                        <i class="bi bi-building text-blue-500 mr-2"></i>
+                        <span class="text-blue-700 font-medium">{{ teacher.department.name }}</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <i class="bi bi-journal-bookmark text-indigo-400 mt-0.5"></i>
+                        <div id="subj-cell-mobile-{{ teacher.pk }}" class="flex flex-wrap gap-1">
+                            <span class="text-xs text-gray-400 italic subj-loading">Loading…</span>
+                        </div>
+                    </div>
                 </div>
+                <div class="flex space-x-2">
+                    <button onclick="openEditModal(
+                                '{{ teacher.pk }}',
+                                '{{ teacher.user.first_name|escapejs }}',
+                                '{{ teacher.user.last_name|escapejs }}',
+                                '{{ teacher.user.email|escapejs }}',
+                                '{{ teacher.employee_id|escapejs }}',
+                                '{{ teacher.department.pk }}',
+                                '{{ teacher.phone|default:''|escapejs }}',
+                                '{{ teacher.user.username|escapejs }}'
+                            )"
+                        class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-center">
+                        <i class="bi bi-pencil-square mr-1"></i> Edit
+                    </button>
+                    <button onclick="openArchiveModal(
+                                '{{ teacher.pk }}',
+                                '{{ teacher.user.get_full_name|escapejs }}',
+                                '{{ teacher.employee_id|escapejs }}',
+                                '{{ teacher.user.email|escapejs }}',
+                                '{{ teacher.department.name|escapejs }}'
+                            )"
+                        class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-center">
+                        <i class="bi bi-archive mr-1"></i> Archive
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="text-center py-16">
+            <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="bi bi-people text-5xl text-gray-400"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-700 mb-2">No Teachers Found</h3>
+            <p class="text-gray-500 mb-6">
+                {% if search_query %}No teachers match your search criteria{% else %}Get started by adding your first teacher{% endif %}
+            </p>
+            <button onclick="openAddModal()"
+                class="inline-flex items-center px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all">
+                <i class="bi bi-person-plus mr-2"></i> Add Teacher
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if teachers %}
+<div class="mt-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+    <div class="flex items-center justify-between">
+        <div>
+            <h3 class="text-lg font-bold text-gray-800 mb-2">Teacher Summary</h3>
+            <div class="flex items-center space-x-6 text-sm">
+                <div class="flex items-center">
+                    <i class="bi bi-people text-green-600 text-xl mr-2"></i>
+                    <span class="text-gray-600">Total: <strong class="text-gray-800">{{ teachers|length }}</strong></span>
+                </div>
+                {% if current_year %}
+                <div class="flex items-center">
+                    <i class="bi bi-calendar-range text-indigo-500 text-xl mr-2"></i>
+                    <span class="text-gray-600">Active School Year: <strong class="text-indigo-700">{{ current_year.name }}</strong></span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="hidden sm:block">
+            <div class="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center">
+                <i class="bi bi-person-badge text-white text-2xl"></i>
             </div>
         </div>
     </div>
-    {% endif %}
+</div>
+{% endif %}
 
 
 <!-- ===================== MODAL BACKDROP ===================== -->
@@ -283,7 +340,6 @@
         <form id="addForm" action="{% url 'accounts:add_teacher' %}" class="p-6 space-y-5">
             {% csrf_token %}
 
-            <!-- General error -->
             <div id="add_general_error" class="hidden bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
                 <i class="bi bi-exclamation-circle-fill text-red-500 mt-0.5 flex-shrink-0"></i>
                 <p id="add_general_error_text" class="text-sm text-red-700"></p>
@@ -380,26 +436,31 @@
 
             <hr class="border-gray-200">
 
-            <!-- Subject Assignment -->
+            <!-- Subject Assignment for current school year -->
             <div>
-                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center">
                     <i class="bi bi-journal-bookmark text-green-500 mr-2"></i>Assigned Subjects
+                    {% if current_year %}
+                    <span class="ml-2 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ current_year.name }}</span>
+                    {% endif %}
                 </h3>
-                <!-- Placeholder when no department is selected -->
-                <div id="add_no_dept_msg" class="flex items-center gap-2 text-sm text-gray-400 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl px-4 py-3">
+                {% if not current_year %}
+                <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700 flex items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    No current school year is set. Subject assignments won't be saved until a school year is configured.
+                </div>
+                {% endif %}
+                <div id="add_no_dept_msg" class="flex items-center gap-2 text-sm text-gray-400 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 mt-3">
                     <i class="bi bi-arrow-up-circle text-gray-300 text-lg"></i>
                     Select a department first to assign subjects
                 </div>
-                <!-- Subject picker (shown after dept selected) -->
-                <div id="add_subject_picker" class="hidden space-y-2">
-                    <!-- Dropdown trigger -->
+                <div id="add_subject_picker" class="hidden space-y-2 mt-3">
                     <div class="relative" id="add_subj_wrap">
                         <button type="button" onclick="toggleSubjDropdown('add')"
                                 class="w-full flex items-center justify-between px-4 py-2.5 border-2 border-gray-200 rounded-xl bg-white text-sm hover:border-green-400 focus:outline-none focus:border-green-400 transition-colors">
                             <span id="add_subj_trigger_text" class="text-gray-400">Select subjects…</span>
                             <i class="bi bi-chevron-down text-gray-400 text-xs transition-transform duration-200" id="add_subj_chevron"></i>
                         </button>
-                        <!-- Dropdown panel -->
                         <div id="add_subj_dropdown" class="hidden absolute z-50 w-full bg-white border-2 border-gray-200 rounded-xl shadow-xl mt-1 overflow-hidden" onclick="event.stopPropagation()">
                             <div class="p-2 border-b border-gray-100 bg-white sticky top-0">
                                 <div class="relative">
@@ -412,7 +473,6 @@
                             <div id="add_subj_list" class="overflow-y-auto max-h-48 divide-y divide-gray-100 text-sm"></div>
                         </div>
                     </div>
-                    <!-- Selected pills -->
                     <div>
                         <p class="text-xs text-gray-500 mb-1.5">Selected subjects:</p>
                         <div id="add_selected_pills" class="flex flex-wrap gap-1.5 min-h-[28px]">
@@ -465,7 +525,6 @@
         <form id="editForm" method="post" action="" class="p-6 space-y-5">
             {% csrf_token %}
 
-            <!-- General error -->
             <div id="edit_general_error" class="hidden bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
                 <i class="bi bi-exclamation-circle-fill text-red-500 mt-0.5 flex-shrink-0"></i>
                 <p id="edit_general_error_text" class="text-sm text-red-700"></p>
@@ -501,7 +560,7 @@
                 </div>
             </div>
 
-            <!-- ========== NEW: LOGIN CREDENTIALS SECTION ========== -->
+            <!-- Login Credentials -->
             <div>
                 <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
                     <i class="bi bi-shield-lock text-yellow-500 mr-2"></i>Login Credentials
@@ -511,8 +570,7 @@
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Username <span class="text-red-500">*</span></label>
                         <input type="text" name="username" id="edit_username"
                                data-req oninput="vBtn('edit')"
-                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors font-mono"
-                               placeholder="Username for login">
+                               class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors font-mono">
                         <p id="edit_username_error" class="text-red-500 text-xs mt-1 hidden"></p>
                         <p class="text-xs text-gray-500 mt-1">Leave unchanged if you don't want to modify</p>
                     </div>
@@ -527,7 +585,7 @@
                 <div class="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <p class="text-xs text-blue-700 flex items-center">
                         <i class="bi bi-info-circle-fill mr-2"></i>
-                        If you change username or password, the teacher will receive an email notification with their new credentials.
+                        If you change username or password, the teacher will receive an email notification.
                     </p>
                 </div>
             </div>
@@ -568,19 +626,43 @@
 
             <hr class="border-gray-200">
 
-            <!-- Subject Assignment (Edit) -->
+            <!-- Subject Assignment (current school year only) -->
             <div>
-                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center">
                     <i class="bi bi-journal-bookmark text-yellow-500 mr-2"></i>Assigned Subjects
+                    {% if current_year %}
+                    <span class="ml-2 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ current_year.name }}</span>
+                    {% endif %}
                 </h3>
-                <!-- Dropdown trigger -->
+                {% if not current_year %}
+                <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 text-sm text-amber-700 flex items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    No current school year set. Subject changes won't be saved.
+                </div>
+                {% else %}
+                <p class="text-xs text-gray-500 mb-3">
+                    Editing subjects for <strong class="text-indigo-700">{{ current_year.name }}</strong> only.
+                    Past year assignments are preserved as history.
+                </p>
+                {% endif %}
+
+                <!-- Past years history accordion -->
+                <div id="edit_past_years_section" class="mb-3 hidden">
+                    <button type="button" onclick="togglePastYears()"
+                            class="flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-800 font-semibold mb-2">
+                        <i class="bi bi-clock-history"></i>
+                        <span id="past_years_toggle_text">View assignment history</span>
+                        <i class="bi bi-chevron-down text-xs" id="past_years_chevron"></i>
+                    </button>
+                    <div id="edit_past_years_list" class="hidden space-y-2"></div>
+                </div>
+
                 <div class="relative" id="edit_subj_wrap">
                     <button type="button" onclick="toggleSubjDropdown('edit')"
                             class="w-full flex items-center justify-between px-4 py-2.5 border-2 border-gray-200 rounded-xl bg-white text-sm hover:border-yellow-400 focus:outline-none focus:border-yellow-400 transition-colors">
                         <span id="edit_subj_trigger_text" class="text-gray-400">Select subjects…</span>
                         <i class="bi bi-chevron-down text-gray-400 text-xs transition-transform duration-200" id="edit_subj_chevron"></i>
                     </button>
-                    <!-- Dropdown panel -->
                     <div id="edit_subj_dropdown" class="hidden absolute z-50 w-full bg-white border-2 border-gray-200 rounded-xl shadow-xl mt-1 overflow-hidden" onclick="event.stopPropagation()">
                         <div class="p-2 border-b border-gray-100 bg-white sticky top-0">
                             <div class="relative">
@@ -593,7 +675,6 @@
                         <div id="edit_subj_list" class="overflow-y-auto max-h-48 divide-y divide-gray-100 text-sm"></div>
                     </div>
                 </div>
-                <!-- Selected pills -->
                 <div class="mt-2">
                     <p class="text-xs text-gray-500 mb-1.5">Selected subjects:</p>
                     <div id="edit_selected_pills" class="flex flex-wrap gap-1.5 min-h-[28px]">
@@ -619,6 +700,9 @@
     </div>
 </div>
 
+
+<!-- ===================== ARCHIVE / ARCHIVED / PERM DELETE MODALS ===================== -->
+<!-- (Unchanged from original — keep your existing archive, archivedModal, permDeleteModal here) -->
 
 <!-- ===================== ARCHIVE TEACHER MODAL ===================== -->
 <div id="archiveModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
@@ -656,6 +740,7 @@
                     <ul class="text-sm text-yellow-700 space-y-1">
                         <li>• Teacher will no longer appear in the active list</li>
                         <li>• Their account and questionnaires are preserved</li>
+                        <li>• Subject assignment history is preserved</li>
                         <li>• Can be restored at any time</li>
                     </ul>
                 </div>
@@ -673,7 +758,6 @@
     </div>
     </div>
 </div>
-
 
 <!-- ===================== ARCHIVED TEACHERS MODAL ===================== -->
 <div id="archivedModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
@@ -737,7 +821,6 @@
     </div>
 </div>
 
-
 <!-- ===================== PERM DELETE TEACHER MODAL ===================== -->
 <div id="permDeleteModal" class="fixed inset-0 overflow-y-auto hidden" style="z-index:60;">
     <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closePermDeleteModal();">
@@ -764,6 +847,7 @@
                     <i class="bi bi-exclamation-triangle-fill text-red-500 text-lg flex-shrink-0 mt-0.5"></i>
                     <ul class="text-sm text-red-700 space-y-1">
                         <li>• Permanently deletes account and login access</li>
+                        <li>• All subject assignment history will be deleted</li>
                         <li>• Uploaded questionnaires remain in the system</li>
                     </ul>
                 </div>
@@ -784,13 +868,17 @@
 
 
 <script>
-    // ── URL templates rendered by Django — no hardcoded paths ────────────────
+    // ── URL templates ────────────────────────────────────────────────────────
     const EDIT_URL_TEMPLATE        = "{% url 'accounts:edit_teacher' pk=0 %}";
     const ARCHIVE_URL_TEMPLATE     = "{% url 'accounts:archive_teacher' pk=0 %}";
     const PERM_DELETE_URL_TEMPLATE = "{% url 'accounts:permanent_delete_teacher' pk=0 %}";
+    const SUBJECTS_AJAX_URL        = "{% url 'accounts:get_subjects_by_department' %}";
+    const ASSIGNMENTS_GET_URL      = "{% url 'accounts:get_teacher_subject_assignments' %}";
+    const ASSIGNMENTS_SAVE_URL     = "{% url 'accounts:save_teacher_subject_assignments' %}";
+    const HAS_CURRENT_YEAR         = {{ current_year|yesno:"true,false" }};
+    const CURRENT_YEAR_NAME        = "{{ current_year.name|default:'' }}";
 
     function makeUrl(template, pk) {
-        // Replace the trailing /0/ with the real pk
         return template.replace('/0/', '/' + pk + '/');
     }
 
@@ -825,7 +913,7 @@
         }, 200);
     }
 
-    /* ── Validate / loading state helpers ──────────────────────── */
+    /* ── Validate / loading state helpers ──────────────────────────────────── */
     function vBtn(prefix) {
         const btn = document.getElementById(prefix + 'SubmitBtn');
         if (!btn) return;
@@ -857,7 +945,6 @@
         vBtn(btnId.replace('SubmitBtn', ''));
     }
 
-    /* ── AJAX helpers ───────────────────────────────────────────── */
     function getCookie(name) {
         let val = null;
         if (document.cookie && document.cookie !== '') {
@@ -899,6 +986,197 @@
         });
     }
 
+    /* ── Subject picker state ───────────────────────────────────────────────── */
+    const TEACHER_SUBJECTS_MAP = {{ teacher_subjects_json|safe }};
+    const subjectState = { add: new Map(), edit: new Map() };
+    const allSubjects  = { add: [], edit: [] };
+    let   currentEditTeacherPk = null;
+
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function openSubjDropdown(prefix) {
+        document.getElementById(prefix + '_subj_dropdown').classList.remove('hidden');
+        document.getElementById(prefix + '_subj_chevron').style.transform = 'rotate(180deg)';
+        document.getElementById(prefix + '_subj_search').focus();
+    }
+    function closeSubjDropdown(prefix) {
+        document.getElementById(prefix + '_subj_dropdown').classList.add('hidden');
+        document.getElementById(prefix + '_subj_chevron').style.transform = '';
+    }
+    function toggleSubjDropdown(prefix) {
+        const dd = document.getElementById(prefix + '_subj_dropdown');
+        if (dd.classList.contains('hidden')) { openSubjDropdown(prefix); } else { closeSubjDropdown(prefix); }
+    }
+    document.addEventListener('click', function(e) {
+        ['add', 'edit'].forEach(prefix => {
+            const wrap = document.getElementById(prefix + '_subj_wrap');
+            if (wrap && !wrap.contains(e.target)) closeSubjDropdown(prefix);
+        });
+    });
+
+    function loadSubjectsForPicker(prefix, deptId, preselected) {
+        allSubjects[prefix] = [];
+        subjectState[prefix] = new Map();
+        renderSubjectList(prefix);
+        renderPills(prefix);
+        updateTriggerText(prefix);
+        if (!deptId) return;
+        fetch(SUBJECTS_AJAX_URL + '?department_id=' + encodeURIComponent(deptId))
+            .then(r => r.json())
+            .then(data => {
+                allSubjects[prefix] = data.subjects || [];
+                if (preselected) {
+                    preselected.forEach(s => {
+                        if (data.subjects.find(x => x.id == s.id)) {
+                            subjectState[prefix].set(s.id, s);
+                        }
+                    });
+                }
+                renderSubjectList(prefix);
+                renderPills(prefix);
+                updateTriggerText(prefix);
+            })
+            .catch(() => {
+                document.getElementById(prefix + '_subj_list').innerHTML =
+                    '<p class="text-xs text-red-400 px-4 py-3 italic">Could not load subjects.</p>';
+            });
+        if (prefix === 'add') {
+            document.getElementById('add_no_dept_msg').classList.add('hidden');
+            document.getElementById('add_subject_picker').classList.remove('hidden');
+        }
+    }
+
+    function renderSubjectList(prefix) {
+        const search = (document.getElementById(prefix + '_subj_search')?.value || '').toLowerCase();
+        const listEl = document.getElementById(prefix + '_subj_list');
+        if (!listEl) return;
+        const items = allSubjects[prefix].filter(s =>
+            s.code.toLowerCase().includes(search) || s.name.toLowerCase().includes(search)
+        );
+        if (!allSubjects[prefix].length) {
+            listEl.innerHTML = '<p class="text-xs text-gray-400 px-4 py-3 italic">No subjects available for this department</p>';
+            return;
+        }
+        if (!items.length) {
+            listEl.innerHTML = '<p class="text-xs text-gray-400 px-4 py-3 italic">No subjects match your search</p>';
+            return;
+        }
+        listEl.innerHTML = items.map(s => {
+            const sel = subjectState[prefix].has(s.id);
+            return `<div class="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors ${sel ? 'bg-green-50' : ''}"
+                        onclick="toggleSubject('${prefix}',${s.id},'${escHtml(s.code)}','${escHtml(s.name)}')">
+                      <i class="bi ${sel ? 'bi-check-square-fill text-green-500' : 'bi-square text-gray-300'} text-base flex-shrink-0"></i>
+                      <span class="font-mono text-xs text-gray-500 flex-shrink-0">${escHtml(s.code)}</span>
+                      <span class="text-sm ${sel ? 'text-green-700 font-medium' : 'text-gray-700'} truncate">${escHtml(s.name)}</span>
+                    </div>`;
+        }).join('');
+    }
+
+    function toggleSubject(prefix, id, code, name) {
+        id = parseInt(id, 10);
+        if (subjectState[prefix].has(id)) { subjectState[prefix].delete(id); }
+        else { subjectState[prefix].set(id, { id, code, name }); }
+        renderSubjectList(prefix);
+        renderPills(prefix);
+        updateTriggerText(prefix);
+    }
+
+    function updateTriggerText(prefix) {
+        const el = document.getElementById(prefix + '_subj_trigger_text');
+        if (!el) return;
+        const count = subjectState[prefix].size;
+        if (count === 0) { el.textContent = 'Select subjects…'; el.className = 'text-gray-400 text-sm'; }
+        else { el.textContent = count === 1 ? '1 subject selected' : count + ' subjects selected'; el.className = 'text-gray-700 text-sm font-medium'; }
+    }
+
+    function renderPills(prefix) {
+        const pillsEl  = document.getElementById(prefix + '_selected_pills');
+        const hiddenEl = document.getElementById(prefix + '_hidden_inputs');
+        const noneEl   = document.getElementById(prefix + '_none_pill');
+        if (!pillsEl) return;
+        const entries = [...subjectState[prefix].values()];
+        noneEl.style.display = entries.length ? 'none' : '';
+        pillsEl.querySelectorAll('.subj-pill').forEach(el => el.remove());
+        hiddenEl.innerHTML = '';
+        entries.forEach(s => {
+            const pill = document.createElement('span');
+            pill.className = 'subj-pill inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800';
+            pill.innerHTML = `<span class="font-mono">${escHtml(s.code)}</span>
+                <button type="button" onclick="toggleSubject('${prefix}',${s.id},'${escHtml(s.code)}','${escHtml(s.name)}')" class="ml-0.5 text-green-600 hover:text-red-500 leading-none font-bold">×</button>`;
+            pillsEl.insertBefore(pill, noneEl);
+            const inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'subjects[]'; inp.value = s.id;
+            hiddenEl.appendChild(inp);
+        });
+    }
+
+    function filterSubjectList(prefix) { renderSubjectList(prefix); }
+
+    /* ── Render subject pills in table cells ─────────────────────────────── */
+    function renderTableSubjectCells() {
+        Object.entries(TEACHER_SUBJECTS_MAP).forEach(([pk, subjects]) => {
+            // Desktop cell
+            const desktopCell = document.getElementById('subj-cell-' + pk);
+            if (desktopCell) {
+                desktopCell.innerHTML = renderSubjectPills(subjects);
+            }
+            // Mobile cell
+            const mobileCell = document.getElementById('subj-cell-mobile-' + pk);
+            if (mobileCell) {
+                mobileCell.innerHTML = renderSubjectPills(subjects);
+            }
+        });
+        // Clear any remaining "Loading…" spans
+        document.querySelectorAll('.subj-loading').forEach(el => {
+            if (el.closest('td') && !el.closest('td').innerHTML.includes('subj-pill') &&
+                !el.closest('div') || el.closest('div')?.id?.startsWith('subj-cell-mobile')) {
+                const cell = el.closest('td') || el.closest('div[id^="subj-cell-mobile"]');
+                if (cell && !cell.innerHTML.includes('font-mono')) {
+                    cell.innerHTML = '<span class="text-xs text-gray-400 italic">None assigned</span>';
+                }
+            } else if (el) {
+                // fallback: if cell was populated, remove leftover loading span
+                el.remove();
+            }
+        });
+        // Any cells with no data
+        document.querySelectorAll('[id^="subj-cell-"]').forEach(cell => {
+            if (cell.querySelector('.subj-loading')) {
+                cell.innerHTML = '<span class="text-xs text-gray-400 italic">None assigned</span>';
+            }
+        });
+    }
+
+    function renderSubjectPills(subjects) {
+        if (!subjects || !subjects.length) {
+            return '<span class="text-xs text-gray-400 italic">None assigned</span>';
+        }
+        const visible = subjects.slice(0, 3);
+        let html = visible.map(s =>
+            `<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 font-mono" title="${escHtml(s.name)}">${escHtml(s.code)}</span>`
+        ).join('');
+        if (subjects.length > 3) {
+            const extra = subjects.slice(3).map(s => s.code).join(', ');
+            html += `<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-600" title="${escHtml(extra)}">+${subjects.length - 3} more</span>`;
+        }
+        return `<div class="flex flex-wrap gap-1">${html}</div>`;
+    }
+
+    /* ── Past years history toggle ────────────────────────────────────────── */
+    let pastYearsOpen = false;
+    function togglePastYears() {
+        pastYearsOpen = !pastYearsOpen;
+        const list    = document.getElementById('edit_past_years_list');
+        const chevron = document.getElementById('past_years_chevron');
+        const text    = document.getElementById('past_years_toggle_text');
+        list.classList.toggle('hidden', !pastYearsOpen);
+        chevron.style.transform = pastYearsOpen ? 'rotate(180deg)' : '';
+        text.textContent = pastYearsOpen ? 'Hide assignment history' : 'View assignment history';
+    }
+
+    /* ── Add form submit ─────────────────────────────────────────────────────*/
     function submitAddTeacher() {
         setBtnLoading('addSubmitBtn');
         const form = document.getElementById('addForm');
@@ -924,10 +1202,12 @@
         });
     }
 
+    /* ── Edit form submit — save profile + subject assignments ───────────── */
     function submitEditTeacher() {
         setBtnLoading('editSubmitBtn');
         const form = document.getElementById('editForm');
         const data = new FormData(form);
+
         fetch(form.action, {
             method: 'POST',
             headers: { 'X-CSRFToken': getCookie('csrftoken') },
@@ -936,8 +1216,27 @@
         .then(r => r.json())
         .then(result => {
             if (result.success) {
-                sessionStorage.setItem('flashMessage', result.message);
-                window.location.reload();
+                // Also save subject assignments separately
+                if (HAS_CURRENT_YEAR && currentEditTeacherPk) {
+                    const assignData = new FormData();
+                    assignData.append('teacher_pk', currentEditTeacherPk);
+                    subjectState.edit.forEach((s, id) => {
+                        assignData.append('subject_ids[]', id);
+                    });
+                    return fetch(ASSIGNMENTS_SAVE_URL, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                        body: assignData,
+                    })
+                    .then(r => r.json())
+                    .then(() => {
+                        sessionStorage.setItem('flashMessage', result.message);
+                        window.location.reload();
+                    });
+                } else {
+                    sessionStorage.setItem('flashMessage', result.message);
+                    window.location.reload();
+                }
             } else {
                 resetBtn('editSubmitBtn');
                 showFormErrors('edit', EDIT_FIELDS, result.errors || {});
@@ -949,165 +1248,7 @@
         });
     }
 
-    /* ── Subject picker ─────────────────────────────────────────── */
-    const SUBJECTS_AJAX_URL = "{% url 'accounts:get_subjects_by_department' %}";
-    const TEACHER_SUBJECTS  = {{ teacher_subjects_json|safe }};
-
-    const subjectState = { add: new Map(), edit: new Map() };
-    const allSubjects  = { add: [], edit: [] };
-
-    function escHtml(s) {
-        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    /* ── Dropdown open / close ───────────────────────────────────── */
-    function openSubjDropdown(prefix) {
-        document.getElementById(prefix + '_subj_dropdown').classList.remove('hidden');
-        document.getElementById(prefix + '_subj_chevron').style.transform = 'rotate(180deg)';
-        document.getElementById(prefix + '_subj_search').focus();
-    }
-
-    function closeSubjDropdown(prefix) {
-        document.getElementById(prefix + '_subj_dropdown').classList.add('hidden');
-        document.getElementById(prefix + '_subj_chevron').style.transform = '';
-    }
-
-    function toggleSubjDropdown(prefix) {
-        const dd = document.getElementById(prefix + '_subj_dropdown');
-        if (dd.classList.contains('hidden')) { openSubjDropdown(prefix); }
-        else { closeSubjDropdown(prefix); }
-    }
-
-    /* Click outside → close dropdown */
-    document.addEventListener('click', function(e) {
-        ['add', 'edit'].forEach(prefix => {
-            const wrap = document.getElementById(prefix + '_subj_wrap');
-            if (wrap && !wrap.contains(e.target)) {
-                closeSubjDropdown(prefix);
-            }
-        });
-    });
-
-    /* ── Fetch subjects for a department ────────────────────────── */
-    function loadSubjectsForPicker(prefix, deptId, preselected) {
-        allSubjects[prefix] = [];
-        subjectState[prefix] = new Map();
-        renderSubjectList(prefix);
-        renderPills(prefix);
-        updateTriggerText(prefix);
-
-        if (!deptId) return;
-
-        fetch(SUBJECTS_AJAX_URL + '?department_id=' + encodeURIComponent(deptId))
-            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-            .then(data => {
-                allSubjects[prefix] = data.subjects || [];
-                if (preselected) {
-                    preselected.forEach(s => {
-                        if (data.subjects.find(x => x.id == s.id)) {
-                            subjectState[prefix].set(s.id, s);
-                        }
-                    });
-                }
-                renderSubjectList(prefix);
-                renderPills(prefix);
-                updateTriggerText(prefix);
-            })
-            .catch(() => {
-                document.getElementById(prefix + '_subj_list').innerHTML =
-                    '<p class="text-xs text-red-400 px-4 py-3 italic">Could not load subjects. Please try again.</p>';
-            });
-
-        if (prefix === 'add') {
-            document.getElementById('add_no_dept_msg').classList.add('hidden');
-            document.getElementById('add_subject_picker').classList.remove('hidden');
-        }
-    }
-
-    /* ── Render dropdown list ────────────────────────────────────── */
-    function renderSubjectList(prefix) {
-        const search = (document.getElementById(prefix + '_subj_search')?.value || '').toLowerCase();
-        const listEl = document.getElementById(prefix + '_subj_list');
-        if (!listEl) return;
-        const items = allSubjects[prefix].filter(s =>
-            s.code.toLowerCase().includes(search) || s.name.toLowerCase().includes(search)
-        );
-
-        if (!allSubjects[prefix].length) {
-            listEl.innerHTML = '<p class="text-xs text-gray-400 px-4 py-3 italic">No subjects available for this department</p>';
-            return;
-        }
-        if (!items.length) {
-            listEl.innerHTML = '<p class="text-xs text-gray-400 px-4 py-3 italic">No subjects match your search</p>';
-            return;
-        }
-
-        listEl.innerHTML = items.map(s => {
-            const sel = subjectState[prefix].has(s.id);
-            return `<div class="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors ${sel ? 'bg-green-50' : ''}"
-                        onclick="toggleSubject('${prefix}',${s.id},'${escHtml(s.code)}','${escHtml(s.name)}')">
-                      <i class="bi ${sel ? 'bi-check-square-fill text-green-500' : 'bi-square text-gray-300'} text-base flex-shrink-0"></i>
-                      <span class="font-mono text-xs text-gray-500 flex-shrink-0">${escHtml(s.code)}</span>
-                      <span class="text-sm ${sel ? 'text-green-700 font-medium' : 'text-gray-700'} truncate">${escHtml(s.name)}</span>
-                    </div>`;
-        }).join('');
-    }
-
-    /* ── Toggle subject selected state ──────────────────────────── */
-    function toggleSubject(prefix, id, code, name) {
-        id = parseInt(id, 10);
-        if (subjectState[prefix].has(id)) {
-            subjectState[prefix].delete(id);
-        } else {
-            subjectState[prefix].set(id, { id, code, name });
-        }
-        renderSubjectList(prefix);
-        renderPills(prefix);
-        updateTriggerText(prefix);
-    }
-
-    /* ── Update the dropdown trigger button text ─────────────────── */
-    function updateTriggerText(prefix) {
-        const triggerEl = document.getElementById(prefix + '_subj_trigger_text');
-        if (!triggerEl) return;
-        const count = subjectState[prefix].size;
-        if (count === 0) {
-            triggerEl.textContent = 'Select subjects…';
-            triggerEl.className = 'text-gray-400 text-sm';
-        } else {
-            triggerEl.textContent = count === 1 ? '1 subject selected' : count + ' subjects selected';
-            triggerEl.className = 'text-gray-700 text-sm font-medium';
-        }
-    }
-
-    /* ── Render selected pills + hidden inputs ───────────────────── */
-    function renderPills(prefix) {
-        const pillsEl  = document.getElementById(prefix + '_selected_pills');
-        const hiddenEl = document.getElementById(prefix + '_hidden_inputs');
-        const noneEl   = document.getElementById(prefix + '_none_pill');
-        if (!pillsEl) return;
-        const entries = [...subjectState[prefix].values()];
-
-        noneEl.style.display = entries.length ? 'none' : '';
-        pillsEl.querySelectorAll('.subj-pill').forEach(el => el.remove());
-        hiddenEl.innerHTML = '';
-
-        entries.forEach(s => {
-            const pill = document.createElement('span');
-            pill.className = 'subj-pill inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800';
-            pill.innerHTML = `<span class="font-mono">${escHtml(s.code)}</span>
-                <button type="button" onclick="toggleSubject('${prefix}',${s.id},'${escHtml(s.code)}','${escHtml(s.name)}')" class="ml-0.5 text-green-600 hover:text-red-500 leading-none font-bold">×</button>`;
-            pillsEl.insertBefore(pill, noneEl);
-
-            const inp = document.createElement('input');
-            inp.type = 'hidden'; inp.name = 'subjects[]'; inp.value = s.id;
-            hiddenEl.appendChild(inp);
-        });
-    }
-
-    function filterSubjectList(prefix) { renderSubjectList(prefix); }
-
-    /* ── Add modal: dept change handler ─────────────────────────── */
+    /* ── Open modals ────────────────────────────────────────────────────────*/
     function onAddDeptChange(deptId) {
         closeSubjDropdown('add');
         if (!deptId) {
@@ -1118,7 +1259,6 @@
         loadSubjectsForPicker('add', deptId, null);
     }
 
-    /* ── Reset add modal subject picker ─────────────────────────── */
     function resetAddSubjectPicker() {
         subjectState.add = new Map();
         allSubjects.add = [];
@@ -1141,6 +1281,7 @@
     }
 
     function openEditModal(pk, firstName, lastName, email, employeeId, deptPk, phone, username) {
+        currentEditTeacherPk = pk;
         clearFormErrors('edit', EDIT_FIELDS);
         document.getElementById('edit_first_name').value   = firstName;
         document.getElementById('edit_last_name').value    = lastName;
@@ -1160,23 +1301,73 @@
         document.getElementById('editTeacherDept').textContent = employeeId + ' — ' + deptName;
         document.getElementById('editForm').action             = makeUrl(EDIT_URL_TEMPLATE, pk);
 
+        // Past years toggle — reset
+        pastYearsOpen = false;
+        document.getElementById('edit_past_years_list').classList.add('hidden');
+        document.getElementById('edit_past_years_list').innerHTML = '';
+        if (document.getElementById('past_years_chevron')) {
+            document.getElementById('past_years_chevron').style.transform = '';
+            document.getElementById('past_years_toggle_text').textContent = 'View assignment history';
+        }
+
         closeSubjDropdown('edit');
         const search = document.getElementById('edit_subj_search');
         if (search) search.value = '';
-        const preselected = TEACHER_SUBJECTS[pk] || [];
-        loadSubjectsForPicker('edit', deptPk, preselected);
+
+        // Load current year's subjects from server
+        subjectState.edit = new Map();
+        allSubjects.edit  = [];
+        renderSubjectList('edit');
+        renderPills('edit');
+        updateTriggerText('edit');
+
+        const pastSection = document.getElementById('edit_past_years_section');
+
+        fetch(ASSIGNMENTS_GET_URL + '?teacher_pk=' + pk)
+            .then(r => r.json())
+            .then(data => {
+                const preselected = data.subjects || [];
+                loadSubjectsForPicker('edit', deptPk, preselected);
+            });
+
+        // Load past year history for accordion
+        fetch(ASSIGNMENTS_GET_URL + '?teacher_pk=' + pk + '&all_years=1')
+            .then(r => r.json())
+            .then(data => {
+                if (data.history && data.history.length > 1) {
+                    pastSection.classList.remove('hidden');
+                    const listEl = document.getElementById('edit_past_years_list');
+                    listEl.innerHTML = data.history
+                        .filter(yr => !yr.is_current)
+                        .map(yr => `
+                            <div class="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                                <p class="text-xs font-bold text-gray-600 mb-2 flex items-center gap-1">
+                                    <i class="bi bi-calendar-range text-indigo-400"></i> ${escHtml(yr.school_year)}
+                                </p>
+                                <div class="flex flex-wrap gap-1">
+                                    ${yr.subjects.length
+                                        ? yr.subjects.map(s => `<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 font-mono">${escHtml(s.code)}</span>`).join('')
+                                        : '<span class="text-xs text-gray-400 italic">None assigned</span>'
+                                    }
+                                </div>
+                            </div>`)
+                        .join('');
+                } else {
+                    pastSection.classList.add('hidden');
+                }
+            })
+            .catch(() => pastSection.classList.add('hidden'));
+
+        document.getElementById('edit_department').addEventListener('change', function() {
+            const preselected = [...subjectState.edit.values()];
+            closeSubjDropdown('edit');
+            loadSubjectsForPicker('edit', this.value, preselected);
+            vBtn('edit');
+        }, { once: true });
 
         openModal('editModal');
         vBtn('edit');
     }
-
-    /* When edit dept changes, reload subjects keeping still-valid selections */
-    document.getElementById('edit_department').addEventListener('change', function() {
-        const preselected = [...subjectState.edit.values()];
-        closeSubjDropdown('edit');
-        loadSubjectsForPicker('edit', this.value, preselected);
-        vBtn('edit');
-    });
 
     function openArchiveModal(pk, fullName, employeeId, email, deptName) {
         const parts    = fullName.trim().split(' ');
@@ -1187,7 +1378,6 @@
         document.getElementById('archiveEmployeeId').textContent   = employeeId;
         document.getElementById('archiveTeacherDept').textContent  = deptName;
         document.getElementById('archiveForm').action              = makeUrl(ARCHIVE_URL_TEMPLATE, pk);
-
         openModal('archiveModal');
     }
 
@@ -1198,7 +1388,7 @@
         document.getElementById('permDeleteName').textContent   = fullName;
         document.getElementById('permDeleteId').textContent     = employeeId;
         document.getElementById('permDeleteForm').action        = PERM_DELETE_URL_TEMPLATE.replace('/0/', '/' + pk + '/');
-        const modal = document.getElementById('permDeleteModal');
+        const modal   = document.getElementById('permDeleteModal');
         const content = document.getElementById('permDeleteModalContent');
         modal.classList.remove('hidden');
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -1215,11 +1405,13 @@
         setTimeout(() => modal.classList.add('hidden'), 200);
     }
 
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAllModals(); closePermDeleteModal(); } });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { closeAllModals(); closePermDeleteModal(); }
+    });
 
-
-    /* Flash message on reload */
+    /* ── Flash message on reload ────────────────────────────────────────── */
     window.addEventListener('load', function () {
+        renderTableSubjectCells();
         const msg = sessionStorage.getItem('flashMessage');
         if (msg) {
             const flash    = document.getElementById('ajaxFlash');

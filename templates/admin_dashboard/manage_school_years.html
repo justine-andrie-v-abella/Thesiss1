@@ -1,0 +1,428 @@
+{% extends 'base.html' %}
+{% block title %}Manage School Years{% endblock %}
+{% block header_title %}School Years{% endblock %}
+{% block header_subtitle %}Configure academic school years and set the current one{% endblock %}
+
+{% block content %}
+
+<!-- Flash -->
+<div id="ajaxFlash" class="hidden mb-4 bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded-xl flex items-center justify-between">
+    <div class="flex items-center">
+        <i class="bi bi-check-circle-fill text-green-500 text-lg mr-2"></i>
+        <span id="ajaxFlashMessage"></span>
+    </div>
+    <button onclick="document.getElementById('ajaxFlash').classList.add('hidden')" class="text-green-600 hover:text-green-800">
+        <i class="bi bi-x-lg"></i>
+    </button>
+</div>
+
+<!-- Current Year Banner -->
+<div class="mb-6 bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="w-14 h-14 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                <i class="bi bi-calendar-check text-white text-2xl"></i>
+            </div>
+            <div>
+                <p class="text-indigo-200 text-sm font-semibold uppercase tracking-wider">Current School Year</p>
+                {% if current_year %}
+                <p class="text-3xl font-bold">{{ current_year.name }}</p>
+                {% if current_year.start_date or current_year.end_date %}
+                <p class="text-indigo-200 text-sm mt-0.5">
+                    {% if current_year.start_date %}{{ current_year.start_date|date:"M d, Y" }}{% endif %}
+                    {% if current_year.start_date and current_year.end_date %} — {% endif %}
+                    {% if current_year.end_date %}{{ current_year.end_date|date:"M d, Y" }}{% endif %}
+                </p>
+                {% endif %}
+                {% else %}
+                <p class="text-xl font-bold text-yellow-300">⚠ Not set — please add and activate a school year</p>
+                {% endif %}
+            </div>
+        </div>
+        <button onclick="openCreateModal()"
+                class="flex items-center gap-2 bg-white text-indigo-700 font-bold px-5 py-3 rounded-xl hover:bg-indigo-50 transition-colors shadow">
+            <i class="bi bi-plus-lg"></i> New School Year
+        </button>
+    </div>
+</div>
+
+<!-- School Years List -->
+<div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 flex items-center justify-between">
+        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <i class="bi bi-list-ul text-indigo-500 text-xl"></i>
+            All School Years
+            <span class="bg-indigo-100 text-indigo-700 text-sm font-semibold px-3 py-0.5 rounded-full">{{ school_years|length }}</span>
+        </h2>
+    </div>
+
+    {% if school_years %}
+    <div class="divide-y divide-gray-100">
+        {% for sy in school_years %}
+        <div class="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors
+                    {% if sy.is_current %}bg-indigo-50 border-l-4 border-indigo-500{% endif %}">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 {% if sy.is_current %}bg-indigo-100{% else %}bg-gray-100{% endif %} rounded-xl flex items-center justify-center">
+                    <i class="bi bi-calendar-range {% if sy.is_current %}text-indigo-600{% else %}text-gray-400{% endif %}"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-gray-800 text-lg">{{ sy.name }}</span>
+                        {% if sy.is_current %}
+                        <span class="inline-flex items-center gap-1 bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
+                            <i class="bi bi-star-fill text-xs"></i> Current
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% if sy.start_date or sy.end_date %}
+                    <p class="text-sm text-gray-500">
+                        {% if sy.start_date %}{{ sy.start_date|date:"M d, Y" }}{% endif %}
+                        {% if sy.start_date and sy.end_date %} — {% endif %}
+                        {% if sy.end_date %}{{ sy.end_date|date:"M d, Y" }}{% endif %}
+                    </p>
+                    {% endif %}
+                    <p class="text-xs text-gray-400 mt-0.5">
+                        {{ sy.assignments.count }} teacher subject assignment{{ sy.assignments.count|pluralize }}
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                {% if not sy.is_current %}
+                <button onclick="setCurrentYear('{{ sy.pk }}', '{{ sy.name|escapejs }}')"
+                        class="flex items-center gap-1.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+                    <i class="bi bi-star"></i> Set as Current
+                </button>
+                <button onclick="confirmDeleteYear('{{ sy.pk }}', '{{ sy.name|escapejs }}')"
+                        class="flex items-center gap-1.5 bg-red-50 text-red-600 hover:bg-red-100 text-sm font-semibold px-3 py-2 rounded-lg transition-colors">
+                    <i class="bi bi-trash3"></i>
+                </button>
+                {% else %}
+                <span class="text-sm text-indigo-500 font-semibold italic">Active year</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+        <div class="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="bi bi-calendar-x text-4xl text-indigo-300"></i>
+        </div>
+        <h3 class="text-lg font-bold text-gray-700 mb-2">No School Years Yet</h3>
+        <p class="text-gray-500 mb-6">Create your first school year to start assigning subjects to teachers.</p>
+        <button onclick="openCreateModal()"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors">
+            <i class="bi bi-plus-lg"></i> Create School Year
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Info Box -->
+<div class="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-5">
+    <div class="flex items-start gap-3">
+        <i class="bi bi-info-circle-fill text-blue-500 text-lg mt-0.5 flex-shrink-0"></i>
+        <div class="text-sm text-blue-700 space-y-1">
+            <p><strong>How school years work:</strong></p>
+            <p>• The <strong>current school year</strong> is the active one — admins assign subjects to teachers under this year.</p>
+            <p>• When you set a new year as current, teachers' subject assignments are <strong>not automatically cleared</strong> — you manage assignments manually in the Manage Teachers page.</p>
+            <p>• Past year assignments are <strong>preserved as read-only history</strong> and can be viewed in the Manage Teachers page using the year switcher.</p>
+            <p>• You cannot delete the current school year.</p>
+        </div>
+    </div>
+</div>
+
+
+<!-- ═══ CREATE MODAL ═══ -->
+<div id="createModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeCreateModal();">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0"
+         id="createModalContent">
+        <div class="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-5 rounded-t-2xl flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                    <i class="bi bi-plus-circle text-white"></i>
+                </div>
+                <h2 class="text-lg font-bold text-white">New School Year</h2>
+            </div>
+            <button onclick="closeCreateModal()" class="text-white hover:text-indigo-200">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div id="create_general_error" class="hidden bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+                <i class="bi bi-exclamation-circle-fill text-red-500 flex-shrink-0"></i>
+                <span id="create_general_error_text"></span>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">School Year Name <span class="text-red-500">*</span></label>
+                <input type="text" id="create_name"
+                       class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors font-mono text-lg text-center tracking-widest"
+                       placeholder="2024-2025" maxlength="20">
+                <p class="text-xs text-gray-500 mt-1">Format: YYYY-YYYY (e.g. 2024-2025)</p>
+                <p id="create_name_error" class="text-red-500 text-xs mt-1 hidden"></p>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Start Date</label>
+                    <input type="date" id="create_start_date"
+                           class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">End Date</label>
+                    <input type="date" id="create_end_date"
+                           class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors">
+                </div>
+            </div>
+            <div class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
+                <input type="checkbox" id="create_set_current" class="w-4 h-4 accent-indigo-600">
+                <label for="create_set_current" class="text-sm font-semibold text-indigo-800 cursor-pointer">
+                    Set as current school year immediately
+                </label>
+            </div>
+            <div class="flex items-center justify-end gap-3 pt-2 border-t border-gray-200">
+                <button type="button" onclick="closeCreateModal()"
+                        class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors">
+                    Cancel
+                </button>
+                <button type="button" onclick="submitCreateYear()" id="createSubmitBtn"
+                        class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-7 py-2.5 rounded-xl font-medium transition-colors shadow">
+                    <i class="bi bi-plus-lg"></i> Create
+                </button>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<!-- ═══ CONFIRM SET CURRENT MODAL ═══ -->
+<div id="setCurrentModal" class="fixed inset-0 z-50 hidden" style="background:rgba(0,0,0,.5)">
+    <div class="flex min-h-full items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div class="text-center mb-4">
+            <div class="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="bi bi-star-fill text-indigo-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800">Set as Current Year?</h3>
+            <p class="text-sm text-gray-500 mt-1">This will become the active school year.</p>
+            <p class="mt-3 font-bold text-indigo-700 text-xl" id="confirm_year_name"></p>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
+            <p class="text-xs text-blue-700">Existing subject assignments for this year are preserved. New assignments added by admins will be stored under this year.</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="closeSetCurrentModal()" class="flex-1 px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Cancel</button>
+            <button onclick="confirmSetCurrent()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium">
+                Yes, Set Current
+            </button>
+        </div>
+    </div>
+    </div>
+</div>
+
+<!-- ═══ CONFIRM DELETE MODAL ═══ -->
+<div id="deleteModal" class="fixed inset-0 z-50 hidden" style="background:rgba(0,0,0,.5)">
+    <div class="flex min-h-full items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div class="text-center mb-4">
+            <div class="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="bi bi-trash3-fill text-red-500 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800">Delete School Year?</h3>
+            <p class="font-bold text-gray-700 text-lg mt-1" id="delete_year_name"></p>
+        </div>
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+            <p class="text-xs text-red-700">All subject assignment records for this school year will be permanently deleted. This cannot be undone.</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="closeDeleteModal()" class="flex-1 px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Cancel</button>
+            <button onclick="confirmDelete()" class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl font-medium">
+                Delete
+            </button>
+        </div>
+    </div>
+    </div>
+</div>
+
+
+<script>
+const MANAGE_URL = "{% url 'accounts:manage_school_years' %}";
+let _pendingPk   = null;
+let _pendingName = '';
+
+function getCookie(name) {
+    let val = null;
+    if (document.cookie) {
+        document.cookie.split(';').forEach(c => {
+            c = c.trim();
+            if (c.startsWith(name + '=')) val = decodeURIComponent(c.substring(name.length + 1));
+        });
+    }
+    return val;
+}
+
+function showFlash(msg) {
+    document.getElementById('ajaxFlashMessage').textContent = msg;
+    document.getElementById('ajaxFlash').classList.remove('hidden');
+    setTimeout(() => document.getElementById('ajaxFlash').classList.add('hidden'), 4000);
+}
+
+/* ── Create Modal ──────────────────────────────────────────────────────── */
+function openCreateModal() {
+    document.getElementById('createModal').classList.remove('hidden');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        const c = document.getElementById('createModalContent');
+        c.classList.remove('scale-95', 'opacity-0');
+        c.classList.add('scale-100', 'opacity-100');
+    }));
+    document.getElementById('create_name').value = '';
+    document.getElementById('create_start_date').value = '';
+    document.getElementById('create_end_date').value = '';
+    document.getElementById('create_set_current').checked = false;
+    document.getElementById('create_general_error').classList.add('hidden');
+    document.getElementById('create_name_error').classList.add('hidden');
+    setTimeout(() => document.getElementById('create_name').focus(), 150);
+}
+
+function closeCreateModal() {
+    const c = document.getElementById('createModalContent');
+    c.classList.remove('scale-100', 'opacity-100');
+    c.classList.add('scale-95', 'opacity-0');
+    setTimeout(() => document.getElementById('createModal').classList.add('hidden'), 200);
+}
+
+function submitCreateYear() {
+    const name       = document.getElementById('create_name').value.trim();
+    const start_date = document.getElementById('create_start_date').value;
+    const end_date   = document.getElementById('create_end_date').value;
+    const setCurrent = document.getElementById('create_set_current').checked;
+
+    document.getElementById('create_name_error').classList.add('hidden');
+    document.getElementById('create_general_error').classList.add('hidden');
+
+    if (!name) {
+        document.getElementById('create_name_error').textContent = 'School year name is required.';
+        document.getElementById('create_name_error').classList.remove('hidden');
+        return;
+    }
+
+    const btn = document.getElementById('createSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Creating…';
+
+    const fd = new FormData();
+    fd.append('action', 'create');
+    fd.append('name', name);
+    if (start_date) fd.append('start_date', start_date);
+    if (end_date)   fd.append('end_date', end_date);
+    if (setCurrent) fd.append('set_current', 'true');
+
+    fetch(MANAGE_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd,
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-plus-lg"></i> Create';
+        if (data.success) {
+            closeCreateModal();
+            sessionStorage.setItem('flashMessage', data.message);
+            window.location.reload();
+        } else {
+            if (data.errors?.name) {
+                document.getElementById('create_name_error').textContent = data.errors.name[0];
+                document.getElementById('create_name_error').classList.remove('hidden');
+            } else {
+                const errText = data.errors?.__all__?.[0] || 'An error occurred.';
+                document.getElementById('create_general_error_text').textContent = errText;
+                document.getElementById('create_general_error').classList.remove('hidden');
+            }
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-plus-lg"></i> Create';
+    });
+}
+
+/* ── Set Current ────────────────────────────────────────────────────────── */
+function setCurrentYear(pk, name) {
+    _pendingPk   = pk;
+    _pendingName = name;
+    document.getElementById('confirm_year_name').textContent = name;
+    document.getElementById('setCurrentModal').classList.remove('hidden');
+}
+function closeSetCurrentModal() {
+    document.getElementById('setCurrentModal').classList.add('hidden');
+    _pendingPk = null; _pendingName = '';
+}
+function confirmSetCurrent() {
+    if (!_pendingPk) return;
+    const fd = new FormData();
+    fd.append('action', 'set_current');
+    fd.append('pk', _pendingPk);
+    fetch(MANAGE_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd,
+    })
+    .then(r => r.json())
+    .then(data => {
+        closeSetCurrentModal();
+        if (data.success) {
+            sessionStorage.setItem('flashMessage', data.message);
+            window.location.reload();
+        }
+    });
+}
+
+/* ── Delete ─────────────────────────────────────────────────────────────── */
+function confirmDeleteYear(pk, name) {
+    _pendingPk   = pk;
+    _pendingName = name;
+    document.getElementById('delete_year_name').textContent = name;
+    document.getElementById('deleteModal').classList.remove('hidden');
+}
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.add('hidden');
+    _pendingPk = null; _pendingName = '';
+}
+function confirmDelete() {
+    if (!_pendingPk) return;
+    const fd = new FormData();
+    fd.append('action', 'delete');
+    fd.append('pk', _pendingPk);
+    fetch(MANAGE_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd,
+    })
+    .then(r => r.json())
+    .then(data => {
+        closeDeleteModal();
+        if (data.success) {
+            sessionStorage.setItem('flashMessage', data.message);
+            window.location.reload();
+        }
+    });
+}
+
+window.addEventListener('load', () => {
+    const msg = sessionStorage.getItem('flashMessage');
+    if (msg) {
+        showFlash(msg);
+        sessionStorage.removeItem('flashMessage');
+    }
+});
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        closeCreateModal();
+        closeSetCurrentModal();
+        closeDeleteModal();
+    }
+});
+</script>
+{% endblock %}
