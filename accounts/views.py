@@ -1777,32 +1777,59 @@ def subadmin_permanent_delete_teacher(request, pk):
 def teacher_dashboard(request):
     if request.user.is_staff:
         return redirect('accounts:admin_dashboard')
-    # For a dual-role user who hasn't picked a role yet (e.g. direct URL access),
-    # send them to the role picker rather than guessing.
+ 
     roles = _get_user_active_roles(request.user)
     if len(roles) > 1 and not request.session.get('active_role'):
         return redirect('accounts:choose_role')
-
+ 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
-
+ 
     from questionnaires.models import Questionnaire, Download
-
+ 
     my_uploads      = teacher.questionnaires.count()
     total_downloads = Download.objects.filter(questionnaire__uploader=teacher).count()
-
+ 
     current_month = timezone.now().month
-    current_year  = timezone.now().year
+    current_year_date = timezone.now().year
     uploads_this_month = teacher.questionnaires.filter(
         uploaded_at__month=current_month,
-        uploaded_at__year=current_year
+        uploaded_at__year=current_year_date
     ).count()
-
+ 
     upload_stats      = get_teacher_upload_stats(teacher)
     top_downloads     = Questionnaire.objects.filter(
         uploader=teacher
     ).annotate(download_count=Count('downloads')).order_by('-download_count')[:3]
     recent_activities = get_teacher_recent_activities(teacher)[:15]
-
+ 
+    # ── School year support ──────────────────────────────────────────────────
+    current_year = SchoolYear.get_current()
+    all_years    = SchoolYear.objects.all().order_by('-name')
+ 
+    # The teacher can switch to view a past year (read-only)
+    view_year_pk = request.GET.get('year', '')
+    if view_year_pk:
+        view_year = SchoolYear.objects.filter(pk=view_year_pk).first() or current_year
+    else:
+        view_year = current_year
+ 
+    # Subjects assigned to this teacher for the viewed year
+    assigned_subjects = []
+    if view_year:
+        assigned_subjects = list(
+            TeacherSubjectAssignment.objects
+            .filter(teacher=teacher, school_year=view_year)
+            .select_related('subject')
+            .order_by('subject__code')
+            .values_list('subject__id', 'subject__code', 'subject__name')
+        )
+        # Convert to simple objects for template
+        from types import SimpleNamespace
+        assigned_subjects = [
+            SimpleNamespace(id=row[0], code=row[1], name=row[2])
+            for row in assigned_subjects
+        ]
+ 
     context = {
         'teacher':            teacher,
         'my_uploads':         my_uploads,
@@ -1811,6 +1838,11 @@ def teacher_dashboard(request):
         'upload_stats':       upload_stats,
         'top_downloads':      top_downloads,
         'recent_activities':  recent_activities,
+        # school year
+        'current_year':       current_year,
+        'all_years':          all_years,
+        'view_year':          view_year,
+        'assigned_subjects':  assigned_subjects,
     }
     return render(request, 'teacher_dashboard/dashboard.html', context)
 
