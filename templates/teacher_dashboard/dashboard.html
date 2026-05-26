@@ -1,6 +1,3 @@
-<!-- ============================================================================
-FILE: templates/teacher_dashboard/dashboard.html
-============================================================================ -->
 {% extends 'base.html' %}
 
 {% block title %}Teacher Dashboard - Test Banking System{% endblock %}
@@ -9,6 +6,68 @@ FILE: templates/teacher_dashboard/dashboard.html
 {% block header_subtitle %}Your personal teaching hub for managing questionnaires{% endblock %}
 
 {% block content %}
+
+<!-- ══════════════════════ SCHOOL YEAR BANNER ══════════════════════ -->
+<div class="mb-6 bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-lg">
+    <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i class="bi bi-calendar-check text-white text-2xl"></i>
+        </div>
+        <div>
+            <p class="text-indigo-200 text-xs font-semibold uppercase tracking-wider">School Year</p>
+            {% if current_year %}
+                <p class="text-white text-2xl font-bold leading-tight">{{ current_year.name }}</p>
+            {% else %}
+                <p class="text-yellow-300 font-semibold">No active school year set</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="flex items-center gap-3 flex-wrap">
+        <!-- Past year viewer -->
+        {% if all_years|length > 1 %}
+        <form method="get" id="yearSwitchForm" class="flex items-center gap-2">
+            <label class="text-indigo-200 text-xs font-semibold whitespace-nowrap">View year:</label>
+            <select name="year" onchange="document.getElementById('yearSwitchForm').submit()"
+                    class="text-sm border-2 border-white border-opacity-30 rounded-lg px-3 py-1.5 bg-white bg-opacity-10 text-white focus:outline-none focus:border-white transition-colors">
+                {% for sy in all_years %}
+                <option value="{{ sy.pk }}"
+                        {% if view_year and view_year.pk == sy.pk %}selected{% endif %}
+                        class="text-gray-800 bg-white">
+                    {{ sy.name }}{% if sy.is_current %} (Current){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+        {% endif %}
+
+        {% if view_year and not view_year.is_current %}
+        <!-- Read-only past year warning -->
+        <span class="inline-flex items-center gap-1.5 bg-amber-400 bg-opacity-20 border border-amber-300 text-amber-100 text-xs font-semibold px-3 py-1.5 rounded-full">
+            <i class="bi bi-eye"></i> Viewing past year — uploads disabled
+        </span>
+        {% endif %}
+
+        <!-- Assigned subjects for the viewed year -->
+        {% if assigned_subjects %}
+        <div class="flex items-center gap-2 bg-white bg-opacity-10 rounded-xl px-4 py-2">
+            <i class="bi bi-journal-bookmark text-indigo-200 text-sm"></i>
+            <span class="text-indigo-100 text-xs font-semibold">My subjects:</span>
+            <div class="flex flex-wrap gap-1">
+                {% for subj in assigned_subjects %}
+                <span class="bg-white bg-opacity-20 text-white text-xs font-mono font-bold px-2 py-0.5 rounded-full" title="{{ subj.name }}">{{ subj.code }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="flex items-center gap-2 bg-white bg-opacity-10 rounded-xl px-4 py-2">
+            <i class="bi bi-journal-bookmark text-indigo-200 text-sm"></i>
+            <span class="text-indigo-200 text-xs italic">No subjects assigned for this year</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Stats Overview -->
 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
     <!-- My Uploads Card -->
@@ -109,16 +168,15 @@ FILE: templates/teacher_dashboard/dashboard.html
                     <i class="bi bi-graph-up text-indigo-500 mr-2"></i>
                     Upload Activity (Last 6 Months)
                 </h3>
-                <!-- Replace the existing chart container div -->
                 <div class="relative h-48 flex items-end justify-between space-x-2 bg-gray-50 rounded-lg p-2">
                     {% for month in upload_stats %}
                     <div class="flex-1 flex flex-col items-center justify-end h-full">
-                        <div class="w-full bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-lg 
-                                    hover:from-indigo-700 hover:to-indigo-500 transition-all cursor-pointer 
-                                    relative group border border-indigo-300 shadow-sm" 
+                        <div class="w-full bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-lg
+                                    hover:from-indigo-700 hover:to-indigo-500 transition-all cursor-pointer
+                                    relative group border border-indigo-300 shadow-sm"
                             style="height: {{ month.percentage }}%; min-height: 8px;">
-                            <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 
-                                        text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 
+                            <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800
+                                        text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100
                                         transition-opacity whitespace-nowrap z-10">
                                 {{ month.count }} upload{{ month.count|pluralize }}
                             </div>
@@ -126,7 +184,9 @@ FILE: templates/teacher_dashboard/dashboard.html
                         <span class="text-xs text-gray-600 mt-2 font-medium">{{ month.label }}</span>
                     </div>
                     {% empty %}
-                    <!-- your existing empty fallback -->
+                    <div class="w-full flex items-center justify-center text-gray-400">
+                        <p class="text-sm">No upload data yet</p>
+                    </div>
                     {% endfor %}
                 </div>
             </div>
@@ -165,7 +225,7 @@ FILE: templates/teacher_dashboard/dashboard.html
         </div>
     </div>
 
-    <!-- Recent Activity Feed - Takes 1 column -->
+    <!-- Recent Activity Feed -->
     <div class="bg-white rounded-xl shadow-lg overflow-hidden">
         <div class="bg-gradient-to-r from-pink-500 to-rose-600 px-6 py-4">
             <h2 class="text-xl font-bold text-white flex items-center">
@@ -179,7 +239,7 @@ FILE: templates/teacher_dashboard/dashboard.html
                 <div class="flex items-start pb-4 border-b border-gray-200 last:border-0">
                     <div class="w-10 h-10 rounded-full flex items-center justify-center mr-3 flex-shrink-0
                         {% if activity.type == 'upload' %}bg-blue-100{% elif activity.type == 'download' %}bg-green-100{% else %}bg-purple-100{% endif %}">
-                        <i class="bi 
+                        <i class="bi
                             {% if activity.type == 'upload' %}bi-upload text-blue-600
                             {% elif activity.type == 'download' %}bi-download text-green-600
                             {% else %}bi-bell text-purple-600{% endif %}">
@@ -207,9 +267,23 @@ FILE: templates/teacher_dashboard/dashboard.html
         <i class="bi bi-lightning-fill text-yellow-500 text-3xl mr-3"></i>
         <h2 class="text-2xl font-bold text-gray-800">Quick Actions</h2>
     </div>
-    
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Upload Questionnaire -->
+        <!-- Upload Questionnaire — disabled if viewing a past year -->
+        {% if view_year and not view_year.is_current %}
+        <div class="group bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border-2 border-gray-200 opacity-60 cursor-not-allowed relative overflow-hidden">
+            <div class="absolute top-3 right-3">
+                <span class="bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-1 rounded-full">Past Year</span>
+            </div>
+            <div class="flex flex-col items-center text-center">
+                <div class="w-20 h-20 bg-gradient-to-br from-gray-400 to-gray-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                    <i class="bi bi-upload text-white text-4xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-500 mb-2">Upload Questionnaire</h3>
+                <p class="text-sm text-gray-400">Switch to the current year to upload</p>
+            </div>
+        </div>
+        {% else %}
         <a href="{% url 'questionnaires:upload_questionnaire' %}" class="group bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-blue-500">
             <div class="flex flex-col items-center text-center">
                 <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
@@ -219,26 +293,41 @@ FILE: templates/teacher_dashboard/dashboard.html
                 <p class="text-sm text-gray-600">Add new questionnaire to the system</p>
             </div>
         </a>
+        {% endif %}
 
         <!-- My Uploads -->
-        <a href="{% url 'questionnaires:my_uploads' %}" class="group bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-green-500">
+        <a href="{% url 'questionnaires:my_uploads' %}{% if view_year and not view_year.is_current %}?year={{ view_year.pk }}{% endif %}"
+           class="group bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-green-500">
             <div class="flex flex-col items-center text-center">
                 <div class="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
                     <i class="bi bi-file-person text-white text-4xl"></i>
                 </div>
                 <h3 class="text-xl font-bold text-gray-800 mb-2 group-hover:text-green-600 transition-colors">My Uploads</h3>
-                <p class="text-sm text-gray-600">View and manage your questionnaires</p>
+                <p class="text-sm text-gray-600">
+                    {% if view_year and not view_year.is_current %}
+                    Viewing {{ view_year.name }} uploads
+                    {% else %}
+                    View and manage your questionnaires
+                    {% endif %}
+                </p>
             </div>
         </a>
 
         <!-- Browse -->
-        <a href="{% url 'questionnaires:browse_questionnaires' %}" class="group bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-purple-500">
+        <a href="{% url 'questionnaires:browse_questionnaires' %}{% if view_year and not view_year.is_current %}?year={{ view_year.pk }}{% endif %}"
+           class="group bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 hover:shadow-xl transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-purple-500">
             <div class="flex flex-col items-center text-center">
                 <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
                     <i class="bi bi-search text-white text-4xl"></i>
                 </div>
                 <h3 class="text-xl font-bold text-gray-800 mb-2 group-hover:text-purple-600 transition-colors">Browse</h3>
-                <p class="text-sm text-gray-600">Find questionnaires from colleagues</p>
+                <p class="text-sm text-gray-600">
+                    {% if view_year and not view_year.is_current %}
+                    Viewing {{ view_year.name }} questionnaires
+                    {% else %}
+                    Find questionnaires from colleagues
+                    {% endif %}
+                </p>
             </div>
         </a>
     </div>
@@ -254,7 +343,6 @@ FILE: templates/teacher_dashboard/dashboard.html
     </div>
     <div class="p-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Name -->
             <div class="flex items-center p-4 bg-gray-50 rounded-lg">
                 <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
                     <i class="bi bi-person-badge text-blue-600 text-xl"></i>
@@ -264,8 +352,6 @@ FILE: templates/teacher_dashboard/dashboard.html
                     <p class="text-gray-800 font-semibold">{{ teacher.user.get_full_name }}</p>
                 </div>
             </div>
-
-            <!-- Email -->
             <div class="flex items-center p-4 bg-gray-50 rounded-lg">
                 <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
                     <i class="bi bi-envelope text-green-600 text-xl"></i>
@@ -275,8 +361,6 @@ FILE: templates/teacher_dashboard/dashboard.html
                     <p class="text-gray-800 font-semibold">{{ teacher.user.email }}</p>
                 </div>
             </div>
-
-            <!-- Employee ID -->
             <div class="flex items-center p-4 bg-gray-50 rounded-lg">
                 <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
                     <i class="bi bi-badge-tm text-purple-600 text-xl"></i>
@@ -286,8 +370,6 @@ FILE: templates/teacher_dashboard/dashboard.html
                     <p class="text-gray-800 font-semibold">{{ teacher.employee_id }}</p>
                 </div>
             </div>
-
-            <!-- Department -->
             <div class="flex items-center p-4 bg-gray-50 rounded-lg">
                 <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mr-4">
                     <i class="bi bi-building text-orange-600 text-xl"></i>
@@ -297,8 +379,6 @@ FILE: templates/teacher_dashboard/dashboard.html
                     <p class="text-gray-800 font-semibold">{{ teacher.department.name }}</p>
                 </div>
             </div>
-
-            <!-- Phone -->
             <div class="flex items-center p-4 bg-gray-50 rounded-lg md:col-span-2">
                 <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center mr-4">
                     <i class="bi bi-telephone text-pink-600 text-xl"></i>
@@ -319,30 +399,14 @@ FILE: templates/teacher_dashboard/dashboard.html
         0%, 100% { transform: translateY(0px); }
         50% { transform: translateY(-10px); }
     }
-    
     .group:hover .bi-upload,
     .group:hover .bi-file-person,
     .group:hover .bi-search {
         animation: float 2s ease-in-out infinite;
     }
-
-    /* Custom scrollbar for activity feed */
-    .overflow-y-auto::-webkit-scrollbar {
-        width: 6px;
-    }
-    
-    .overflow-y-auto::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 10px;
-    }
-    
-    .overflow-y-auto::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 10px;
-    }
-    
-    .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-    }
+    .overflow-y-auto::-webkit-scrollbar { width: 6px; }
+    .overflow-y-auto::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+    .overflow-y-auto::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .overflow-y-auto::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>
 {% endblock %}
