@@ -38,6 +38,9 @@ urlpatterns = [
     path('archive-department/<int:pk>/', views.archive_department, name='archive_department'),
     path('unarchive-department/<int:pk>/', views.unarchive_department, name='unarchive_department'),
     path('permanent-delete-department/<int:pk>/', views.permanent_delete_department, name='permanent_delete_department'),
+    
+    # School Year Management (superadmin)
+    path('manage-school-years/', views.manage_school_years, name='manage_school_years'),
 
     # Subject Management
     path('manage-subjects/', views.manage_subjects, name='manage_subjects'),
@@ -160,5 +163,9 @@ urlpatterns = [
     path('subadmin/questionnaires/<int:pk>/restore/', subadmin_restore_questionnaire, name='subadmin_restore_questionnaire'),
     path('subadmin/questionnaires/<int:pk>/permanent-delete/', subadmin_permanent_delete_questionnaire, name='subadmin_permanent_delete_questionnaire'),
     path('subadmin/archive-count/', subadmin_archive_count, name='subadmin_archive_count'),
+    
+    # Teacher Subject Assignment AJAX (shared — both admin and subadmin call these)
+    path('ajax/teacher-subject-assignments/', views.get_teacher_subject_assignments, name='get_teacher_subject_assignments'),
+    path('ajax/save-teacher-subject-assignments/', views.save_teacher_subject_assignments, name='save_teacher_subject_assignments'),
     
 ]

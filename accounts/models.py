@@ -42,6 +42,41 @@ class Subject(models.Model):
     def get_departments_display(self):
         return ", ".join([dept.code for dept in self.departments.all()])
 
+class SchoolYear(models.Model):
+    """
+    Represents an academic school year (e.g. 2024-2025).
+    Only one record can be marked is_current=True at a time.
+    When a new school year is set as current, subject assignments reset
+    (but old assignments are preserved as read-only history).
+    """
+    name = models.CharField(
+        max_length=20, unique=True,
+        help_text='e.g. 2024-2025'
+    )
+    start_date = models.DateField(null=True, blank=True)
+    end_date   = models.DateField(null=True, blank=True)
+    is_current = models.BooleanField(
+        default=False,
+        help_text='Only one school year should be current at a time.'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+ 
+    class Meta:
+        ordering = ['-name']
+ 
+    def __str__(self):
+        return self.name
+ 
+    def save(self, *args, **kwargs):
+        # Enforce: only one current school year
+        if self.is_current:
+            SchoolYear.objects.exclude(pk=self.pk).filter(is_current=True).update(is_current=False)
+        super().save(*args, **kwargs)
+ 
+    @classmethod
+    def get_current(cls):
+        """Return the current school year, or None if not set."""
+        return cls.objects.filter(is_current=True).first()
 
 class TeacherProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='teacher_profile')
@@ -56,6 +91,44 @@ class TeacherProfile(models.Model):
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.employee_id}"
 
+class TeacherSubjectAssignment(models.Model):
+    """
+    Records which subjects a teacher handles for a specific school year.
+    Old school years are read-only history.
+    The current school year's assignments are editable by admins.
+    """
+    teacher     = models.ForeignKey(
+        'TeacherProfile',
+        on_delete=models.CASCADE,
+        related_name='subject_assignments'
+    )
+    subject     = models.ForeignKey(
+        'Subject',
+        on_delete=models.CASCADE,
+        related_name='teacher_assignments'
+    )
+    school_year = models.ForeignKey(
+        'SchoolYear',
+        on_delete=models.CASCADE,
+        related_name='assignments'
+    )
+    assigned_by = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='teacher_subject_assignments_made'
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+ 
+    class Meta:
+        unique_together = [['teacher', 'subject', 'school_year']]
+        ordering = ['school_year__name', 'subject__code']
+ 
+    def __str__(self):
+        return (
+            f"{self.teacher.user.get_full_name()} — "
+            f"{self.subject.code} ({self.school_year.name})"
+        )
 
 # ============================================================================
 # NEW: SubAdminProfile

@@ -17,6 +17,7 @@ from .forms import (
     SubAdminTeacherCreationForm, SubAdminTeacherEditForm,
     ProgramForm,
 )
+from .models import SchoolYear, TeacherSubjectAssignment
 from .models import Curriculum
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -513,11 +514,14 @@ def admin_dashboard(request):
 # SUPERADMIN — TEACHER MANAGEMENT
 # ============================================================================
 
-@login_required
-@user_passes_test(is_admin)
 def manage_teachers(request):
+    """
+    Superadmin: list all teachers.
+    This is a DROP-IN REPLACEMENT for the existing manage_teachers view.
+    Rename this to manage_teachers in views.py.
+    """
     teachers = TeacherProfile.objects.select_related('user', 'department').filter(is_archived=False)
-
+ 
     search_query = request.GET.get('search', '')
     if search_query:
         teachers = teachers.filter(
@@ -525,31 +529,50 @@ def manage_teachers(request):
             Q(user__last_name__icontains=search_query) |
             Q(employee_id__icontains=search_query)
         )
-
+ 
     archived_teachers = TeacherProfile.objects.select_related('user', 'department').filter(is_archived=True)
-    departments = Department.objects.filter(is_archived=False).order_by('name')
-    form = TeacherCreationForm()
-
-    # Prefetch subjects for each teacher (for display in table/edit modal)
-    teachers = teachers.prefetch_related('subjects')
-
-    # Build a JSON-safe dict of teacher_pk → [subjects] for the edit modal
+    departments       = Department.objects.filter(is_archived=False).order_by('name')
+    form              = TeacherCreationForm()
+    teachers          = teachers.prefetch_related('subjects')
+ 
+    current_year = SchoolYear.get_current()
+    all_years    = SchoolYear.objects.all().order_by('-name')
+ 
+    # Determine which school year to display in the table
+    view_year_pk = request.GET.get('year', '')
+    if view_year_pk:
+        view_year = SchoolYear.objects.filter(pk=view_year_pk).first() or current_year
+    else:
+        view_year = current_year
+ 
     import json
+ 
+    # Build teacher_pk → [current-year subjects] map for the edit modal
     teacher_subjects_map = {}
-    for t in teachers:
-        teacher_subjects_map[str(t.pk)] = [
-            {'id': s.pk, 'code': s.code, 'name': s.name}
-            for s in t.subjects.all()
-        ]
-
+    if view_year:
+        assignments = (
+            TeacherSubjectAssignment.objects
+            .filter(school_year=view_year, teacher__in=teachers)
+            .select_related('subject', 'teacher')
+        )
+        for a in assignments:
+            key = str(a.teacher_id)
+            if key not in teacher_subjects_map:
+                teacher_subjects_map[key] = []
+            teacher_subjects_map[key].append({
+                'id': a.subject.pk, 'code': a.subject.code, 'name': a.subject.name
+            })
+ 
     context = {
-        'teachers':             teachers,
-        'archived_teachers':    archived_teachers,
-        'search_query':         search_query,
-        'departments':          departments,
-        'form':                 form,
+        'teachers':              teachers,
+        'archived_teachers':     archived_teachers,
+        'search_query':          search_query,
+        'departments':           departments,
+        'form':                  form,
         'teacher_subjects_json': json.dumps(teacher_subjects_map),
-        'ajax_subjects_url':    'accounts:get_subjects_by_department',
+        'current_year':          current_year,
+        'all_years':             all_years,
+        'view_year':             view_year,
     }
     return render(request, 'admin_dashboard/manage_teachers.html', context)
 
@@ -1449,15 +1472,14 @@ def subadmin_dashboard(request):
 # SUB-ADMIN — TEACHER MANAGEMENT
 # ============================================================================
 
-@login_required
-@user_passes_test(is_subadmin)
 def subadmin_manage_teachers(request):
+    """Sub-admin: list teachers in their department with school year subject view."""
     department = request.user.subadmin_profile.department
-
+ 
     teachers = TeacherProfile.objects.select_related('user', 'department').filter(
         department=department, is_archived=False
     )
-
+ 
     search_query = request.GET.get('search', '')
     if search_query:
         teachers = teachers.filter(
@@ -1465,32 +1487,54 @@ def subadmin_manage_teachers(request):
             Q(user__last_name__icontains=search_query) |
             Q(employee_id__icontains=search_query)
         )
-
+ 
     archived_teachers = TeacherProfile.objects.select_related('user').filter(
         department=department, is_archived=True
     )
-
     teachers = teachers.prefetch_related('subjects')
-
+ 
+    current_year = SchoolYear.get_current()
+    all_years    = SchoolYear.objects.all().order_by('-name')
+ 
+    # Allow browsing a past school year (read-only)
+    view_year_pk = request.GET.get('year', '')
+    if view_year_pk:
+        view_year = SchoolYear.objects.filter(pk=view_year_pk).first() or current_year
+    else:
+        view_year = current_year
+ 
     import json
+ 
+    # Subjects assigned to each teacher for view_year
     teacher_subjects_map = {}
-    for t in teachers:
-        teacher_subjects_map[str(t.pk)] = [
-            {'id': s.pk, 'code': s.code, 'name': s.name}
-            for s in t.subjects.all()
-        ]
-
+    if view_year:
+        assignments = (
+            TeacherSubjectAssignment.objects
+            .filter(school_year=view_year, teacher__in=teachers)
+            .select_related('subject', 'teacher')
+        )
+        for a in assignments:
+            key = str(a.teacher_id)
+            if key not in teacher_subjects_map:
+                teacher_subjects_map[key] = []
+            teacher_subjects_map[key].append({
+                'id': a.subject.pk, 'code': a.subject.code, 'name': a.subject.name
+            })
+ 
     dept_subjects = list(
         Subject.objects.filter(departments=department, is_archived=False).order_by('code').values('id', 'code', 'name')
     )
-
+ 
     context = {
-        'teachers':             teachers,
-        'archived_teachers':    archived_teachers,
-        'search_query':         search_query,
-        'department':           department,
+        'teachers':              teachers,
+        'archived_teachers':     archived_teachers,
+        'search_query':          search_query,
+        'department':            department,
         'teacher_subjects_json': json.dumps(teacher_subjects_map),
-        'dept_subjects_json':   json.dumps(dept_subjects),
+        'dept_subjects_json':    json.dumps(dept_subjects),
+        'current_year':          current_year,
+        'all_years':             all_years,
+        'view_year':             view_year,
     }
     return render(request, 'subadmin_dashboard/manage_teachers.html', context)
 
@@ -3187,3 +3231,200 @@ def subadmin_remove_curriculum_subject(request, prog_pk, entry_pk):
         metadata={'program_id': program.pk},
     )
     return JsonResponse({'success': True})
+
+# ============================================================================
+# SCHOOL YEAR MANAGEMENT — SUPERADMIN
+# ============================================================================
+ 
+@login_required
+@user_passes_test(is_admin)
+def manage_school_years(request):
+    """Superadmin: list all school years and set the current one."""
+    school_years  = SchoolYear.objects.all().order_by('-name')
+    current_year  = SchoolYear.get_current()
+ 
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        action = request.POST.get('action', '')
+ 
+        # ── Create ────────────────────────────────────────────────────────
+        if action == 'create':
+            name        = request.POST.get('name', '').strip()
+            start_date  = request.POST.get('start_date', '') or None
+            end_date    = request.POST.get('end_date', '')   or None
+            set_current = request.POST.get('set_current', 'false') == 'true'
+ 
+            if not name:
+                return JsonResponse({'success': False, 'errors': {'name': ['School year name is required.']}})
+            if SchoolYear.objects.filter(name=name).exists():
+                return JsonResponse({'success': False, 'errors': {'name': [f'School year "{name}" already exists.']}})
+ 
+            sy = SchoolYear.objects.create(
+                name=name,
+                start_date=start_date,
+                end_date=end_date,
+                is_current=set_current,
+            )
+            log_activity('system', f'School year "{sy.name}" created', user=request.user)
+            return JsonResponse({'success': True, 'message': f'School year "{sy.name}" created successfully.'})
+ 
+        # ── Set as current ────────────────────────────────────────────────
+        if action == 'set_current':
+            sy_pk = request.POST.get('pk', '')
+            sy    = get_object_or_404(SchoolYear, pk=sy_pk)
+            sy.is_current = True
+            sy.save()     # save() enforces only-one-current rule
+            log_activity('system', f'School year "{sy.name}" set as current', user=request.user)
+            return JsonResponse({'success': True, 'message': f'"{sy.name}" is now the current school year.'})
+ 
+        # ── Delete ────────────────────────────────────────────────────────
+        if action == 'delete':
+            sy_pk = request.POST.get('pk', '')
+            sy    = get_object_or_404(SchoolYear, pk=sy_pk)
+            if sy.is_current:
+                return JsonResponse({'success': False, 'errors': {'__all__': ['Cannot delete the current school year.']}})
+            sy_name = sy.name
+            sy.delete()
+            log_activity('system', f'School year "{sy_name}" deleted', user=request.user)
+            return JsonResponse({'success': True, 'message': f'School year "{sy_name}" deleted.'})
+ 
+    context = {
+        'school_years': school_years,
+        'current_year': current_year,
+    }
+    return render(request, 'admin_dashboard/manage_school_years.html', context)
+ 
+ 
+# ============================================================================
+# TEACHER SUBJECT ASSIGNMENT — AJAX (shared by superadmin + subadmin)
+# ============================================================================
+ 
+@login_required
+def get_teacher_subject_assignments(request):
+    """
+    AJAX GET: return a teacher's subject assignments.
+ 
+    Params:
+      teacher_pk      — required
+      school_year_pk  — optional; defaults to current year
+      all_years       — optional; if '1', returns full history for the history accordion
+    """
+    teacher_pk  = request.GET.get('teacher_pk', '')
+    sy_pk       = request.GET.get('school_year_pk', '')
+    all_years   = request.GET.get('all_years', '0') == '1'
+ 
+    if not teacher_pk:
+        return JsonResponse({'subjects': [], 'school_year': None, 'history': []})
+ 
+    # ── Full history (for accordion in edit modal) ────────────────────────
+    if all_years:
+        history = []
+        all_school_years = SchoolYear.objects.all().order_by('-name')
+        current = SchoolYear.get_current()
+ 
+        for sy in all_school_years:
+            assignments = (
+                TeacherSubjectAssignment.objects
+                .filter(teacher_id=teacher_pk, school_year=sy)
+                .select_related('subject')
+                .order_by('subject__code')
+            )
+            history.append({
+                'school_year': sy.name,
+                'is_current':  sy.is_current,
+                'subjects': [
+                    {'id': a.subject.pk, 'code': a.subject.code, 'name': a.subject.name}
+                    for a in assignments
+                ],
+            })
+ 
+        # Also return current year's subjects for the picker
+        current_subjects = []
+        if current:
+            current_assignments = (
+                TeacherSubjectAssignment.objects
+                .filter(teacher_id=teacher_pk, school_year=current)
+                .select_related('subject')
+                .order_by('subject__code')
+            )
+            current_subjects = [
+                {'id': a.subject.pk, 'code': a.subject.code, 'name': a.subject.name}
+                for a in current_assignments
+            ]
+ 
+        return JsonResponse({
+            'subjects':    current_subjects,
+            'school_year': {'id': current.pk, 'name': current.name} if current else None,
+            'history':     history,
+        })
+ 
+    # ── Single year (default — current or specified) ──────────────────────
+    if sy_pk:
+        sy = get_object_or_404(SchoolYear, pk=sy_pk)
+    else:
+        sy = SchoolYear.get_current()
+ 
+    if not sy:
+        return JsonResponse({'subjects': [], 'school_year': None, 'history': []})
+ 
+    assignments = (
+        TeacherSubjectAssignment.objects
+        .filter(teacher_id=teacher_pk, school_year=sy)
+        .select_related('subject')
+        .order_by('subject__code')
+    )
+ 
+    return JsonResponse({
+        'subjects': [
+            {'id': a.subject.pk, 'code': a.subject.code, 'name': a.subject.name}
+            for a in assignments
+        ],
+        'school_year': {'id': sy.pk, 'name': sy.name},
+        'history': [],
+    })
+ 
+ 
+@login_required
+def save_teacher_subject_assignments(request):
+    """
+    AJAX POST: replace a teacher's subject assignments for the CURRENT school year.
+    Only editable for the current school year.
+    Body params: teacher_pk, subject_ids[] (list)
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed.'}, status=405)
+ 
+    teacher_pk  = request.POST.get('teacher_pk', '')
+    subject_ids = request.POST.getlist('subject_ids[]')
+ 
+    sy = SchoolYear.get_current()
+    if not sy:
+        return JsonResponse({'success': False, 'error': 'No current school year is set. Please ask your administrator to configure it.'})
+ 
+    # Permission: superadmin can edit any teacher; subadmin only their dept
+    teacher = get_object_or_404(TeacherProfile, pk=teacher_pk)
+    if not request.user.is_staff:
+        # Must be subadmin of the same department
+        dept = get_subadmin_department(request.user)
+        if not dept or teacher.department_id != dept.pk:
+            return JsonResponse({'success': False, 'error': 'Permission denied.'}, status=403)
+ 
+    # Replace assignments for this teacher + current school year
+    TeacherSubjectAssignment.objects.filter(teacher=teacher, school_year=sy).delete()
+ 
+    subjects = Subject.objects.filter(pk__in=subject_ids)
+    for subject in subjects:
+        TeacherSubjectAssignment.objects.create(
+            teacher=teacher,
+            subject=subject,
+            school_year=sy,
+            assigned_by=request.user,
+        )
+ 
+    log_activity(
+        'teacher_updated',
+        f"Subjects for {teacher.user.get_full_name()} updated for school year {sy.name} "
+        f"by {request.user.get_full_name()} ({len(subjects)} subjects)",
+        user=request.user,
+    )
+ 
+    return JsonResponse({'success': True, 'message': f'Subject assignments updated for {sy.name}.'})
