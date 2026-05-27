@@ -1083,6 +1083,9 @@ def my_uploads(request):
 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
 
+    from accounts.models import SchoolYear
+    current_year = SchoolYear.get_current()
+
     questionnaires = (
         Questionnaire.objects
         .filter(uploader=teacher, is_archived=False)
@@ -1092,6 +1095,10 @@ def my_uploads(request):
     search_query         = request.GET.get('search', '')
     selected_semester    = request.GET.get('semester', '')
     selected_school_year = request.GET.get('school_year', '')
+
+    # Default to current school year if no explicit filter was chosen
+    if not selected_school_year and current_year:
+        selected_school_year = current_year.name
 
     if search_query:
         questionnaires = questionnaires.filter(
@@ -1115,20 +1122,26 @@ def my_uploads(request):
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)
 
+    # Build school year options — always include current year even if no uploads yet
+    school_year_options = list(
+        Questionnaire.objects
+        .filter(uploader=teacher, is_archived=False, school_year__gt='')
+        .values_list('school_year', flat=True)
+        .distinct()
+        .order_by('-school_year')
+    )
+    if current_year and current_year.name not in school_year_options:
+        school_year_options.insert(0, current_year.name)
+
     return render(request, 'teacher_dashboard/my_uploads.html', {
-        'page_obj':               page_obj,
-        'search_query':           search_query,
+        'page_obj':                page_obj,
+        'search_query':            search_query,
         'archived_questionnaires': archived_questionnaires,
-        'semester_choices':       Questionnaire.SEMESTER_CHOICES,
-        'selected_semester':      selected_semester,
-        'selected_school_year':   selected_school_year,
-        'school_year_options':    list(
-            Questionnaire.objects
-            .filter(uploader=teacher, is_archived=False, school_year__gt='')
-            .values_list('school_year', flat=True)
-            .distinct()
-            .order_by('-school_year')
-        ),
+        'semester_choices':        Questionnaire.SEMESTER_CHOICES,
+        'selected_semester':       selected_semester,
+        'selected_school_year':    selected_school_year,
+        'school_year_options':     school_year_options,
+        'current_year':            current_year,
     })
 
 
@@ -1315,6 +1328,9 @@ def browse_questionnaires(request):
             is_archived=False,
         )
 
+    from accounts.models import SchoolYear
+    current_year = SchoolYear.get_current()
+
     subject_id             = request.GET.get('subject', '')
     exam_type              = request.GET.get('exam_type', '')
     search_query           = request.GET.get('search', '')
@@ -1323,6 +1339,10 @@ def browse_questionnaires(request):
     selected_question_type = request.GET.get('question_type', '')
     selected_year_level    = request.GET.get('year_level', '')
     selected_curriculum_id = request.GET.get('curriculum', '')
+
+    # Default to current school year if no explicit filter was chosen
+    if not selected_school_year and current_year:
+        selected_school_year = current_year.name
 
     if selected_year_level:
         questionnaires = questionnaires.filter(year_level=selected_year_level)
@@ -1384,6 +1404,10 @@ def browse_questionnaires(request):
             ).values_list('school_year', flat=True).distinct().order_by('-school_year')
         )
 
+    # Always include current year in the options even if no uploads exist yet
+    if current_year and current_year.name not in school_year_options:
+        school_year_options.insert(0, current_year.name)
+
     paginator   = Paginator(questionnaires, 12)
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)
@@ -1404,6 +1428,7 @@ def browse_questionnaires(request):
         'selected_year_level':    selected_year_level,
         'curriculum_options':     list(curriculum_options),
         'selected_curriculum_id': selected_curriculum_id,
+        'current_year': current_year,
     }
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'teacher_dashboard/browse_questionnaires_partial.html', ctx)
