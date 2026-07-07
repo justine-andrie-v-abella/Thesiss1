@@ -655,6 +655,10 @@ window.addEventListener('load', function () {
 document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { closeModals(); closePermDeleteModal(); }
 });
+    ['modalBackdrop', 'addModal', 'editModal', 'archiveModal', 'archivedModal', 'permDeleteModal', 'newCurriculumModal'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) document.body.appendChild(el);
+    });
 </script>
 
 <style>
