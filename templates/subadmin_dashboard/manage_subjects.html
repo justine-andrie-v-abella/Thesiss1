@@ -736,5 +736,19 @@
     });
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
+
+    /* ── Move modals (+ their shared backdrop) to <body> so they escape
+         #main-page-content's stacking context ──────────────────────────────
+         base.html applies a CSS animation to #main-page-content, and any
+         element with an animation targeting opacity/transform establishes
+         its own stacking context — even after the animation finishes. That
+         traps position:fixed modals nested inside it, so their z-index only
+         competes with siblings inside that container instead of the
+         sidebar/header. Reparenting to <body> fixes it. Order is preserved
+         so the shared backdrop still paints beneath whichever modal is open. */
+    ['modalBackdrop', 'addModal', 'editModal', 'archiveModal', 'archivedModal', 'permDeleteModal'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) document.body.appendChild(el);
+    });
 </script>
 {% endblock %}

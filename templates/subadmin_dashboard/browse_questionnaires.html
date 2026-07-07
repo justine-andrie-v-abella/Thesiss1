@@ -9,112 +9,113 @@
 
 <!-- Filter Card -->
 <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-    <form method="get" id="filterForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <form method="get" id="filterForm" class="space-y-4">
+        <div class="flex flex-wrap gap-4">
 
-        <!-- Subject Filter — only subjects in this department -->
-        <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                <i class="bi bi-book text-purple-500 mr-1"></i> Subject
-            </label>
-            <select name="subject"
-                class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors">
-                <option value="">All Subjects</option>
-                {% for sub in subjects %}
-                    <option value="{{ sub.id }}" {% if selected_subject == sub.id|stringformat:"s" %}selected{% endif %}>
-                        {{ sub.code }} - {{ sub.name }}
-                    </option>
-                {% endfor %}
-            </select>
+            <!-- Subject Filter — only subjects in this department -->
+            <div class="flex-1 min-w-[160px]">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="bi bi-book text-purple-500 mr-1"></i> Subject
+                </label>
+                <select name="subject"
+                    class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 transition-colors">
+                    <option value="">All Subjects</option>
+                    {% for sub in subjects %}
+                        <option value="{{ sub.id }}" {% if selected_subject == sub.id|stringformat:"s" %}selected{% endif %}>
+                            {{ sub.code }} - {{ sub.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Teacher Filter — only teachers in this department -->
+            <div class="flex-1 min-w-[160px]">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="bi bi-person text-green-500 mr-1"></i> Teacher
+                </label>
+                <select name="teacher"
+                    class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 transition-colors">
+                    <option value="">All Teachers</option>
+                    {% for teacher in teachers %}
+                        <option value="{{ teacher.id }}" {% if selected_teacher == teacher.id|stringformat:"s" %}selected{% endif %}>
+                            {{ teacher.user.get_full_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Term Filter -->
+            <div class="flex-1 min-w-[160px]">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="bi bi-tag-fill text-orange-500 mr-1"></i> Term
+                </label>
+                <select name="exam_type"
+                    class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition-colors">
+                    <option value="">All Terms</option>
+                    {% for val, label in exam_type_choices %}
+                        <option value="{{ val }}" {% if exam_type == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- School Year Filter -->
+            <div class="flex-1 min-w-[160px]">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="bi bi-calendar2-check text-teal-500 mr-1"></i> School Year
+                </label>
+                <select name="school_year"
+                    class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 transition-colors">
+                    <option value="">All Years</option>
+                    {% for sy in school_year_options %}
+                        <option value="{{ sy }}" {% if selected_school_year == sy %}selected{% endif %}>{{ sy }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Semester Filter -->
+            <div class="flex-1 min-w-[160px]">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="bi bi-calendar3 text-blue-500 mr-1"></i> Semester
+                </label>
+                <select name="semester"
+                    class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors">
+                    <option value="">All Semesters</option>
+                    {% for val, label in semester_choices %}
+                        <option value="{{ val }}" {% if selected_semester == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Question Type Filter -->
+            <div class="flex-1 min-w-[160px]">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="bi bi-list-check text-pink-500 mr-1"></i> Question Type
+                </label>
+                <select name="question_type"
+                    class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-pink-500 transition-colors">
+                    <option value="">All Types</option>
+                    {% for val, label in question_type_choices %}
+                        <option value="{{ val }}" {% if selected_question_type == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
         </div>
 
-        <!-- Teacher Filter — only teachers in this department -->
-        <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                <i class="bi bi-person text-green-500 mr-1"></i> Teacher
-            </label>
-            <select name="teacher"
-                class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 transition-colors">
-                <option value="">All Teachers</option>
-                {% for teacher in teachers %}
-                    <option value="{{ teacher.id }}" {% if selected_teacher == teacher.id|stringformat:"s" %}selected{% endif %}>
-                        {{ teacher.user.get_full_name }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Term Filter -->
-        <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                <i class="bi bi-tag-fill text-orange-500 mr-1"></i> Term
-            </label>
-            <select name="exam_type"
-                class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition-colors">
-                <option value="">All Terms</option>
-                {% for val, label in exam_type_choices %}
-                    <option value="{{ val }}" {% if exam_type == val %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Search -->
+        <!-- Search + Filter button -->
         <div>
             <label class="block text-sm font-semibold text-gray-700 mb-2">
                 <i class="bi bi-search text-blue-500 mr-1"></i> Search
             </label>
-            <input type="text" name="search" value="{{ search_query }}"
-                placeholder="Search questionnaires..."
-                class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors">
-        </div>
-
-        <!-- School Year Filter -->
-        <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                <i class="bi bi-calendar2-check text-teal-500 mr-1"></i> School Year
-            </label>
-            <select name="school_year"
-                class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 transition-colors">
-                <option value="">All Years</option>
-                {% for sy in school_year_options %}
-                    <option value="{{ sy }}" {% if selected_school_year == sy %}selected{% endif %}>{{ sy }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Semester Filter -->
-        <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                <i class="bi bi-calendar3 text-blue-500 mr-1"></i> Semester
-            </label>
-            <select name="semester"
-                class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors">
-                <option value="">All Semesters</option>
-                {% for val, label in semester_choices %}
-                    <option value="{{ val }}" {% if selected_semester == val %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Question Type Filter -->
-        <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                <i class="bi bi-list-check text-pink-500 mr-1"></i> Question Type
-            </label>
-            <select name="question_type"
-                class="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-pink-500 transition-colors">
-                <option value="">All Types</option>
-                {% for val, label in question_type_choices %}
-                    <option value="{{ val }}" {% if selected_question_type == val %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Filter Button -->
-        <div class="flex items-end">
-            <button type="submit" id="filterSubmitBtn"
-                class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-2.5 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg flex items-center justify-center">
-                <i class="bi bi-funnel text-lg mr-2"></i> Filter
-            </button>
+            <div class="flex gap-3">
+                <input type="text" name="search" value="{{ search_query }}"
+                    placeholder="Search questionnaires..."
+                    class="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors">
+                <button type="submit" id="filterSubmitBtn"
+                    class="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-2.5 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg flex items-center justify-center whitespace-nowrap">
+                    <i class="bi bi-funnel text-lg mr-2"></i> Filter
+                </button>
+            </div>
         </div>
     </form>
 </div>
@@ -1015,6 +1016,17 @@ updateArchiveCount();
         });
     }
 })();
+
+/* ── Move modals to <body> so they escape #main-page-content's stacking context ──
+     base.html applies a CSS animation to #main-page-content, and any element with
+     an animation targeting opacity/transform establishes its own stacking context —
+     even after the animation finishes. That traps position:fixed modals nested
+     inside it, so their z-index only competes with siblings inside that container
+     instead of the sidebar/header. Reparenting to <body> fixes it. ── */
+['docPreviewModal', 'viewQuestionsModal', 'saArchiveModal', 'saPermanentDeleteModal'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) document.body.appendChild(el);
+});
 </script>
 
 {% endblock %}
