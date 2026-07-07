@@ -73,10 +73,15 @@ class SchoolYear(models.Model):
             SchoolYear.objects.exclude(pk=self.pk).filter(is_current=True).update(is_current=False)
         super().save(*args, **kwargs)
  
+    # AFTER
     @classmethod
     def get_current(cls):
-        """Return the current school year, or None if not set."""
-        return cls.objects.filter(is_current=True).first()
+        """Return the current school year, or None if not set or if it has expired."""
+        from django.utils import timezone
+        sy = cls.objects.filter(is_current=True).first()
+        if sy and sy.end_date and sy.end_date < timezone.now().date():
+            return None
+        return sy
 
 class TeacherProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='teacher_profile')
