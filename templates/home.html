@@ -1,107 +1,480 @@
 {% load static %}
-
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BISU Test Banking System</title>
+    <link rel="icon" type="image/png" href="{% static 'images/bisulogo.png' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&display=swap');
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
 
   body {
+    font-family: 'DM Sans', sans-serif;
+    color: #2c2440;
+    background: #f8f5ef;
+    overflow-x: hidden;
+  }
+
+  :root {
+    --ink: #1c1730;
+    --violet: #667eea;
+    --deep-violet: #764ba2;
+    --gold: #c9a04d;
+    --parchment: #f8f5ef;
+    --paper-line: #ded5c2;
+    --ink-text: #2c2440;
+    --muted: #6b6480;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  }
+
+  a { text-decoration: none; }
+
+  /* ══════════════════════════════════════════
+     NAV
+  ══════════════════════════════════════════ */
+  .site-nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 40px;
+    background: rgba(28, 23, 48, 0.0);
+    transition: background 0.35s ease, box-shadow 0.35s ease, padding 0.35s ease;
+  }
+  .site-nav.scrolled {
+    background: rgba(28, 23, 48, 0.88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+    padding: 10px 40px;
+  }
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
+  }
+  .nav-brand img { width: 32px; height: 32px; object-fit: contain; }
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+  .nav-links a {
+    color: rgba(255,255,255,0.78);
+    font-size: 0.88rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    position: relative;
+    padding: 4px 0;
+    transition: color 0.2s ease;
+  }
+  .nav-links a::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: -2px;
+    width: 0; height: 1.5px;
+    background: var(--gold);
+    transition: width 0.25s ease;
+  }
+  .nav-links a:hover { color: #fff; }
+  .nav-links a:hover::after { width: 100%; }
+  .nav-cta {
+    background: linear-gradient(135deg, var(--violet), var(--deep-violet));
+    color: #fff !important;
+    padding: 9px 22px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 14px rgba(102,126,234,0.35);
+  }
+  .nav-links a.nav-cta::after { display: none; }
+
+  @media (max-width: 860px) {
+    .nav-links a:not(.nav-cta) { display: none; }
+    .site-nav { padding: 14px 20px; }
+  }
+
+  /* ══════════════════════════════════════════
+     HERO
+  ══════════════════════════════════════════ */
+  .hero {
+    position: relative;
     min-height: 100vh;
     display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 24px 24px 80px;
-    font-family: 'DM Sans', sans-serif;
-    background: url("{% static 'images/violet-bisu-H-plain.png' %}") no-repeat center center fixed;
+    padding: 120px 6vw 80px;
+    background:
+      linear-gradient(150deg, rgba(20,15,40,0.82) 0%, rgba(28,23,48,0.55) 55%, rgba(28,23,48,0.35) 100%),
+      url("{% static 'images/violet-bisu-H-plain.png' %}") no-repeat center center;
     background-size: cover;
+    color: #fff;
+    overflow: hidden;
   }
 
-  /* ── Card ── */
-  .card-wrap {
-    width: 100%;
-    max-width: 550px;
-    animation: fadeUp 0.55s cubic-bezier(0.22,1,0.36,1) both;
-  }
-  @keyframes fadeUp {
-    from { opacity:0; transform: translateY(28px); }
-    to   { opacity:1; transform: translateY(0); }
-  }
-
-  .card {
-    background: linear-gradient(135deg,
-      rgba(255,255,255,0.85) 0%,
-      rgba(255,255,255,0.95) 100%);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-radius: 20px;
-    border: 1px solid rgba(255,255,255,0.4);
-    box-shadow: 0 15px 40px rgba(0,0,0,0.15);
-    padding: 50px 40px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 48px;
     align-items: center;
+    width: 100%;
+    max-width: 1180px;
+    margin: 0 auto;
   }
 
-  /* ── Logo ── */
-  .bisu-logo {
-    width: 100px;
-    height: 100px;
-    object-fit: contain;
-    margin-bottom: 25px;
-    animation: fadeUp 0.55s 0.08s cubic-bezier(0.22,1,0.36,1) both;
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 18px;
+  }
+  .eyebrow::before {
+    content: '';
+    width: 22px; height: 1.5px;
+    background: var(--gold);
   }
 
-  /* ── Title ── */
-  .title-text {
-    color: #2c3e50;
+  .hero-title {
+    font-family: 'Fraunces', serif;
     font-weight: 700;
-    font-size: 2rem;
-    line-height: 1.3;
-    margin-bottom: 16px;
-    animation: fadeUp 0.55s 0.13s cubic-bezier(0.22,1,0.36,1) both;
+    font-size: clamp(2.2rem, 4.4vw, 3.4rem);
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    margin-bottom: 20px;
+  }
+  .hero-title em {
+    font-style: italic;
+    font-weight: 500;
+    color: #e7ddc7;
   }
 
-  /* ── Description ── */
-  .lead-text {
-    color: #5a6c7d;
-    font-size: 1.1rem;
-    line-height: 1.6;
-    margin-bottom: 35px;
-    max-width: 420px;
-    animation: fadeUp 0.55s 0.18s cubic-bezier(0.22,1,0.36,1) both;
-  }
-
-  /* ── Button ── */
-  .btn-custom {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border: none;
-    padding: 14px 40px;
+  .hero-lead {
     font-size: 1.05rem;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.82);
+    max-width: 480px;
+    margin-bottom: 34px;
+  }
+
+  .btn-custom {
+    background: linear-gradient(135deg, var(--violet) 0%, var(--deep-violet) 100%);
+    border: none;
+    padding: 14px 34px;
+    font-size: 1rem;
     font-weight: 600;
     border-radius: 10px;
     color: white;
-    text-decoration: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     min-width: 220px;
     transition: transform 0.25s, box-shadow 0.25s;
-    box-shadow: 0 6px 20px rgba(102,126,234,0.4);
-    animation: fadeUp 0.55s 0.23s cubic-bezier(0.22,1,0.36,1) both;
+    box-shadow: 0 8px 24px rgba(102,126,234,0.4);
   }
   .btn-custom:hover {
     transform: translateY(-3px);
-    box-shadow: 0 10px 28px rgba(102,126,234,0.5);
+    box-shadow: 0 12px 30px rgba(102,126,234,0.5);
     color: white;
-    text-decoration: none;
   }
   .btn-custom:active { transform: translateY(0); }
 
+  /* Index-card stack illustration */
+  .card-stack {
+    position: relative;
+    height: 360px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .idx-card {
+    position: absolute;
+    width: 240px;
+    height: 150px;
+    background: #fdfcf9;
+    border-radius: 6px;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+    padding: 18px 20px;
+    color: var(--ink-text);
+    border-top: 3px solid var(--gold);
+  }
+  .idx-card .idx-tag {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--deep-violet);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .idx-card .idx-line {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--paper-line);
+    margin-bottom: 8px;
+  }
+  .idx-card .idx-line.w70 { width: 70%; }
+  .idx-card .idx-line.w90 { width: 90%; }
+  .idx-card .idx-line.w50 { width: 50%; }
+
+  .idx-card.c1 { transform: rotate(-9deg) translate(-70px, -18px); z-index: 1; }
+  .idx-card.c2 { transform: rotate(4deg) translate(30px, -46px); z-index: 2; }
+  .idx-card.c3 { transform: rotate(-2deg) translate(-10px, 30px); z-index: 3; }
+
+  .idx-card { animation: cardFloat 6s ease-in-out infinite; }
+  .idx-card.c2 { animation-delay: 0.4s; }
+  .idx-card.c3 { animation-delay: 0.8s; }
+  @keyframes cardFloat {
+    0%, 100% { --fy: 0px; }
+    50% { --fy: -8px; }
+  }
+  .idx-card.c1 { animation-name: floatC1; }
+  .idx-card.c2 { animation-name: floatC2; }
+  .idx-card.c3 { animation-name: floatC3; }
+  @keyframes floatC1 { 0%,100%{ transform: rotate(-9deg) translate(-70px, -18px);} 50%{ transform: rotate(-9deg) translate(-70px, -26px);} }
+  @keyframes floatC2 { 0%,100%{ transform: rotate(4deg) translate(30px, -46px);} 50%{ transform: rotate(4deg) translate(30px, -54px);} }
+  @keyframes floatC3 { 0%,100%{ transform: rotate(-2deg) translate(-10px, 30px);} 50%{ transform: rotate(-2deg) translate(-10px, 22px);} }
+
+  @media (max-width: 900px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .card-stack { height: 260px; margin-top: 10px; }
+    .idx-card { width: 190px; height: 120px; padding: 14px 16px; }
+  }
+
   /* ══════════════════════════════════════════
-     TOAST NOTIFICATION — top right
+     SCROLL REVEAL
+  ══════════════════════════════════════════ */
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1);
+  }
+  .reveal.in-view { opacity: 1; transform: translateY(0); }
+
+  /* ══════════════════════════════════════════
+     FEATURES
+  ══════════════════════════════════════════ */
+  .section {
+    padding: 100px 6vw;
+  }
+  .section-head {
+    max-width: 640px;
+    margin: 0 auto 56px;
+    text-align: center;
+  }
+  .section-head .eyebrow { color: var(--deep-violet); justify-content: center; }
+  .section-head .eyebrow::before { background: var(--deep-violet); }
+  .section-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: clamp(1.7rem, 3vw, 2.3rem);
+    color: var(--ink-text);
+    line-height: 1.25;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  .feature-card {
+    background: #fdfcf9;
+    border-radius: 4px 4px 12px 12px;
+    padding: 34px 28px 30px;
+    position: relative;
+    box-shadow: 0 10px 28px rgba(44,36,64,0.07);
+    border-top: 3px solid var(--gold);
+  }
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: -3px; left: 20px; right: 20px;
+    height: 6px;
+    background: repeating-linear-gradient(90deg, var(--paper-line) 0 6px, transparent 6px 12px);
+  }
+  .feature-num {
+    font-family: 'Fraunces', serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.06em;
+    margin-bottom: 14px;
+  }
+  .feature-card h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--ink-text);
+    margin-bottom: 10px;
+  }
+  .feature-card p {
+    font-size: 0.92rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  @media (max-width: 900px) {
+    .features-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ══════════════════════════════════════════
+     ABOUT (dark section)
+  ══════════════════════════════════════════ */
+  .about-section {
+    background: var(--ink);
+    color: #fff;
+    padding: 100px 6vw;
+  }
+  .about-section .section-head .eyebrow { color: var(--gold); }
+  .about-section .section-head .eyebrow::before { background: var(--gold); }
+  .about-section .section-title { color: #fff; }
+
+  .about-content {
+    max-width: 760px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .about-content p {
+    font-size: 1rem;
+    line-height: 1.8;
+    color: rgba(255,255,255,0.78);
+    margin-bottom: 20px;
+  }
+
+  .about-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    max-width: 900px;
+    margin: 48px auto 0;
+  }
+  .about-stat {
+    text-align: center;
+    padding: 24px 16px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .about-stat .stat-icon {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--violet), var(--deep-violet));
+  }
+  .about-stat .stat-icon i { color: #fff; font-size: 1.2rem; }
+  .about-stat h4 {
+    font-family: 'Fraunces', serif;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #fff;
+  }
+  .about-stat p {
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.6);
+    margin: 0;
+  }
+
+  @media (max-width: 900px) {
+    .about-stats { grid-template-columns: 1fr; }
+  }
+
+  /* ══════════════════════════════════════════
+     FOOTER
+  ══════════════════════════════════════════ */
+  .site-footer {
+    background: #14102a;
+    color: rgba(255,255,255,0.68);
+    padding: 56px 6vw 28px;
+  }
+  .footer-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  .footer-top {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 40px;
+    padding-bottom: 36px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .footer-col h5 {
+    font-family: 'Fraunces', serif;
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .footer-col .footer-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 0.85rem;
+    margin-bottom: 11px;
+    color: rgba(255,255,255,0.65);
+  }
+  .footer-col .footer-item i { color: var(--gold); font-size: 0.85rem; width: 16px; }
+
+  .footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .footer-brand img { width: 36px; height: 36px; object-fit: contain; }
+  .footer-brand span {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    color: #fff;
+    font-size: 1.05rem;
+  }
+  .footer-tagline {
+    font-size: 0.82rem;
+    line-height: 1.6;
+    max-width: 280px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .footer-bottom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 22px;
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.45);
+  }
+  .footer-bottom .credit strong { color: rgba(255,255,255,0.72); }
+
+  @media (max-width: 700px) {
+    .footer-bottom { flex-direction: column; align-items: flex-start; }
+  }
+
+  /* ══════════════════════════════════════════
+     TOAST NOTIFICATION
   ══════════════════════════════════════════ */
   .toast-container {
     position: fixed;
@@ -113,7 +486,6 @@
     gap: 10px;
     pointer-events: none;
   }
-
   .toast {
     display: flex;
     align-items: center;
@@ -122,116 +494,42 @@
     border-radius: 12px;
     padding: 14px 18px;
     box-shadow: 0 8px 30px rgba(0,0,0,0.18);
-    border-left: 4px solid #667eea;
+    border-left: 4px solid var(--violet);
     min-width: 280px;
     max-width: 360px;
     pointer-events: all;
+    position: relative;
+    overflow: hidden;
     animation: toastIn 0.4s cubic-bezier(0.22,1,0.36,1) both;
   }
-  .toast.hide {
-    animation: toastOut 0.35s cubic-bezier(0.4,0,1,1) forwards;
-  }
-
-  @keyframes toastIn {
-    from { opacity:0; transform: translateX(40px) scale(0.95); }
-    to   { opacity:1; transform: translateX(0)    scale(1); }
-  }
-  @keyframes toastOut {
-    from { opacity:1; transform: translateX(0)    scale(1); }
-    to   { opacity:0; transform: translateX(40px) scale(0.95); }
-  }
-
+  .toast.hide { animation: toastOut 0.35s cubic-bezier(0.4,0,1,1) forwards; }
+  @keyframes toastIn { from { opacity:0; transform: translateX(40px) scale(0.95);} to { opacity:1; transform: translateX(0) scale(1);} }
+  @keyframes toastOut { from { opacity:1; transform: translateX(0) scale(1);} to { opacity:0; transform: translateX(40px) scale(0.95);} }
   .toast-icon {
     width: 36px; height: 36px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, var(--violet), var(--deep-violet));
     border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
   .toast-icon i { color: #fff; font-size: 1rem; }
-
   .toast-body { flex: 1; }
-  .toast-title {
-    font-weight: 600;
-    font-size: 0.875rem;
-    color: #2c3e50;
-    margin-bottom: 2px;
-  }
-  .toast-msg {
-    font-size: 0.8rem;
-    color: #5a6c7d;
-  }
-
-  .toast-close {
-    background: none; border: none; padding: 0;
-    color: #9ba8b5; cursor: pointer; font-size: 0.95rem;
-    flex-shrink: 0; transition: color 0.2s;
-    line-height: 1;
-  }
+  .toast-title { font-weight: 600; font-size: 0.875rem; color: #2c3e50; margin-bottom: 2px; }
+  .toast-msg { font-size: 0.8rem; color: #5a6c7d; }
+  .toast-close { background: none; border: none; padding: 0; color: #9ba8b5; cursor: pointer; font-size: 0.95rem; flex-shrink: 0; transition: color 0.2s; line-height: 1; }
   .toast-close:hover { color: #2c3e50; }
+  .toast-progress { position: absolute; bottom: 0; left: 0; height: 3px; border-radius: 0 0 0 12px; background: linear-gradient(90deg, var(--violet), var(--deep-violet)); animation: toastProgress 4s linear forwards; }
+  @keyframes toastProgress { from { width: 100%; } to { width: 0%; } }
 
-  /* Progress bar */
-  .toast-progress {
-    position: absolute;
-    bottom: 0; left: 0;
-    height: 3px;
-    border-radius: 0 0 0 12px;
-    background: linear-gradient(90deg, #667eea, #764ba2);
-    animation: toastProgress 4s linear forwards;
-  }
-  .toast { position: relative; overflow: hidden; }
-
-  @keyframes toastProgress {
-    from { width: 100%; }
-    to   { width: 0%; }
-  }
-
-  /* ── Footer bar ── */
-  .page-footer {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    z-index: 20;
-    background: rgba(20,10,50,0.55);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    padding: 14px 32px;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 32px;
-  }
-  .footer-item {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    color: rgba(255,255,255,0.80);
-    font-size: 0.82rem;
-    white-space: nowrap;
-  }
-  .footer-item i { color: rgba(255,255,255,0.55); }
-
-  /* ── Responsive ── */
-  @media (max-width: 768px) {
-    .card { padding: 40px 25px; }
-    .title-text { font-size: 1.7rem; }
-    .lead-text { font-size: 1rem; }
-    .btn-custom { padding: 12px 30px; font-size: 1rem; min-width: 200px; }
-  }
   @media (max-width: 480px) {
-    .card { padding: 35px 20px; }
-    .bisu-logo { width: 85px; height: 85px; }
-    .title-text { font-size: 1.5rem; }
-    body { padding-bottom: 100px; }
     .toast { min-width: 240px; }
     .toast-container { right: 12px; top: 12px; }
   }
-  @media (max-width: 400px) {
-    .page-footer .footer-item:nth-child(n+3) { display: none; }
-  }
 </style>
+</head>
+<body>
 
-<!-- ── Toast container — only rendered when there are messages ── -->
+<!-- ── Toast container ── -->
 {% if messages %}
 <div class="toast-container" id="toastContainer">
   {% for message in messages %}
@@ -264,82 +562,255 @@
 </div>
 {% endif %}
 
-<!-- ── Card ── -->
-<div class="card-wrap">
-  <div class="card">
-
-    <img src="{% static 'images/bisulogo.png' %}" alt="BISU Logo" class="bisu-logo">
-
-    <h1 class="title-text">BISU Test Banking System</h1>
-
-    <p class="lead-text">
-      A centralized digital repository of test questionnaires for BISU Balilihan
-    </p>
-
+<!-- ══════════════════════════════════════════
+     NAV
+══════════════════════════════════════════ -->
+<nav class="site-nav" id="siteNav">
+  <a href="#hero" class="nav-brand">
+    <img src="{% static 'images/bisulogo.png' %}" alt="BISU Logo">
+    Test Banking System
+  </a>
+  <div class="nav-links">
+    <a href="#hero">Home</a>
+    <a href="#features">Features</a>
+    <a href="#about">About</a>
     {% if user.is_authenticated %}
       {% if user.is_staff %}
-        <a href="{% url 'accounts:admin_dashboard' %}" class="btn-custom">
-          <i class="bi bi-speedometer2"></i> Go to Admin Dashboard
-        </a>
+        <a href="{% url 'accounts:admin_dashboard' %}" class="nav-cta">Dashboard</a>
       {% elif user.subadmin_profile.is_active and user.teacher_profile %}
-        <a href="{% url 'accounts:choose_role' %}" class="btn-custom">
-          <i class="bi bi-person-gear"></i> Choose Your Role
-        </a>
+        <a href="{% url 'accounts:choose_role' %}" class="nav-cta">Choose Role</a>
       {% elif user.subadmin_profile.is_active %}
-        <a href="{% url 'accounts:subadmin_dashboard' %}" class="btn-custom">
-          <i class="bi bi-speedometer2"></i> Go to Dashboard
-        </a>
+        <a href="{% url 'accounts:subadmin_dashboard' %}" class="nav-cta">Dashboard</a>
       {% else %}
-        <a href="{% url 'accounts:teacher_dashboard' %}" class="btn-custom">
-          <i class="bi bi-speedometer2"></i> Go to Dashboard
-        </a>
+        <a href="{% url 'accounts:teacher_dashboard' %}" class="nav-cta">Dashboard</a>
       {% endif %}
     {% else %}
-      <a href="{% url 'accounts:login' %}" class="btn-custom">
-        <i class="bi bi-box-arrow-in-right"></i> Login to Continue
-      </a>
+      <a href="{% url 'accounts:login' %}" class="nav-cta">Login</a>
     {% endif %}
+  </div>
+</nav>
 
-  </div>
-</div>
+<!-- ══════════════════════════════════════════
+     HERO
+══════════════════════════════════════════ -->
+<section class="hero" id="hero">
+  <div class="hero-grid">
+    <div>
+      <div class="eyebrow">BISU Balilihan Campus</div>
+      <h1 class="hero-title">Every exam question,<br><em>kept in one place.</em></h1>
+      <p class="hero-lead">
+        The BISU Test Banking System is a centralized digital repository of test
+        questionnaires — built so teachers can contribute, reuse, and review exam
+        items without ever digging through a filing cabinet again.
+      </p>
+      {% if user.is_authenticated %}
+        {% if user.is_staff %}
+          <a href="{% url 'accounts:admin_dashboard' %}" class="btn-custom">
+            <i class="bi bi-speedometer2"></i> Go to Admin Dashboard
+          </a>
+        {% elif user.subadmin_profile.is_active and user.teacher_profile %}
+          <a href="{% url 'accounts:choose_role' %}" class="btn-custom">
+            <i class="bi bi-person-gear"></i> Choose Your Role
+          </a>
+        {% elif user.subadmin_profile.is_active %}
+          <a href="{% url 'accounts:subadmin_dashboard' %}" class="btn-custom">
+            <i class="bi bi-speedometer2"></i> Go to Dashboard
+          </a>
+        {% else %}
+          <a href="{% url 'accounts:teacher_dashboard' %}" class="btn-custom">
+            <i class="bi bi-speedometer2"></i> Go to Dashboard
+          </a>
+        {% endif %}
+      {% else %}
+        <a href="{% url 'accounts:login' %}" class="btn-custom">
+          <i class="bi bi-box-arrow-in-right"></i> Login to Continue
+        </a>
+      {% endif %}
+    </div>
 
-<!-- ── Footer ── -->
-<footer class="page-footer">
-  <div class="footer-item">
-    <i class="bi bi-telephone-fill"></i>
-    <span>(038) 416-0797</span>
+    <div class="card-stack" aria-hidden="true">
+      <div class="idx-card c1">
+        <div class="idx-tag">Math 101 · Item 14</div>
+        <div class="idx-line w90"></div>
+        <div class="idx-line w70"></div>
+        <div class="idx-line w50"></div>
+      </div>
+      <div class="idx-card c2">
+        <div class="idx-tag">Sci 210 · Item 08</div>
+        <div class="idx-line w70"></div>
+        <div class="idx-line w90"></div>
+        <div class="idx-line w50"></div>
+      </div>
+      <div class="idx-card c3">
+        <div class="idx-tag">Eng 305 · Item 22</div>
+        <div class="idx-line w50"></div>
+        <div class="idx-line w90"></div>
+        <div class="idx-line w70"></div>
+      </div>
+    </div>
   </div>
-  <div class="footer-item">
-    <i class="bi bi-people-fill"></i>
-    <span>bisubalilihanofficial</span>
+</section>
+
+<!-- ══════════════════════════════════════════
+     FEATURES
+══════════════════════════════════════════ -->
+<section class="section" id="features">
+  <div class="section-head reveal">
+    <div class="eyebrow">What it does</div>
+    <h2 class="section-title">Built around how test banks actually get used</h2>
   </div>
-  <div class="footer-item">
-    <i class="bi bi-envelope-fill"></i>
-    <span>balilihan@bisu.edu.ph</span>
+  <div class="features-grid">
+    <div class="feature-card reveal">
+      <div class="feature-num">Repository</div>
+      <h3>Centralized question bank</h3>
+      <p>Every questionnaire submitted by faculty lives in one searchable archive, organized by subject, topic, and difficulty. No more scattered files.</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-num">Access</div>
+      <h3>Role-based dashboards</h3>
+      <p>Admins, sub-admins, and teachers each get a workspace scoped to what they need, from campus-wide oversight down to a single subject.</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-num">Workflow</div>
+      <h3>Review before it's banked</h3>
+      <p>Submitted items move through an approval step before joining the repository, keeping the bank accurate and exam-ready.</p>
+    </div>
   </div>
-  <div class="footer-item">
-    <i class="bi bi-globe"></i>
-    <span>www.bisubalilihan.com</span>
+</section>
+
+<!-- ══════════════════════════════════════════
+     ABOUT
+══════════════════════════════════════════ -->
+<section class="about-section" id="about">
+  <div class="section-head reveal">
+    <div class="eyebrow">About the system</div>
+    <h2 class="section-title">Why BISU Balilihan built a test bank</h2>
+  </div>
+
+  <div class="about-content reveal">
+    <p>
+      The BISU Test Banking System replaces scattered folders, printed
+      questionnaires, and filing cabinets with a single digital archive.
+      Faculty can submit, tag, and retrieve exam items in seconds, and
+      every item passes through a review step before it becomes part of
+      the shared bank — so what's stored is always accurate and ready
+      to use.
+    </p>
+    <p>
+      It's designed around three roles: administrators who oversee the
+      whole campus repository, sub-admins who manage their department's
+      collection, and teachers who contribute and draw from the bank
+      for their own subjects.
+    </p>
+  </div>
+
+  <div class="about-stats">
+    <div class="about-stat reveal">
+      <div class="stat-icon"><i class="bi bi-archive"></i></div>
+      <h4>Centralized Storage</h4>
+      <p>One repository for every questionnaire, searchable by subject and topic.</p>
+    </div>
+    <div class="about-stat reveal">
+      <div class="stat-icon"><i class="bi bi-shield-check"></i></div>
+      <h4>Reviewed Content</h4>
+      <p>Items are checked before joining the bank, keeping quality consistent.</p>
+    </div>
+    <div class="about-stat reveal">
+      <div class="stat-icon"><i class="bi bi-people"></i></div>
+      <h4>Role-Based Access</h4>
+      <p>Admins, sub-admins, and teachers each work within their own scope.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-col">
+        <div class="footer-brand">
+          <img src="{% static 'images/bisulogo.png' %}" alt="BISU Logo">
+          <span>BISU Test Banking</span>
+        </div>
+        <p class="footer-tagline">
+          A centralized digital repository of test questionnaires for
+          BISU Balilihan.
+        </p>
+      </div>
+
+      <div class="footer-col">
+        <h5>Contact</h5>
+        <div class="footer-item"><i class="bi bi-telephone-fill"></i><span>(038) 416-0797</span></div>
+        <div class="footer-item"><i class="bi bi-envelope-fill"></i><span>balilihan@bisu.edu.ph</span></div>
+      </div>
+
+      <div class="footer-col">
+        <h5>Find Us</h5>
+        <div class="footer-item"><i class="bi bi-people-fill"></i><span>bisubalilihanofficial</span></div>
+        <div class="footer-item"><i class="bi bi-globe"></i><span>www.bisubalilihan.com</span></div>
+      </div>
+
+      <div class="footer-col">
+        <h5>Explore</h5>
+        <div class="footer-item"><a href="#features" style="color:inherit;">Features</a></div>
+        <div class="footer-item"><a href="#about" style="color:inherit;">About</a></div>
+        {% if not user.is_authenticated %}
+        <div class="footer-item"><a href="{% url 'accounts:login' %}" style="color:inherit;">Login</a></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div>© {% now "Y" %} BISU Balilihan · Test Banking System. All rights reserved.</div>
+      <div class="credit">
+        Developed by <strong>Justine, Kim, and Ian</strong> as a thesis project, BISU Balilihan.
+      </div>
+    </div>
   </div>
 </footer>
 
 <script>
-function dismissToast(id) {
-  var el = document.getElementById(id);
-  if (!el) return;
-  el.classList.add('hide');
-  setTimeout(function () { el.remove(); }, 350);
-}
+  function dismissToast(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('hide');
+    setTimeout(function () { el.remove(); }, 350);
+  }
 
-// Auto-dismiss all toasts after 4 seconds
-document.addEventListener('DOMContentLoaded', function () {
-  var toasts = document.querySelectorAll('.toast');
-  toasts.forEach(function (toast, i) {
-    setTimeout(function () {
-      dismissToast(toast.id);
-    }, 4000 + (i * 300));
+  document.addEventListener('DOMContentLoaded', function () {
+    // Auto-dismiss toasts
+    document.querySelectorAll('.toast').forEach(function (toast, i) {
+      setTimeout(function () { dismissToast(toast.id); }, 4000 + (i * 300));
+    });
+
+    // Nav background on scroll
+    var nav = document.getElementById('siteNav');
+    var onScroll = function () {
+      if (window.scrollY > 40) nav.classList.add('scrolled');
+      else nav.classList.remove('scrolled');
+    };
+    window.addEventListener('scroll', onScroll);
+    onScroll();
+
+    // Scroll-reveal
+    var revealEls = document.querySelectorAll('.reveal');
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.15 });
+      revealEls.forEach(function (el) { io.observe(el); });
+    } else {
+      revealEls.forEach(function (el) { el.classList.add('in-view'); });
+    }
   });
-});
 </script>
 
-{% endblock %}
+</body>
+</html>

@@ -1,6 +1,12 @@
 {% load static %}
-
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — BISU Test Banking System</title>
+    <link rel="icon" type="image/png" href="{% static 'images/bisulogo.png' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
 
@@ -222,6 +228,8 @@
     .page-footer .footer-item:nth-child(n+3) { display: none; }
   }
 </style>
+</head>
+<body>
 
 <!-- Card -->
 <div class="card-wrap">
@@ -320,4 +328,5 @@
   });
 </script>
 
-{% endblock %}
+</body>
+</html>
