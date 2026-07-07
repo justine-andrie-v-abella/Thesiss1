@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-
+{% comment %} My Uploads Template {% endcomment %}
 {% block title %}My Uploads - Teacher{% endblock %}
 {% block header_title %}My Uploads{% endblock %}
 {% block header_subtitle %}Manage your uploaded questionnaires{% endblock %}
@@ -249,13 +249,15 @@
             <!-- Action Buttons -->
             <div class="flex items-center space-x-2">
                 {% if quest.is_extracted %}
-                <!-- Preview questions — opens modal -->
+                <!-- Document Preview — opens exam-paper style modal -->
                 <button type="button"
-                    class="preview-btn bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg transition-all"
-                    title="Preview Questions"
-                    data-pk="{{ quest.pk }}"
-                    data-title="{{ quest.title|escapejs }}">
-                    <i class="bi bi-eye"></i>
+                    class="doc-preview-btn bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-3 rounded-lg transition-all"
+                    title="Preview Document"
+                    data-quest-id="{{ quest.pk }}"
+                    data-quest-title="{{ quest.title|escapejs }}"
+                    data-quest-subject="{{ quest.subject.code|escapejs }} — {{ quest.subject.name|escapejs }}"
+                    data-quest-exam-type-display="{{ quest.get_exam_type_display|escapejs }}">
+                    <i class="bi bi-file-earmark-text"></i>
                 </button>
                 <a href="{% url 'questionnaires:review_extracted_pk' quest.pk %}"
                     class="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-3 rounded-lg transition-all text-center text-sm">
@@ -719,38 +721,31 @@
 
 
 <!-- ═══════════════════════════════════════════════════════════════
-     PREVIEW QUESTIONS MODAL
+     DOCUMENT PREVIEW MODAL  (ported from Browse Questionnaires)
 ════════════════════════════════════════════════════════════════ -->
-<div id="previewModal" style="display:none;"
-    class="fixed inset-0 bg-black bg-opacity-60 z-[9999] flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col animate-modal">
-
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-4 flex items-center justify-between rounded-t-xl flex-shrink-0">
-            <div class="min-w-0">
-                <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                    <i class="bi bi-eye text-xl"></i>
-                    <span id="previewModalTitle" class="truncate"></span>
-                </h3>
-                <p id="previewModalCount" class="text-blue-100 text-xs mt-0.5"></p>
+<div id="docPreviewModal" class="doc-preview-overlay" onclick="if(event.target===this)closeDocPreview()">
+    <div class="doc-preview-wrapper">
+        <div class="doc-preview-toolbar">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:36px;height:36px;background:rgba(255,255,255,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-file-earmark-text text-white" style="font-size:16px;"></i>
+                </div>
+                <div>
+                    <p style="color:white;font-weight:700;font-size:14px;margin:0;font-family:Arial,sans-serif;" id="dpTitle">Document Preview</p>
+                    <p style="color:rgba(255,255,255,0.55);font-size:11px;margin:0;font-family:Arial,sans-serif;" id="dpSubtitle"></p>
+                </div>
             </div>
-            <button type="button" onclick="closePreviewModal()"
-                class="w-9 h-9 flex-shrink-0 flex items-center justify-center text-white hover:bg-white/20 rounded-lg transition-colors ml-3">
-                <i class="bi bi-x-lg text-xl"></i>
-            </button>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button onclick="printDocPreview()" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:white;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:Arial,sans-serif;">
+                    <i class="bi bi-printer"></i> Print
+                </button>
+                <button onclick="closeDocPreview()" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:white;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:14px;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
         </div>
-
-        <!-- Body -->
-        <div id="previewModalBody" class="overflow-y-auto flex-1 p-5 space-y-3">
-            <!-- filled by JS -->
-        </div>
-
-        <!-- Footer -->
-        <div class="px-6 py-4 border-t border-gray-200 flex justify-end flex-shrink-0 rounded-b-xl bg-gray-50">
-            <button type="button" onclick="closePreviewModal()"
-                class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-100 transition-colors">
-                Close
-            </button>
+        <div class="doc-preview-scroll">
+            <div id="dpPaper" class="doc-preview-paper"></div>
         </div>
     </div>
 </div>
@@ -775,6 +770,51 @@
 .animate-modal {
     animation: modalIn 0.2s ease forwards;
 }
+/* ── Document Preview (ported from Browse Questionnaires) ── */
+@keyframes aqModalIn { from { opacity:0; transform: scale(0.96) translateY(-10px);} to { opacity:1; transform: scale(1) translateY(0);} }
+.doc-preview-overlay{display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1.5rem;}.doc-preview-overlay.dp-open{display:flex;}
+.doc-preview-wrapper{max-width:860px;width:100%;max-height:90vh;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.5);animation:aqModalIn 0.25s cubic-bezier(0.34,1.56,0.64,1) both;}
+.doc-preview-toolbar{background:rgba(17,24,39,.97);backdrop-filter:blur(8px);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.doc-preview-scroll{overflow-y:auto;flex:1;min-height:0;}
+.doc-preview-paper{background:#fff;padding:48px 60px;font-family:"Times New Roman",Times,serif;}
+.dp-school{text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#374151;margin-bottom:2px;font-family:Arial,sans-serif;}
+.dp-college{text-align:center;font-size:11px;text-transform:uppercase;color:#374151;margin-bottom:8px;font-family:Arial,sans-serif;}
+.dp-title{text-align:center;font-size:18px;font-weight:800;color:#111827;margin-bottom:2px;font-family:Arial,sans-serif;}
+.dp-subtitle{text-align:center;font-size:12px;color:#4B5563;margin-bottom:10px;font-family:Arial,sans-serif;}
+.dp-rule{border:none;border-top:2.5px solid #111827;margin:0 0 2px;}
+.dp-rule-thin{border:none;border-top:1px solid #374151;margin:0 0 12px;}
+.dp-fields{display:flex;gap:20px;font-size:12px;color:#374151;padding:7px 0 12px;border-bottom:1.5px solid #374151;margin-bottom:20px;font-family:Arial,sans-serif;}
+.dp-blank{display:inline-block;border-bottom:1px solid #374151;min-width:80px;vertical-align:middle;}
+.dp-section{margin-bottom:22px;}
+.dp-sec-head{display:flex;align-items:baseline;gap:5px;margin-bottom:1px;font-family:Arial,sans-serif;}
+.dp-roman{font-size:13px;font-weight:900;color:#111827;}
+.dp-sec-title{font-size:13px;font-weight:800;color:#111827;text-transform:uppercase;letter-spacing:.04em;}
+.dp-directions{font-size:11px;font-style:italic;color:#6B7280;margin-bottom:11px;padding-left:16px;font-family:Arial,sans-serif;}
+.dp-q{font-size:13px;margin-bottom:10px;color:#1F2937;line-height:1.6;}.dp-qn{font-weight:700;}
+.dp-mc-opts{display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;padding-left:20px;margin-top:5px;}
+.dp-opt{font-size:12px;color:#374151;display:flex;gap:4px;align-items:baseline;}
+.dp-opt.dp-correct{color:#065F46;font-weight:700;}
+.dp-blank-line{display:inline-block;border-bottom:1px solid #374151;width:150px;margin-left:6px;vertical-align:middle;}
+.dp-tf-line{display:inline-block;border-bottom:1px solid #374151;width:65px;margin-left:10px;vertical-align:middle;}
+.dp-match-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-left:20px;margin-top:7px;}
+.dp-match-col-hd{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6B7280;border-bottom:1px solid #E5E7EB;padding-bottom:3px;margin-bottom:4px;font-family:Arial,sans-serif;}
+.dp-match-item{font-size:12px;color:#374151;margin-bottom:3px;}
+.dp-essay-lines{padding-left:20px;margin-top:7px;}
+.dp-essay-line{border-bottom:1px solid #D1D5DB;height:20px;margin-bottom:7px;}
+.dp-ans-key{margin-top:26px;padding-top:10px;border-top:2px dashed #D1D5DB;page-break-before:always;}
+.dp-ak-hd{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#9CA3AF;margin-bottom:6px;font-family:Arial,sans-serif;}
+.dp-ak-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:3px;}
+.dp-ak-item{font-size:11px;color:#374151;font-family:Arial,sans-serif;}
+.dp-dept{text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#4B5563;margin-bottom:6px;font-family:Arial,sans-serif;}
+.dp-part-label{font-size:13px;font-weight:900;color:#111827;font-family:Arial,sans-serif;}
+.dp-sec-instr{font-size:12px;font-style:italic;color:#4B5563;font-family:Arial,sans-serif;}
+.dp-tf-pre{font-family:"Courier New",monospace;font-size:12px;letter-spacing:1px;color:#374151;}
+.dp-q-ans{font-size:12px;margin-bottom:10px;margin-left:20px;color:#1F2937;font-family:Arial,sans-serif;}
+.dp-ans-blank{display:inline-block;border-bottom:1px solid #374151;min-width:120px;vertical-align:middle;}
+.dp-match-section{margin-bottom:14px;}
+.dp-match-grid3{display:grid;grid-template-columns:0.12fr 0.40fr 0.48fr;gap:4px 12px;padding-left:8px;margin-top:6px;}
+.dp-match-hdr{font-size:11px;font-weight:700;text-decoration:underline;color:#374151;padding-bottom:3px;border-bottom:1px solid #D1D5DB;margin-bottom:3px;font-family:Arial,sans-serif;}
+.dp-match-cell{font-size:12px;color:#374151;font-family:Arial,sans-serif;padding:1px 0;}
 </style>
 
 <script>
@@ -944,110 +984,13 @@
     document.getElementById('archivedModal').addEventListener('click', function (e) {
         if (e.target === this) closeArchivedModal();
     });
-    document.getElementById('previewModal').addEventListener('click', function (e) {
-        if (e.target === this) closePreviewModal();
-    });
 
     /* ── Close on Escape ── */
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') { closeEditModal(); closeArchiveModal(); closeArchivedModal(); closePermDeleteModal(); closePreviewModal(); }
-    });
-
-    /* ══════════════════════════════════════════
-       PREVIEW QUESTIONS MODAL
-    ══════════════════════════════════════════ */
-    function esc(s) {
-        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    function renderQuestions(questions) {
-        if (!questions || !questions.length) {
-            return '<div class="text-center py-10 text-gray-400"><i class="bi bi-inbox text-4xl"></i><p class="mt-2">No questions found.</p></div>';
+        if (e.key === 'Escape') {
+            closeEditModal(); closeArchiveModal(); closeArchivedModal(); closePermDeleteModal();
+            if (typeof closeDocPreview === 'function') closeDocPreview();
         }
-        var letters = ['A','B','C','D'];
-        var html = '';
-        questions.forEach(function (q, idx) {
-            var diffColor = q.difficulty === 'easy'
-                ? 'border-green-400'
-                : q.difficulty === 'hard' ? 'border-red-400' : 'border-yellow-400';
-            var diffBadge = q.difficulty === 'easy'
-                ? 'bg-green-100 text-green-800'
-                : q.difficulty === 'hard' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800';
-
-            html += '<div class="bg-white rounded-lg border-l-4 ' + diffColor + ' shadow-sm p-4">' +
-                '<div class="flex flex-wrap gap-2 mb-2">' +
-                '<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">' + esc(q.type_display || q.type) + '</span>' +
-                '<span class="px-2 py-0.5 ' + diffBadge + ' text-xs font-semibold rounded-full">' + esc(q.difficulty || 'medium') + '</span>' +
-                '<span class="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">' + (q.points || 1) + ' pt</span>' +
-                '</div>' +
-                '<p class="text-gray-800 font-medium text-sm mb-3"><span class="text-gray-400 mr-1">' + (idx + 1) + '.</span>' + esc(q.question_text) + '</p>';
-
-            /* Multiple choice options */
-            if (q.type === 'multiple_choice' && q.options) {
-                html += '<div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-2">';
-                q.options.forEach(function (opt, i) {
-                    var letter = letters[i];
-                    var isCorrect = q.correct_answer && q.correct_answer.toUpperCase() === letter;
-                    html += '<div class="flex items-center gap-2 px-3 py-1.5 rounded text-xs ' +
-                        (isCorrect ? 'bg-green-50 border border-green-400 font-semibold text-green-800' : 'bg-gray-50 text-gray-700') + '">' +
-                        '<span class="font-bold">' + letter + '.</span>' + esc(opt || '') +
-                        (isCorrect ? ' <i class="bi bi-check-circle-fill text-green-600 ml-auto"></i>' : '') +
-                        '</div>';
-                });
-                html += '</div>';
-            } else if (q.correct_answer) {
-                html += '<div class="bg-green-50 border-l-4 border-green-400 px-3 py-2 rounded text-xs">' +
-                    '<span class="text-gray-500">Answer: </span>' +
-                    '<span class="text-green-800 font-semibold">' + esc(q.correct_answer) + '</span></div>';
-            } else {
-                html += '<div class="bg-amber-50 border-l-4 border-amber-400 px-3 py-2 rounded text-xs flex items-center gap-1">' +
-                    '<i class="bi bi-exclamation-triangle text-amber-500"></i>' +
-                    '<span class="text-amber-700">No answer recorded.</span></div>';
-            }
-
-            if (q.explanation) {
-                html += '<div class="mt-2 px-3 py-2 bg-blue-50 rounded text-xs text-gray-600 border-l-4 border-blue-300">' +
-                    '<i class="bi bi-lightbulb-fill text-blue-500 mr-1"></i>' + esc(q.explanation) + '</div>';
-            }
-
-            html += '</div>';
-        });
-        return html;
-    }
-
-    window.openPreviewModal = function (pk, title) {
-        var modal = document.getElementById('previewModal');
-        var body  = document.getElementById('previewModalBody');
-        document.getElementById('previewModalTitle').textContent = title;
-        document.getElementById('previewModalCount').textContent = '';
-        body.innerHTML = '<div class="flex items-center justify-center py-16 text-gray-400">' +
-            '<i class="bi bi-arrow-repeat animate-spin text-3xl mr-3"></i><span>Loading questions…</span></div>';
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-
-        fetch('/questionnaires/get-questions/' + pk + '/')
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                var questions = data.questions || [];
-                document.getElementById('previewModalCount').textContent =
-                    questions.length + ' question' + (questions.length !== 1 ? 's' : '');
-                body.innerHTML = renderQuestions(questions);
-            })
-            .catch(function () {
-                body.innerHTML = '<div class="text-center py-10 text-red-400"><i class="bi bi-exclamation-triangle text-4xl"></i><p class="mt-2">Failed to load questions.</p></div>';
-            });
-    };
-
-    window.closePreviewModal = function () {
-        document.getElementById('previewModal').style.display = 'none';
-        document.body.style.overflow = 'auto';
-    };
-
-    /* Bind preview buttons */
-    document.querySelectorAll('.preview-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            openPreviewModal(this.dataset.pk, this.dataset.title);
-        });
     });
 
     /* ══════════════════════════════════════════
@@ -1170,8 +1113,199 @@
 
 })();
 
+/* ══════════════════════════════════════════════════
+   DOCUMENT PREVIEW  (exam-paper format, ported from Browse Questionnaires)
+════════════════════════════════════════════════ */
+(function(){
+'use strict';
+var dpOverlay=document.getElementById('docPreviewModal');
+var dpPaper=document.getElementById('dpPaper');
+if(!dpOverlay||!dpPaper)return;
+/* Order matches generators.py section_config */
+var DP_TYPE_ORDER=['identification','multiple_choice','true_false','essay','fill_blank','matching','enumeration'];
+var DP_TYPE_DISPLAY={identification:'Identification',multiple_choice:'Multiple Choice',true_false:'True or False',essay:'Essay',fill_blank:'Fill in the Blanks',fill_in_the_blank:'Fill in the Blanks',matching:'Matching Type',enumeration:'Enumeration'};
+var DP_INSTRUCTIONS={identification:'Read carefully and identify what is being asked.',multiple_choice:'Write the CAPITAL LETTER of the best response.',true_false:'Write TRUE if the statement is correct, otherwise write FALSE.',essay:'Answer the following questions comprehensively.',fill_blank:'Complete the following statements.',fill_in_the_blank:'Complete the following statements.',matching:'Match the items in Column A with their correct description in Column B. Write the letter of your answer in the blank provided.',enumeration:'List all the correct items being asked in each question.'};
+
+function dpEsc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function initDocPreviewBtns(){
+    document.querySelectorAll('.doc-preview-btn').forEach(function(btn){
+        btn.addEventListener('click',function(){
+            var qid=btn.getAttribute('data-quest-id');
+            var title=btn.getAttribute('data-quest-title')||'';
+            var subject=btn.getAttribute('data-quest-subject')||'';
+            var examType=btn.getAttribute('data-quest-exam-type-display')||'';
+            document.getElementById('dpTitle').textContent=title||'Document Preview';
+            document.getElementById('dpSubtitle').textContent=subject+(examType?' \u2014 '+examType:'');
+            dpPaper.innerHTML='<div style="text-align:center;padding:48px 0;color:#9CA3AF;"><div style="width:36px;height:36px;border:4px solid #E0E7FF;border-top-color:#6366F1;border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite;"></div><p style="font-size:13px;font-family:Arial,sans-serif;">Building document preview...</p></div>';
+            dpOverlay.classList.add('dp-open');
+            document.body.style.overflow='hidden';
+            fetch('/questionnaires/get-questions/'+qid+'/')
+                .then(function(r){return r.json();})
+                .then(function(data){
+                    if(data.error)throw new Error(data.error);
+                    renderDP(data,title,subject,examType);
+                })
+                .catch(function(err){
+                    dpPaper.innerHTML='<div style="text-align:center;padding:48px 0;color:#EF4444;"><i class="bi bi-exclamation-circle" style="font-size:32px;display:block;margin-bottom:12px;"></i><p style="font-size:14px;font-weight:600;font-family:Arial,sans-serif;">Failed to load questions.</p><p style="font-size:12px;color:#9CA3AF;margin-top:4px;font-family:Arial,sans-serif;">'+(err.message?dpEsc(err.message):'')+'</p></div>';
+                });
+        });
+    });
+}
+window.initDocPreviewBtns=initDocPreviewBtns;
+initDocPreviewBtns();
+
+function closeDocPreview(){dpOverlay.classList.remove('dp-open');document.body.style.overflow='';dpPaper.innerHTML='';}
+window.closeDocPreview=closeDocPreview;
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&dpOverlay.classList.contains('dp-open'))closeDocPreview();});
+
+function printDocPreview(){
+    var styles='';
+    document.querySelectorAll('style').forEach(function(s){styles+=s.innerHTML+'\n';});
+    var win=window.open('','_blank','width=900,height=700');
+    win.document.write('<html><head><title>'+dpEsc(document.getElementById('dpTitle').textContent||'Document Preview')+'</title>');
+    win.document.write('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">');
+    win.document.write('<style>'+styles+'body{margin:0;padding:32px 48px;font-family:"Times New Roman",Times,serif;}@media print{@page{margin:18mm 15mm;}}</style>');
+    win.document.write('</head><body>');
+    win.document.write(dpPaper.innerHTML);
+    win.document.write('</body></html>');
+    win.document.close();
+    win.focus();
+    setTimeout(function(){win.print();},600);
+}
+window.printDocPreview=printDocPreview;
+
+function renderDP(data,titleOverride,subjectOverride,examTypeOverride){
+    var questions=data.questions||[];
+    var title=titleOverride||data.questionnaire_title||'Questionnaire';
+    var subject=subjectOverride||data.questionnaire_subject||'';
+    var examType=examTypeOverride||data.exam_type_display||'';
+    var department=data.department||'';
+    /* Merge fill_in_the_blank into fill_blank so they form one section */
+    var groups={};
+    questions.forEach(function(q){
+        var t=q.type==='fill_in_the_blank'?'fill_blank':q.type;
+        if(!groups[t])groups[t]=[];
+        groups[t].push(q);
+    });
+    var html='';
+    html+='<div style="text-align:center;margin-bottom:16px;">';
+    html+='<div class="dp-school">Republic of the Philippines</div>';
+    html+='<div class="dp-college">Bohol Island State University</div>';
+    if(department){html+='<div class="dp-dept">'+dpEsc(department)+'</div>';}
+    html+='<hr class="dp-rule"><hr class="dp-rule-thin">';
+    html+='<div class="dp-title">'+dpEsc(title)+'</div>';
+    if(subject||examType){html+='<div class="dp-subtitle">'+dpEsc(subject)+(examType?'&nbsp;&nbsp;|&nbsp;&nbsp;'+dpEsc(examType):'')+'</div>';}
+    html+='</div>';
+    html+='<div class="dp-fields">';
+    html+='<span>Name:&nbsp;<span class="dp-blank" style="min-width:180px;">&nbsp;</span></span>';
+    html+='<span>Score:&nbsp;<span class="dp-blank" style="min-width:65px;">&nbsp;</span></span>';
+    html+='<span>Date:&nbsp;<span class="dp-blank" style="min-width:100px;">&nbsp;</span></span>';
+    html+='</div>';
+    var partNum=0,globalN=0,keyItems=[];
+    DP_TYPE_ORDER.forEach(function(type){
+        if(!groups[type]||!groups[type].length)return;
+        partNum++;
+        var qs=groups[type];
+        var displayName=DP_TYPE_DISPLAY[type]||type;
+        var instruction=DP_INSTRUCTIONS[type]||'';
+        html+='<div class="dp-section">';
+        /* Format matches generators.py: "PART 1. Multiple Choice. Write the CAPITAL LETTER..." */
+        html+='<div class="dp-sec-head">';
+        html+='<span class="dp-part-label">PART '+partNum+'.&nbsp;</span>';
+        html+='<span class="dp-sec-title">'+dpEsc(displayName)+'.&nbsp;</span>';
+        html+='<span class="dp-sec-instr">'+dpEsc(instruction)+'</span>';
+        html+='</div>';
+        qs.forEach(function(q){
+            globalN++;
+            html+=renderDPQ(q,globalN,type);
+            if(type!=='essay'){
+                if(type==='matching'&&q.matching_pairs&&q.matching_pairs.length){
+                    var pStr=q.matching_pairs.map(function(p){
+                        var n=p.item?(String(p.item).split('.')[0].trim()):String(p.item||'');
+                        return n+'\u2192'+p.match;
+                    }).join('   ');
+                    keyItems.push(globalN+'. '+pStr);
+                }else if(q.correct_answer){
+                    keyItems.push(globalN+'. '+q.correct_answer);
+                }
+            }
+        });
+        html+='</div>';
+    });
+    if(keyItems.length){
+        html+='<div class="dp-ans-key"><div class="dp-ak-hd">&#9830; Answer Key &nbsp;<span style="font-weight:400;font-style:italic;color:#9CA3AF;font-size:9px;">(For Instructor Use Only \u2014 Detach Before Distributing)</span></div>';
+        html+='<div class="dp-ak-grid">';
+        keyItems.forEach(function(k){html+='<div class="dp-ak-item">'+dpEsc(k)+'</div>';});
+        html+='</div></div>';
+    }
+    dpPaper.innerHTML=html;
+}
+
+function renderDPQ(q,num,type){
+    var L=['A','B','C','D'];
+    var html='';
+    if(type==='multiple_choice'){
+        html='<div class="dp-q"><span class="dp-qn">'+num+'.</span>&nbsp;'+dpEsc(q.question_text);
+        if(q.options&&q.options.length){
+            html+='<div class="dp-mc-opts">';
+            q.options.forEach(function(opt,i){
+                if(!opt)return;
+                html+='<div class="dp-opt"><span style="font-weight:700;">'+L[i]+'.</span>&nbsp;'+dpEsc(opt)+'</div>';
+            });
+            html+='</div>';
+        }
+        html+='</div>';
+    }else if(type==='true_false'){
+        /* DOCX format: ________ N. question_text */
+        html='<div class="dp-q"><span class="dp-tf-pre">________&nbsp;</span><span class="dp-qn">'+num+'.</span>&nbsp;'+dpEsc(q.question_text)+'</div>';
+    }else if(type==='identification'||type==='fill_blank'||type==='fill_in_the_blank'){
+        /* DOCX format: N. question_text  then "Answer: ____" on next line */
+        html='<div class="dp-q"><span class="dp-qn">'+num+'.</span>&nbsp;'+dpEsc(q.question_text)+'</div>';
+        html+='<div class="dp-q-ans">Answer:&nbsp;<span class="dp-ans-blank">________________________</span></div>';
+    }else if(type==='matching'){
+        /* DOCX format: 3-col table \u2014 Ans. | Column A | Column B */
+        html='<div class="dp-match-section">';
+        if(q.column_a&&q.column_a.length&&q.column_b&&q.column_b.length){
+            html+='<div class="dp-match-grid3">';
+            html+='<div class="dp-match-hdr" style="text-align:center;">Ans.</div>';
+            html+='<div class="dp-match-hdr">Column A</div>';
+            html+='<div class="dp-match-hdr">Column B</div>';
+            var maxR=Math.max(q.column_a.length,q.column_b.length);
+            for(var i=0;i<maxR;i++){
+                html+='<div class="dp-match-cell" style="text-align:center;">_______</div>';
+                html+='<div class="dp-match-cell">'+dpEsc(q.column_a[i]||'')+'</div>';
+                html+='<div class="dp-match-cell">'+dpEsc(q.column_b[i]||'')+'</div>';
+            }
+            html+='</div>';
+        }
+        html+='</div>';
+    }else if(type==='essay'){
+        html='<div class="dp-q"><span class="dp-qn">'+num+'.</span>&nbsp;'+dpEsc(q.question_text)+'</div>';
+        html+='<div class="dp-essay-lines">';
+        for(var j=0;j<4;j++)html+='<div class="dp-essay-line"></div>';
+        html+='</div>';
+    }else if(type==='enumeration'){
+        html='<div class="dp-q"><span class="dp-qn">'+num+'.</span>&nbsp;'+dpEsc(q.question_text)+'</div>';
+        var raw=q.correct_answer||'';
+        var enumItems=raw.split('\n').map(function(s){return s.trim();}).filter(Boolean);
+        if(enumItems.length<=1)enumItems=raw.split(',').map(function(s){return s.trim();}).filter(Boolean);
+        var nLines=Math.max(enumItems.length,3);
+        html+='<div class="dp-essay-lines">';
+        for(var k=0;k<nLines;k++){
+            html+='<div class="dp-q-ans" style="margin-bottom:6px;"><span style="font-size:12px;font-family:Arial,sans-serif;">'+(k+1)+'.&nbsp;<span class="dp-ans-blank" style="min-width:200px;">&nbsp;</span></span></div>';
+        }
+        html+='</div>';
+    }else{
+        html='<div class="dp-q"><span class="dp-qn">'+num+'.</span>&nbsp;'+dpEsc(q.question_text)+'</div>';
+    }
+    return html;
+}
+
+})();
+
     /* ── Move modals to <body> so they escape #main-page-content stacking context ── */
-    ['editModal','archiveModal','archivedModal','permDeleteModal','previewModal'].forEach(function(id){
+    ['editModal','archiveModal','archivedModal','permDeleteModal','docPreviewModal'].forEach(function(id){
         var el = document.getElementById(id);
         if (el) document.body.appendChild(el);
     });
