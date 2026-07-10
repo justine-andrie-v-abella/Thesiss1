@@ -24,9 +24,28 @@
         </a>
     </div>
 
+    {% elif is_read_only %}
+    <!-- Viewing a past school year — uploads are blocked -->
+    <div class="bg-blue-50 border-2 border-blue-400 rounded-2xl p-8 text-center shadow">
+        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="bi bi-calendar-week text-blue-500 text-3xl"></i>
+        </div>
+        <h3 class="text-xl font-bold text-blue-800 mb-2">Viewing {{ view_year.name }} (Read-only)</h3>
+        <p class="text-blue-700 text-sm">
+            You can only upload questionnaires for the current school year
+            (<strong>{{ current_year.name }}</strong>). Use the school year
+            selector at the top of the page to switch back.
+        </p>
+        <a href="{% url 'accounts:teacher_dashboard' %}"
+           class="inline-flex items-center gap-2 mt-6 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
     {% else %}
 
     <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <!-- ... everything from your existing template stays exactly the same from here down ... -->
 
         <!-- Header -->
         <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex items-center justify-between">
