@@ -145,3 +145,22 @@ def notifications_context(request):
 
     except Exception:
         return SAFE_DEFAULTS.copy()
+    
+# accounts/context_processors.py
+
+from .models import SchoolYear
+from .school_year_utils import resolve_view_year
+
+
+def school_year_context(request):
+    if not request.user.is_authenticated:
+        return {}
+
+    current_year, view_year = resolve_view_year(request)
+    all_years = SchoolYear.objects.all().order_by('-name')
+
+    return {
+        'current_year': current_year,
+        'all_years': all_years,
+        'view_year': view_year,
+    }
