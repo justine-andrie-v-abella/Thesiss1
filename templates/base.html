@@ -405,9 +405,11 @@
                                     <select id="baseYearSwitcher" onchange="switchSchoolYear(this)"
                                             class="bg-transparent text-sm font-semibold text-indigo-800 focus:outline-none cursor-pointer pr-1"
                                             title="Switch school year">
-                                        <option value="">Current ({{ current_year.name }})</option>
+                                        <option value="current" {% if not view_year or view_year.pk == current_year.pk %}selected{% endif %}>
+                                            Current ({{ current_year.name }})
+                                        </option>
                                         {% for sy in all_years %}
-                                        <option value="{{ sy.pk }}" {% if view_year and view_year.pk == sy.pk %}selected{% endif %}>
+                                        <option value="{{ sy.pk }}" {% if view_year and view_year.pk == sy.pk and view_year.pk != current_year.pk %}selected{% endif %}>
                                             {{ sy.name }}{% if sy.is_current %} ★{% endif %}
                                         </option>
                                         {% endfor %}
@@ -878,11 +880,7 @@
     // School Year switcher (sub-admin / teacher header widget)
     function switchSchoolYear(selectEl) {
         const url = new URL(window.location.href);
-        if (selectEl.value) {
-            url.searchParams.set('year', selectEl.value);
-        } else {
-            url.searchParams.delete('year');
-        }
+        url.searchParams.set('year', selectEl.value);   // always explicit now, incl. 'current'
         window.location.href = url.toString();
     }
 
