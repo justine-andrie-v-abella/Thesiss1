@@ -421,14 +421,11 @@ def logout_view(request):
     return redirect('home')
 
 
-# ============================================================================
-# SUPERADMIN DASHBOARD
-# ============================================================================
-
 @login_required
 @user_passes_test(is_admin)
 def admin_dashboard(request):
     from questionnaires.models import Questionnaire, Download
+    from accounts.models import SchoolYear  # adjust import path if needed
     from django.core.cache import cache
     import json
 
@@ -445,6 +442,7 @@ def admin_dashboard(request):
         total_departments = Department.objects.count()
         total_subjects    = Subject.objects.count()
         total_subadmins   = SubAdminProfile.objects.filter(is_active=True).count()
+        current_year      = SchoolYear.objects.filter(is_current=True).first()
 
         questionnaires_qs = Questionnaire.objects.all()
         if selected_department != 'all':
@@ -495,6 +493,7 @@ def admin_dashboard(request):
             'total_departments':     total_departments,
             'total_subjects':        total_subjects,
             'total_subadmins':       total_subadmins,
+            'current_year':          current_year,
             'total_uploads':         total_uploads,
             'total_downloads':       total_downloads,
             'total_questionnaires':  total_questionnaires,
@@ -535,15 +534,10 @@ def manage_teachers(request):
     form              = TeacherCreationForm()
     teachers          = teachers.prefetch_related('subjects')
  
-    current_year = SchoolYear.get_current()
-    all_years    = SchoolYear.objects.all().order_by('-name')
- 
-    # Determine which school year to display in the table
-    view_year_pk = request.GET.get('year', '')
-    if view_year_pk:
-        view_year = SchoolYear.objects.filter(pk=view_year_pk).first() or current_year
-    else:
-        view_year = current_year
+    from .school_year_utils import resolve_view_year
+
+    current_year, view_year = resolve_view_year(request)
+    all_years = SchoolYear.objects.all().order_by('-name')
  
     import json
  
