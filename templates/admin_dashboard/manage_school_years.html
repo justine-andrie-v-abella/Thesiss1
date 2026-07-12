@@ -17,7 +17,7 @@
     </button>
 </div>
 
-<!-- Current Year Banner -->
+<!-- Current Semester Banner -->
 <div class="mb-6 bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
@@ -25,18 +25,18 @@
                 <i class="bi bi-calendar-check text-white text-2xl"></i>
             </div>
             <div>
-                <p class="text-indigo-200 text-sm font-semibold uppercase tracking-wider">Current School Year</p>
-                {% if current_year %}
-                <p class="text-3xl font-bold">{{ current_year.name }}</p>
-                {% if current_year.start_date or current_year.end_date %}
+                <p class="text-indigo-200 text-sm font-semibold uppercase tracking-wider">Current Semester</p>
+                {% if current_semester %}
+                <p class="text-3xl font-bold">{{ current_semester.school_year.name }} · Semester {{ current_semester.number }}</p>
+                {% if current_semester.start_date or current_semester.end_date %}
                 <p class="text-indigo-200 text-sm mt-0.5">
-                    {% if current_year.start_date %}{{ current_year.start_date|date:"M d, Y" }}{% endif %}
-                    {% if current_year.start_date and current_year.end_date %} — {% endif %}
-                    {% if current_year.end_date %}{{ current_year.end_date|date:"M d, Y" }}{% endif %}
+                    {% if current_semester.start_date %}{{ current_semester.start_date|date:"M d, Y" }}{% endif %}
+                    {% if current_semester.start_date and current_semester.end_date %} — {% endif %}
+                    {% if current_semester.end_date %}{{ current_semester.end_date|date:"M d, Y" }}{% endif %}
                 </p>
                 {% endif %}
                 {% else %}
-                <p class="text-xl font-bold text-yellow-300">⚠ Not set — please add and activate a school year</p>
+                <p class="text-xl font-bold text-yellow-300">⚠ Not set — please add a school year and activate a semester</p>
                 {% endif %}
             </div>
         </div>
@@ -47,7 +47,7 @@
     </div>
 </div>
 
-<!-- School Years List -->
+<!-- School Years & Semesters List -->
 <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 flex items-center justify-between">
         <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -60,45 +60,101 @@
     {% if school_years %}
     <div class="divide-y divide-gray-100">
         {% for sy in school_years %}
-        <div class="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors
-                    {% if sy.is_current %}bg-indigo-50 border-l-4 border-indigo-500{% endif %}">
-            <div class="flex items-center gap-4">
-                <div class="w-10 h-10 {% if sy.is_current %}bg-indigo-100{% else %}bg-gray-100{% endif %} rounded-xl flex items-center justify-center">
-                    <i class="bi bi-calendar-range {% if sy.is_current %}text-indigo-600{% else %}text-gray-400{% endif %}"></i>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="font-bold text-gray-800 text-lg">{{ sy.name }}</span>
-                        {% if sy.is_current %}
-                        <span class="inline-flex items-center gap-1 bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
-                            <i class="bi bi-star-fill text-xs"></i> Current
-                        </span>
+        <div class="px-6 py-5 {% if sy.is_current %}bg-indigo-50 border-l-4 border-indigo-500{% endif %}">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 {% if sy.is_current %}bg-indigo-100{% else %}bg-gray-100{% endif %} rounded-xl flex items-center justify-center">
+                        <i class="bi bi-calendar-range {% if sy.is_current %}text-indigo-600{% else %}text-gray-400{% endif %}"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-gray-800 text-lg">{{ sy.name }}</span>
+                            {% if sy.is_current %}
+                            <span class="inline-flex items-center gap-1 bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
+                                <i class="bi bi-star-fill text-xs"></i> Current Year
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% if sy.start_date or sy.end_date %}
+                        <p class="text-sm text-gray-500">
+                            {% if sy.start_date %}{{ sy.start_date|date:"M d, Y" }}{% endif %}
+                            {% if sy.start_date and sy.end_date %} — {% endif %}
+                            {% if sy.end_date %}{{ sy.end_date|date:"M d, Y" }}{% endif %}
+                        </p>
                         {% endif %}
                     </div>
-                    {% if sy.start_date or sy.end_date %}
-                    <p class="text-sm text-gray-500">
-                        {% if sy.start_date %}{{ sy.start_date|date:"M d, Y" }}{% endif %}
-                        {% if sy.start_date and sy.end_date %} — {% endif %}
-                        {% if sy.end_date %}{{ sy.end_date|date:"M d, Y" }}{% endif %}
-                    </p>
-                    {% endif %}
-                    <p class="text-xs text-gray-400 mt-0.5">
-                        {{ sy.assignments.count }} teacher subject assignment{{ sy.assignments.count|pluralize }}
-                    </p>
                 </div>
-            </div>
-            <div class="flex items-center gap-2">
                 {% if not sy.is_current %}
-                <button onclick="setCurrentYear('{{ sy.pk }}', '{{ sy.name|escapejs }}')"
-                        class="flex items-center gap-1.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-                    <i class="bi bi-star"></i> Set as Current
+                <div class="flex gap-1.5">
+                    {% if sy.can_set_current %}
+                    <button onclick="setCurrentYear('{{ sy.pk }}', '{{ sy.name|escapejs }}')"
+                            class="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-sm font-semibold px-3 py-2 rounded-lg transition-colors">
+                        <i class="bi bi-star"></i> Set Current
+                    </button>
+                    {% else %}
+                    <button type="button" disabled
+                            class="flex items-center gap-1.5 bg-gray-100 text-gray-400 text-sm font-semibold px-3 py-2 rounded-lg cursor-not-allowed"
+                            title="{% if not sy.start_date or not sy.end_date %}Set both a start and end date first{% else %}Today's date is outside this school year's date range{% endif %}">
+                        <i class="bi bi-star"></i> Set Current
+                    </button>
+                    {% endif %}
+                    <button onclick="confirmDeleteYear('{{ sy.pk }}', '{{ sy.name|escapejs }}')"
+                            class="flex items-center gap-1.5 bg-red-50 text-red-600 hover:bg-red-100 text-sm font-semibold px-3 py-2 rounded-lg transition-colors">
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 ml-2">
+                {% for sem in sy.semesters.all %}
+                <div class="flex items-center justify-between bg-white border {% if sem.is_current %}border-indigo-400{% else %}border-gray-200{% endif %} rounded-xl px-4 py-3">
+                    <div>
+                        <p class="font-semibold text-gray-800">
+                            Semester {{ sem.number }}
+                            {% if sem.is_current %}<span class="text-indigo-600 text-xs font-bold ml-1">★ Current</span>{% endif %}
+                        </p>
+                        {% if sem.start_date or sem.end_date %}
+                        <p class="text-xs text-gray-500">
+                            {% if sem.start_date %}{{ sem.start_date|date:"M d, Y" }}{% endif %}
+                            {% if sem.start_date and sem.end_date %} – {% endif %}
+                            {% if sem.end_date %}{{ sem.end_date|date:"M d, Y" }}{% endif %}
+                        </p>
+                        {% endif %}
+                        <p class="text-xs text-gray-400 mt-0.5">
+                            {{ sem.assignments.count }} teacher subject assignment{{ sem.assignments.count|pluralize }}
+                        </p>
+                    </div>
+                    {% if not sem.is_current %}
+                    <div class="flex gap-1.5 flex-shrink-0">
+                        {% if sem.can_set_current %}
+                        <button onclick="setCurrentSemester('{{ sem.pk }}', '{{ sy.name|escapejs }} · Sem {{ sem.number }}')"
+                                class="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                            Set Current
+                        </button>
+                        {% else %}
+                        <button type="button" disabled
+                                class="bg-gray-100 text-gray-400 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-not-allowed"
+                                title="{% if not sem.start_date or not sem.end_date %}Set both a start and end date first{% else %}Today's date is outside this semester's date range{% endif %}">
+                            Set Current
+                        </button>
+                        {% endif %}
+                        <button onclick="confirmDeleteSemester('{{ sem.pk }}', '{{ sy.name|escapejs }} · Sem {{ sem.number }}')"
+                                class="bg-red-50 text-red-600 hover:bg-red-100 text-xs px-2.5 py-1.5 rounded-lg transition-colors">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </div>
+                    {% else %}
+                    <span class="text-xs text-indigo-500 font-semibold italic flex-shrink-0">Active</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+                {% if sy.semesters.count < 2 %}
+                <button onclick="openAddSemesterModal('{{ sy.pk }}', '{{ sy.name|escapejs }}', {{ sy.semesters.count }})"
+                        class="flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded-xl px-4 py-3 text-gray-400 hover:border-indigo-400 hover:text-indigo-500 transition-colors text-sm font-semibold">
+                    <i class="bi bi-plus-lg"></i> Add Semester
                 </button>
-                <button onclick="confirmDeleteYear('{{ sy.pk }}', '{{ sy.name|escapejs }}')"
-                        class="flex items-center gap-1.5 bg-red-50 text-red-600 hover:bg-red-100 text-sm font-semibold px-3 py-2 rounded-lg transition-colors">
-                    <i class="bi bi-trash3"></i>
-                </button>
-                {% else %}
-                <span class="text-sm text-indigo-500 font-semibold italic">Active year</span>
                 {% endif %}
             </div>
         </div>
@@ -110,7 +166,7 @@
             <i class="bi bi-calendar-x text-4xl text-indigo-300"></i>
         </div>
         <h3 class="text-lg font-bold text-gray-700 mb-2">No School Years Yet</h3>
-        <p class="text-gray-500 mb-6">Create your first school year to start assigning subjects to teachers.</p>
+        <p class="text-gray-500 mb-6">Create your first school year, then add semesters to start assigning subjects.</p>
         <button onclick="openCreateModal()"
                 class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors">
             <i class="bi bi-plus-lg"></i> Create School Year
@@ -124,11 +180,11 @@
     <div class="flex items-start gap-3">
         <i class="bi bi-info-circle-fill text-blue-500 text-lg mt-0.5 flex-shrink-0"></i>
         <div class="text-sm text-blue-700 space-y-1">
-            <p><strong>How school years work:</strong></p>
-            <p>• The <strong>current school year</strong> is the active one — admins assign subjects to teachers under this year.</p>
-            <p>• When you set a new year as current, teachers' subject assignments are <strong>not automatically cleared</strong> — you manage assignments manually in the Manage Teachers page.</p>
-            <p>• Past year assignments are <strong>preserved as read-only history</strong> and can be viewed in the Manage Teachers page using the year switcher.</p>
-            <p>• You cannot delete the current school year.</p>
+            <p><strong>How school years & semesters work:</strong></p>
+            <p>• Each school year can have up to two semesters. Only one semester system-wide is <strong>current</strong> at a time — activating a semester also marks its school year as current.</p>
+            <p>• Admins assign subjects to teachers under the <strong>current semester</strong> only.</p>
+            <p>• Past semester assignments are <strong>preserved as read-only history</strong> and can be viewed in the Manage Teachers page using the semester switcher.</p>
+            <p>• You cannot delete the current semester or the current school year.</p>
         </div>
     </div>
 </div>
@@ -191,6 +247,120 @@
                     <i class="bi bi-plus-lg"></i> Create
                 </button>
             </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<!-- ═══ ADD SEMESTER MODAL ═══ -->
+<div id="addSemesterModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex min-h-full items-center justify-center p-4" onclick="if(event.target===this)closeAddSemesterModal();">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-200 scale-95 opacity-0"
+         id="addSemesterModalContent">
+        <div class="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-5 rounded-t-2xl flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                    <i class="bi bi-calendar-plus text-white"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-white">Add Semester</h2>
+                    <p class="text-indigo-200 text-xs" id="addsem_year_label"></p>
+                </div>
+            </div>
+            <button onclick="closeAddSemesterModal()" class="text-white hover:text-indigo-200">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div id="addsem_general_error" class="hidden bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+                <i class="bi bi-exclamation-circle-fill text-red-500 flex-shrink-0"></i>
+                <span id="addsem_general_error_text"></span>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Semester <span class="text-red-500">*</span></label>
+                <select id="addsem_number"
+                        class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors bg-white">
+                    <option value="1">Semester 1</option>
+                    <option value="2">Semester 2</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Start Date</label>
+                    <input type="date" id="addsem_start_date"
+                           class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">End Date</label>
+                    <input type="date" id="addsem_end_date"
+                           class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors">
+                </div>
+            </div>
+            <div class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
+                <input type="checkbox" id="addsem_set_current" class="w-4 h-4 accent-indigo-600">
+                <label for="addsem_set_current" class="text-sm font-semibold text-indigo-800 cursor-pointer">
+                    Set as current semester immediately
+                </label>
+            </div>
+            <div class="flex items-center justify-end gap-3 pt-2 border-t border-gray-200">
+                <button type="button" onclick="closeAddSemesterModal()"
+                        class="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors">
+                    Cancel
+                </button>
+                <button type="button" onclick="submitAddSemester()" id="addSemesterSubmitBtn"
+                        class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-7 py-2.5 rounded-xl font-medium transition-colors shadow">
+                    <i class="bi bi-plus-lg"></i> Add
+                </button>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<!-- ═══ CONFIRM SET CURRENT SEMESTER MODAL ═══ -->
+<div id="setCurrentSemesterModal" class="fixed inset-0 z-50 hidden" style="background:rgba(0,0,0,.5)">
+    <div class="flex min-h-full items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div class="text-center mb-4">
+            <div class="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="bi bi-star-fill text-indigo-600 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800">Set as Current Semester?</h3>
+            <p class="text-sm text-gray-500 mt-1">Admins will assign subjects under this semester.</p>
+            <p class="mt-3 font-bold text-indigo-700 text-xl" id="confirm_semester_name"></p>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
+            <p class="text-xs text-blue-700">This also marks the parent school year as current. Existing assignments for other semesters are preserved as read-only history.</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="closeSetCurrentSemesterModal()" class="flex-1 px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Cancel</button>
+            <button onclick="confirmSetCurrentSemester()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium">
+                Yes, Set Current
+            </button>
+        </div>
+    </div>
+    </div>
+</div>
+
+<!-- ═══ CONFIRM DELETE SEMESTER MODAL ═══ -->
+<div id="deleteSemesterModal" class="fixed inset-0 z-50 hidden" style="background:rgba(0,0,0,.5)">
+    <div class="flex min-h-full items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div class="text-center mb-4">
+            <div class="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="bi bi-trash3-fill text-red-500 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800">Delete Semester?</h3>
+            <p class="font-bold text-gray-700 text-lg mt-1" id="delete_semester_name"></p>
+        </div>
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+            <p class="text-xs text-red-700">All subject assignment records for this semester will be permanently deleted. This cannot be undone.</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="closeDeleteSemesterModal()" class="flex-1 px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Cancel</button>
+            <button onclick="confirmDeleteSemesterSubmit()" class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl font-medium">
+                Delete
+            </button>
         </div>
     </div>
     </div>
@@ -307,9 +477,31 @@ function submitCreateYear() {
         return;
     }
 
+    const yearMatch = name.match(/^(\d{4})-(\d{4})$/);
+    if (!yearMatch || parseInt(yearMatch[2]) !== parseInt(yearMatch[1]) + 1) {
+        document.getElementById('create_name_error').textContent = 'Format must be YYYY-YYYY, one year apart (e.g. 2026-2027).';
+        document.getElementById('create_name_error').classList.remove('hidden');
+        return;
+    }
+
     const btn = document.getElementById('createSubmitBtn');
     btn.disabled = true;
     btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Creating…';
+
+    if (setCurrent) {
+        if (!start_date || !end_date) {
+            document.getElementById('create_general_error_text').textContent = 'Set both a start and end date before marking this as current.';
+            document.getElementById('create_general_error').classList.remove('hidden');
+            return;
+        }
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (!(start_date <= todayStr && todayStr <= end_date)) {
+            document.getElementById('create_general_error_text').textContent =
+                `Today (${todayStr}) is outside the selected date range. You can only mark a school year as current if today falls within its dates.`;
+            document.getElementById('create_general_error').classList.remove('hidden');
+            return;
+        }
+    }
 
     const fd = new FormData();
     fd.append('action', 'create');
@@ -410,6 +602,143 @@ function confirmDelete() {
     });
 }
 
+/* ── Add Semester ──────────────────────────────────────────────────────── */
+let _pendingSemesterYearPk = null;
+
+function openAddSemesterModal(yearPk, yearName, existingCount) {
+    _pendingSemesterYearPk = yearPk;
+    document.getElementById('addsem_year_label').textContent = yearName;
+    document.getElementById('addsem_number').value = existingCount === 0 ? '1' : '2';
+    document.getElementById('addsem_start_date').value = '';
+    document.getElementById('addsem_end_date').value = '';
+    document.getElementById('addsem_set_current').checked = false;
+    document.getElementById('addsem_general_error').classList.add('hidden');
+
+    document.getElementById('addSemesterModal').classList.remove('hidden');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        const c = document.getElementById('addSemesterModalContent');
+        c.classList.remove('scale-95', 'opacity-0');
+        c.classList.add('scale-100', 'opacity-100');
+    }));
+}
+
+function closeAddSemesterModal() {
+    const c = document.getElementById('addSemesterModalContent');
+    c.classList.remove('scale-100', 'opacity-100');
+    c.classList.add('scale-95', 'opacity-0');
+    setTimeout(() => document.getElementById('addSemesterModal').classList.add('hidden'), 200);
+    _pendingSemesterYearPk = null;
+}
+
+function submitAddSemester() {
+    if (!_pendingSemesterYearPk) return;
+
+    const number      = document.getElementById('addsem_number').value;
+    const start_date   = document.getElementById('addsem_start_date').value;
+    const end_date     = document.getElementById('addsem_end_date').value;
+    const setCurrent   = document.getElementById('addsem_set_current').checked;
+
+    document.getElementById('addsem_general_error').classList.add('hidden');
+
+    const btn = document.getElementById('addSemesterSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Adding…';
+
+    const fd = new FormData();
+    fd.append('action', 'create_semester');
+    fd.append('school_year', _pendingSemesterYearPk);
+    fd.append('number', number);
+    if (start_date) fd.append('start_date', start_date);
+    if (end_date)   fd.append('end_date', end_date);
+    if (setCurrent) fd.append('set_current', 'true');
+
+    fetch(MANAGE_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd,
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-plus-lg"></i> Add';
+        if (data.success) {
+            closeAddSemesterModal();
+            sessionStorage.setItem('flashMessage', data.message);
+            window.location.reload();
+        } else {
+            const errText = data.errors?.__all__?.[0] || 'An error occurred.';
+            document.getElementById('addsem_general_error_text').textContent = errText;
+            document.getElementById('addsem_general_error').classList.remove('hidden');
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-plus-lg"></i> Add';
+    });
+}
+
+/* ── Set Current Semester ──────────────────────────────────────────────── */
+let _pendingSemesterPk = null;
+
+function setCurrentSemester(pk, label) {
+    _pendingSemesterPk = pk;
+    document.getElementById('confirm_semester_name').textContent = label;
+    document.getElementById('setCurrentSemesterModal').classList.remove('hidden');
+}
+function closeSetCurrentSemesterModal() {
+    document.getElementById('setCurrentSemesterModal').classList.add('hidden');
+    _pendingSemesterPk = null;
+}
+function confirmSetCurrentSemester() {
+    if (!_pendingSemesterPk) return;
+    const fd = new FormData();
+    fd.append('action', 'set_current_semester');
+    fd.append('pk', _pendingSemesterPk);
+    fetch(MANAGE_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd,
+    })
+    .then(r => r.json())
+    .then(data => {
+        closeSetCurrentSemesterModal();
+        if (data.success) {
+            sessionStorage.setItem('flashMessage', data.message);
+            window.location.reload();
+        }
+    });
+}
+
+/* ── Delete Semester ───────────────────────────────────────────────────── */
+function confirmDeleteSemester(pk, label) {
+    _pendingSemesterPk = pk;
+    document.getElementById('delete_semester_name').textContent = label;
+    document.getElementById('deleteSemesterModal').classList.remove('hidden');
+}
+function closeDeleteSemesterModal() {
+    document.getElementById('deleteSemesterModal').classList.add('hidden');
+    _pendingSemesterPk = null;
+}
+function confirmDeleteSemesterSubmit() {
+    if (!_pendingSemesterPk) return;
+    const fd = new FormData();
+    fd.append('action', 'delete_semester');
+    fd.append('pk', _pendingSemesterPk);
+    fetch(MANAGE_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd,
+    })
+    .then(r => r.json())
+    .then(data => {
+        closeDeleteSemesterModal();
+        if (data.success) {
+            sessionStorage.setItem('flashMessage', data.message);
+            window.location.reload();
+        }
+    });
+}
+
 window.addEventListener('load', () => {
     const msg = sessionStorage.getItem('flashMessage');
     if (msg) {
@@ -423,6 +752,9 @@ document.addEventListener('keydown', e => {
         closeCreateModal();
         closeSetCurrentModal();
         closeDeleteModal();
+        closeAddSemesterModal();
+        closeSetCurrentSemesterModal();
+        closeDeleteSemesterModal();
     }
 });
 </script>
