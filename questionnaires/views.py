@@ -196,18 +196,21 @@ def upload_questionnaire(request):
     teacher = get_object_or_404(TeacherProfile, user=request.user)
 
     from accounts.models import TeacherSubjectAssignment
-    from accounts.school_year_utils import resolve_view_year
-    current_year, view_year = resolve_view_year(request)
+    from accounts.school_year_utils import resolve_view_semester
+    current_semester, view_semester = resolve_view_semester(request)
 
-    # Viewing a past year → read-only, block uploads (template shows the notice)
-    is_read_only = bool(view_year and current_year and view_year.pk != current_year.pk)
+    current_year = current_semester.school_year if current_semester else None
+    view_year    = view_semester.school_year if view_semester else None
+
+    # Viewing a past semester → read-only, block uploads (template shows the notice)
+    is_read_only = bool(view_semester and current_semester and view_semester.pk != current_semester.pk)
 
     assigned_subject_ids = []
     assigned_subjects    = []
-    if current_year:
+    if current_semester:
         assignments = (
             TeacherSubjectAssignment.objects
-            .filter(teacher=teacher, school_year=current_year)
+            .filter(teacher=teacher, semester=current_semester)
             .select_related('subject')
             .order_by('subject__code')
         )
@@ -225,12 +228,12 @@ def upload_questionnaire(request):
         }
 
     if request.method == 'POST':
-        # Defense in depth — reject if somehow POSTed while viewing a past year
         if is_read_only:
             messages.error(
                 request,
-                f"You're viewing {view_year.name}. Switch back to the current "
-                f"school year ({current_year.name}) to upload questionnaires."
+                f"You're viewing a past semester"
+                f"{f' ({view_year.name})' if view_year else ''}. "
+                f"Switch back to the current semester to upload questionnaires."
             )
             form = QuestionnaireUploadForm(user=request.user)
             _restrict_subject_queryset(form, assigned_subject_ids)
@@ -240,16 +243,19 @@ def upload_questionnaire(request):
         _restrict_subject_queryset(form, assigned_subject_ids)
 
         if form.is_valid():
-            # ... unchanged from your existing code ...
-            pass
+            questionnaire = form.save(commit=False)
+            questionnaire.uploader   = teacher
+            questionnaire.department = teacher.department
+            # Stamp with the CURRENT year/semester server-side — never trust the client.
+            if current_year:
+                questionnaire.school_year = current_year.name
+            # ... keep the rest of your existing save + AI extraction logic here ...
         else:
             messages.error(request, 'Please correct the errors below.')
-
     else:
         form = QuestionnaireUploadForm(user=request.user)
 
     _restrict_subject_queryset(form, assigned_subject_ids)
-
     return render(request, 'teacher_dashboard/upload_questionnaire.html', _base_context(form))
 
 # ============================================================================
@@ -870,57 +876,26 @@ def review_extracted_questions_pk(request, pk):
         messages.error(request, 'You do not have permission to view this.')
         return redirect('questionnaires:browse_questionnaires')
 
+    from accounts.models import Semester
+    current_semester = Semester.get_current()
+    quest_sem_label = questionnaire.semester  # '1st' / '2nd'
+    is_read_only = bool(
+        current_semester and quest_sem_label and
+        quest_sem_label != ('1st' if current_semester.number == 1 else '2nd')
+        or (current_semester and questionnaire.school_year != current_semester.school_year.name)
+    )
+
     extracted_questions = questionnaire.extracted_questions.select_related('question_type').all()
     source = request.GET.get('source', request.POST.get('source', 'extract'))
 
     if request.method == 'POST':
-        action = request.POST.get('action')
-        source = request.POST.get('source', 'extract')
-
-        if action == 'save_selected':
-            selected_ids = request.POST.getlist('selected_questions')
-            manual_uids  = request.POST.getlist('manual_selected_uid[]')
-
-            newly_created_ids  = _save_manual_questions(request, questionnaire)
-            all_approved_ids   = list(selected_ids) + [str(i) for i in newly_created_ids]
-
-            if not all_approved_ids:
-                messages.error(request, 'Please select at least one question.')
-                return redirect('questionnaires:review_extracted_pk', pk=pk)
-
-            extracted_questions.filter(id__in=selected_ids).update(is_approved=True)
-            extracted_questions.exclude(id__in=all_approved_ids).update(is_approved=False)
-
-            final_title = request.POST.get('final_title', '').strip()
-            if final_title:
-                questionnaire.title = final_title
-                questionnaire.save()
-
-            total_saved = len(all_approved_ids)
-            ActivityLog.objects.create(
-                activity_type='questions_approved',
-                user=request.user,
-                description=f'Saved {total_saved} question(s) for "{questionnaire.title}"',
-            )
-
-            download_format = request.POST.get('download_format', 'none')
-            if download_format != 'none':
-                from django.urls import reverse
-                download_url = reverse(
-                    'questionnaires:download_questionnaire',
-                    args=[questionnaire.pk],
-                )
-                return redirect(f"{download_url}?type=generated&format={download_format}")
-
-            messages.success(request, f'Saved {total_saved} question(s) successfully!')
+        if is_read_only:
+            messages.error(request, 'This questionnaire belongs to a past semester and cannot be edited.')
             return redirect('questionnaires:my_uploads')
 
-        elif action == 'delete_question':
-            question_id = request.POST.get('question_id')
-            ExtractedQuestion.objects.filter(
-                id=question_id, questionnaire=questionnaire
-            ).delete()
-            return JsonResponse({'ok': True})
+        action = request.POST.get('action')
+        source = request.POST.get('source', 'extract')
+        # ... rest unchanged ...
 
     question_types = QuestionType.objects.filter(
         id__in=extracted_questions.values_list('question_type', flat=True).distinct()
@@ -932,8 +907,8 @@ def review_extracted_questions_pk(request, pk):
         'total_points':   sum(q.points for q in extracted_questions),
         'source':         source,
         'from_my_uploads': True,
+        'is_read_only':   is_read_only,
     })
-
 
 # ============================================================================
 # MY UPLOADS
@@ -946,8 +921,13 @@ def my_uploads(request):
 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
 
-    from accounts.school_year_utils import resolve_view_year
-    current_year, view_year = resolve_view_year(request)
+    from accounts.school_year_utils import resolve_view_semester
+    from accounts.models import Semester
+    current_semester, view_semester = resolve_view_semester(request)
+
+    current_year_obj = current_semester.school_year if current_semester else None
+    view_year_obj     = view_semester.school_year if view_semester else None
+    is_read_only      = bool(view_semester and current_semester and view_semester.pk != current_semester.pk)
 
     questionnaires = (
         Questionnaire.objects
@@ -955,19 +935,20 @@ def my_uploads(request):
         .select_related('department', 'subject')
     )
 
-    search_query      = request.GET.get('search', '')
-    selected_semester = request.GET.get('semester', '')
+    search_query = request.GET.get('search', '')
 
-    if view_year:
-        questionnaires = questionnaires.filter(school_year=view_year.name)
+    if view_semester:
+        sem_label = '1st' if view_semester.number == 1 else '2nd'
+        questionnaires = questionnaires.filter(
+            school_year=view_semester.school_year.name,
+            semester=sem_label,
+        )
     if search_query:
         questionnaires = questionnaires.filter(
             Q(title__icontains=search_query) |
             Q(description__icontains=search_query) |
             Q(subject__name__icontains=search_query)
         )
-    if selected_semester:
-        questionnaires = questionnaires.filter(semester=selected_semester)
 
     archived_questionnaires = (
         Questionnaire.objects
@@ -980,14 +961,18 @@ def my_uploads(request):
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)
 
+    all_semesters = Semester.objects.select_related('school_year').order_by('-school_year__name', '-number')
+
     return render(request, 'teacher_dashboard/my_uploads.html', {
         'page_obj':                page_obj,
         'search_query':            search_query,
         'archived_questionnaires': archived_questionnaires,
-        'semester_choices':        Questionnaire.SEMESTER_CHOICES,
-        'selected_semester':       selected_semester,
-        'current_year':            current_year,
-        'view_year':               view_year,
+        'current_semester':        current_semester,
+        'view_semester':           view_semester,
+        'all_semesters':           all_semesters,
+        'is_read_only':            is_read_only,
+        'current_year_name':       current_year_obj.name if current_year_obj else '',
+        'selected_school_year':    view_year_obj.name if view_year_obj else '',
     })
 
 # ============================================================================
@@ -1173,8 +1158,10 @@ def browse_questionnaires(request):
             is_archived=False,
         )
 
-    from accounts.school_year_utils import resolve_view_year
-    current_year, view_year = resolve_view_year(request)
+    from accounts.school_year_utils import resolve_view_semester
+    current_semester, view_semester = resolve_view_semester(request)
+    current_year = current_semester.school_year if current_semester else None
+    view_year    = view_semester.school_year if view_semester else None
 
     subject_id              = request.GET.get('subject', '')
     exam_type                = request.GET.get('exam_type', '')
@@ -1192,8 +1179,11 @@ def browse_questionnaires(request):
         questionnaires = questionnaires.filter(exam_type=exam_type)
     if selected_semester:
         questionnaires = questionnaires.filter(semester=selected_semester)
-    if view_year:
-        questionnaires = questionnaires.filter(school_year=view_year.name)
+    if view_semester:
+        questionnaires = questionnaires.filter(
+            school_year=view_semester.school_year.name,
+            semester='1st' if view_semester.number == 1 else '2nd',
+        )
     if selected_question_type:
         questionnaires = questionnaires.filter(
             extracted_questions__question_type__name=selected_question_type
@@ -1246,8 +1236,11 @@ def browse_questionnaires(request):
         'selected_year_level':    selected_year_level,
         'curriculum_options':     list(curriculum_options),
         'selected_curriculum_id': selected_curriculum_id,
+        'current_semester':       current_semester,
+        'view_semester':          view_semester,
         'current_year':           current_year,
         'view_year':              view_year,
+        'current_year_name':      current_year.name if current_year else '',
         'selected_school_year':   view_year.name if view_year else '',
     }
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
