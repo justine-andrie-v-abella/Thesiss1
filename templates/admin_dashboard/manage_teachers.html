@@ -43,7 +43,7 @@
 <!-- Search -->
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
     <form method="get" class="w-full">
-        {% if view_year %}<input type="hidden" name="year" value="{{ view_year.pk }}">{% endif %}
+        {% if view_semester %}<input type="hidden" name="semester" value="{{ view_semester.pk }}">{% endif %}
         <div class="relative">
             <input type="text" name="search"
                 placeholder="Search by name, email, or employee ID..."
@@ -69,10 +69,10 @@
                     {{ teachers|length }}
                 </span>
             </h2>
-            {% if view_year %}
+            {% if view_semester %}
             <span class="text-sm text-gray-500">
-                Showing subjects for <strong class="text-indigo-700">{{ view_year.name }}</strong>
-                {% if not view_year.is_current %}<span class="ml-2 text-amber-600 font-semibold">(read-only)</span>{% endif %}
+                Showing subjects for <strong class="text-indigo-700">{{ view_semester.school_year.name }} · Sem {{ view_semester.number }}</strong>
+                {% if not view_semester.is_current %}<span class="ml-2 text-amber-600 font-semibold">(read-only)</span>{% endif %}
             </span>
             {% endif %}
         </div>
@@ -91,7 +91,7 @@
                         <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Department</th>
                         <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Subjects
-                            {% if view_year %}<span class="text-indigo-500 font-normal normal-case">({{ view_year.name }})</span>{% endif %}
+                            {% if view_semester %}<span class="text-indigo-500 font-normal normal-case">(Sem {{ view_semester.number }})</span>{% endif %}
                         </th>
                         <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
                     </tr>
@@ -252,10 +252,10 @@
                     <i class="bi bi-people text-green-600 text-xl mr-2"></i>
                     <span class="text-gray-600">Total: <strong class="text-gray-800">{{ teachers|length }}</strong></span>
                 </div>
-                {% if current_year %}
+                {% if current_semester %}
                 <div class="flex items-center">
                     <i class="bi bi-calendar-range text-indigo-500 text-xl mr-2"></i>
-                    <span class="text-gray-600">School Year: <strong class="text-indigo-700">{{ current_year.name }}</strong></span>
+                    <span class="text-gray-600">Semester: <strong class="text-indigo-700">{{ current_semester.school_year.name }} · Sem {{ current_semester.number }}</strong></span>
                 </div>
                 {% endif %}
             </div>
@@ -397,14 +397,14 @@
             <div>
                 <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center">
                     <i class="bi bi-journal-bookmark text-green-500 mr-2"></i>Assigned Subjects
-                    {% if current_year %}
-                    <span class="ml-2 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ current_year.name }}</span>
+                    {% if current_semester %}
+                    <span class="ml-2 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ current_semester.school_year.name }} · Sem {{ current_semester.number }}</span>
                     {% endif %}
                 </h3>
-                {% if not current_year %}
+                {% if not current_semester %}
                 <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700 flex items-center gap-2">
                     <i class="bi bi-exclamation-triangle-fill"></i>
-                    No current school year is set. Subject assignments won't be saved until a school year is configured.
+                    No current semester is set. Subject assignments won't be saved until a semester is configured.
                 </div>
                 {% endif %}
                 <div id="add_no_dept_msg" class="flex items-center gap-2 text-sm text-gray-400 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 mt-3">
@@ -587,19 +587,19 @@
             <div>
                 <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center">
                     <i class="bi bi-journal-bookmark text-yellow-500 mr-2"></i>Assigned Subjects
-                    {% if current_year %}
-                    <span class="ml-2 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ current_year.name }}</span>
+                    {% if current_semester %}
+                    <span class="ml-2 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-0.5 rounded-full">{{ current_semester.school_year.name }} · Sem {{ current_semester.number }}</span>
                     {% endif %}
                 </h3>
-                {% if not current_year %}
+                {% if not current_semester %}
                 <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 text-sm text-amber-700 flex items-center gap-2">
                     <i class="bi bi-exclamation-triangle-fill"></i>
-                    No current school year set. Subject changes won't be saved.
+                    No current semester set. Subject changes won't be saved.
                 </div>
                 {% else %}
                 <p class="text-xs text-gray-500 mb-3">
-                    Editing subjects for <strong class="text-indigo-700">{{ current_year.name }}</strong> only.
-                    Past year assignments are preserved as history.
+                    Editing subjects for <strong class="text-indigo-700">{{ current_semester.school_year.name }} · Sem {{ current_semester.number }}</strong> only.
+                    Past semester assignments are preserved as history.
                 </p>
                 {% endif %}
 
@@ -823,8 +823,6 @@
     </div>
 </div>
 
-
-<script>
     // ── URL templates ────────────────────────────────────────────────────────
     const EDIT_URL_TEMPLATE        = "{% url 'accounts:edit_teacher' pk=0 %}";
     const ARCHIVE_URL_TEMPLATE     = "{% url 'accounts:archive_teacher' pk=0 %}";
@@ -834,6 +832,9 @@
     const ASSIGNMENTS_SAVE_URL     = "{% url 'accounts:save_teacher_subject_assignments' %}";
     const HAS_CURRENT_YEAR         = {{ current_year|yesno:"true,false" }};
     const CURRENT_YEAR_NAME        = "{{ current_year.name|default:'' }}";
+
+<script>
+
 
     function makeUrl(template, pk) {
         return template.replace('/0/', '/' + pk + '/');
@@ -1174,7 +1175,7 @@
         .then(result => {
             if (result.success) {
                 // Also save subject assignments separately
-                if (HAS_CURRENT_YEAR && currentEditTeacherPk) {
+                if (HAS_CURRENT_SEMESTER && currentEditTeacherPk) {
                     const assignData = new FormData();
                     assignData.append('teacher_pk', currentEditTeacherPk);
                     subjectState.edit.forEach((s, id) => {
@@ -1287,23 +1288,23 @@
                 loadSubjectsForPicker('edit', deptPk, preselected);
             });
 
-        // Load past year history for accordion
-        fetch(ASSIGNMENTS_GET_URL + '?teacher_pk=' + pk + '&all_years=1')
+        // Load past semester history for accordion
+        fetch(ASSIGNMENTS_GET_URL + '?teacher_pk=' + pk + '&all_semesters=1')
             .then(r => r.json())
             .then(data => {
                 if (data.history && data.history.length > 1) {
                     pastSection.classList.remove('hidden');
                     const listEl = document.getElementById('edit_past_years_list');
                     listEl.innerHTML = data.history
-                        .filter(yr => !yr.is_current)
-                        .map(yr => `
+                        .filter(sem => !sem.is_current)
+                        .map(sem => `
                             <div class="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
                                 <p class="text-xs font-bold text-gray-600 mb-2 flex items-center gap-1">
-                                    <i class="bi bi-calendar-range text-indigo-400"></i> ${escHtml(yr.school_year)}
+                                    <i class="bi bi-calendar-range text-indigo-400"></i> ${escHtml(sem.semester_label)}
                                 </p>
                                 <div class="flex flex-wrap gap-1">
-                                    ${yr.subjects.length
-                                        ? yr.subjects.map(s => `<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 font-mono">${escHtml(s.code)}</span>`).join('')
+                                    ${sem.subjects.length
+                                        ? sem.subjects.map(s => `<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 font-mono">${escHtml(s.code)}</span>`).join('')
                                         : '<span class="text-xs text-gray-400 italic">None assigned</span>'
                                     }
                                 </div>
