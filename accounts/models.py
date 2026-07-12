@@ -82,6 +82,51 @@ class SchoolYear(models.Model):
         if sy and sy.end_date and sy.end_date < timezone.now().date():
             return None
         return sy
+    
+class Semester(models.Model):
+    """
+    A half of a SchoolYear. Admins create these manually (they know exact
+    start/end dates). Exactly one Semester system-wide can be is_current=True;
+    activating a semester also marks its parent SchoolYear as current.
+    """
+    SEMESTER_CHOICES = [(1, 'Semester 1'), (2, 'Semester 2')]
+
+    school_year = models.ForeignKey(
+        'SchoolYear', on_delete=models.CASCADE, related_name='semesters'
+    )
+    number = models.PositiveSmallIntegerField(choices=SEMESTER_CHOICES)
+    is_current = models.BooleanField(
+        default=False,
+        help_text='Only one semester system-wide should be current at a time.'
+    )
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [['school_year', 'number']]
+        ordering = ['school_year__name', 'number']
+
+    def __str__(self):
+        return f"{self.school_year.name} — Semester {self.number}"
+
+    def save(self, *args, **kwargs):
+        if self.is_current:
+            # Enforce single current semester system-wide
+            Semester.objects.exclude(pk=self.pk).filter(is_current=True).update(is_current=False)
+        super().save(*args, **kwargs)
+        if self.is_current:
+            # Keep SchoolYear.is_current in sync with whichever year owns the current semester
+            SchoolYear.objects.exclude(pk=self.school_year_id).filter(is_current=True).update(is_current=False)
+            SchoolYear.objects.filter(pk=self.school_year_id).update(is_current=True)
+
+    @classmethod
+    def get_current(cls):
+        """Return the current semester, or None if not set or if it has expired."""
+        sem = cls.objects.select_related('school_year').filter(is_current=True).first()
+        if sem and sem.end_date and sem.end_date < timezone.now().date():
+            return None
+        return sem
 
 class TeacherProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='teacher_profile')
@@ -98,42 +143,42 @@ class TeacherProfile(models.Model):
 
 class TeacherSubjectAssignment(models.Model):
     """
-    Records which subjects a teacher handles for a specific school year.
-    Old school years are read-only history.
-    The current school year's assignments are editable by admins.
+    TRANSITIONAL VERSION — step 1 of the semester migration.
+    Keeps school_year so existing rows/queries still work, adds a nullable
+    semester FK that step 2's data migration will populate.
     """
-    teacher     = models.ForeignKey(
-        'TeacherProfile',
-        on_delete=models.CASCADE,
-        related_name='subject_assignments'
+    teacher = models.ForeignKey(
+        'TeacherProfile', on_delete=models.CASCADE, related_name='subject_assignments'
     )
-    subject     = models.ForeignKey(
-        'Subject',
-        on_delete=models.CASCADE,
-        related_name='teacher_assignments'
+    subject = models.ForeignKey(
+        'Subject', on_delete=models.CASCADE, related_name='teacher_assignments'
     )
     school_year = models.ForeignKey(
-        'SchoolYear',
-        on_delete=models.CASCADE,
-        related_name='assignments'
+        'SchoolYear', on_delete=models.CASCADE, related_name='assignments'
+    )
+    semester = models.ForeignKey(
+        'Semester', on_delete=models.CASCADE, related_name='assignments'
     )
     assigned_by = models.ForeignKey(
-        'auth.User',
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='teacher_subject_assignments_made'
     )
     assigned_at = models.DateTimeField(auto_now_add=True)
- 
+
     class Meta:
-        unique_together = [['teacher', 'subject', 'school_year']]
-        ordering = ['school_year__name', 'subject__code']
- 
+        unique_together = [['teacher', 'subject', 'semester']]
+        ordering = ['semester__school_year__name', 'semester__number', 'subject__code']
+
     def __str__(self):
         return (
             f"{self.teacher.user.get_full_name()} — "
             f"{self.subject.code} ({self.school_year.name})"
         )
+
+    @property
+    def school_year(self):
+        """Back-compat shim — some old code/templates may still read .school_year"""
+        return self.semester.school_year
 
 # ============================================================================
 # NEW: SubAdminProfile
