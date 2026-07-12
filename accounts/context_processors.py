@@ -146,21 +146,23 @@ def notifications_context(request):
     except Exception:
         return SAFE_DEFAULTS.copy()
     
-# accounts/context_processors.py
+# accounts/context_processors.py (bottom section)
 
-from .models import SchoolYear
-from .school_year_utils import resolve_view_year
+from .models import SchoolYear, Semester
+from .school_year_utils import resolve_view_semester
 
 
 def school_year_context(request):
     if not request.user.is_authenticated:
         return {}
 
-    current_year, view_year = resolve_view_year(request)
-    all_years = SchoolYear.objects.all().order_by('-name')
+    current_semester, view_semester = resolve_view_semester(request)
+    current_year = SchoolYear.get_current()
+    all_semesters = Semester.objects.select_related('school_year').order_by('-school_year__name', '-number')
 
     return {
         'current_year': current_year,
-        'all_years': all_years,
-        'view_year': view_year,
+        'current_semester': current_semester,
+        'view_semester': view_semester,
+        'all_semesters': all_semesters,
     }
