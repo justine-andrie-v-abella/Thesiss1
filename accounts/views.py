@@ -24,6 +24,7 @@ from django.views.decorators.http import require_POST
 from django.db import OperationalError
 from django.core.mail import send_mail
 from django.conf import settings
+from .models import SchoolYear, Semester, TeacherSubjectAssignment
 
 import logging
 logger = logging.getLogger(__name__)
@@ -97,6 +98,29 @@ def log_activity(activity_type, description, user=None, metadata=None):
         description=description,
         metadata=metadata or {}
     )
+    
+def sync_teacher_semester_assignments(teacher, subject_ids, assigned_by):
+    """
+    Mirror the subjects[] list submitted on teacher create/edit forms into
+    TeacherSubjectAssignment for the CURRENT semester only. Past semesters
+    are never touched — they stay as read-only history.
+    """
+    current_semester = Semester.get_current()
+    if not current_semester:
+        return  # no current semester configured yet — nothing to sync
+
+    TeacherSubjectAssignment.objects.filter(
+        teacher=teacher, semester=current_semester
+    ).delete()
+
+    subjects = Subject.objects.filter(pk__in=subject_ids)
+    for subject in subjects:
+        TeacherSubjectAssignment.objects.create(
+            teacher=teacher,
+            subject=subject,
+            semester=current_semester,
+            assigned_by=assigned_by,
+        )
 
 
 # ============================================================================
@@ -513,6 +537,8 @@ def admin_dashboard(request):
 # SUPERADMIN — TEACHER MANAGEMENT
 # ============================================================================
 
+@login_required
+@user_passes_test(is_admin)
 def manage_teachers(request):
     """
     Superadmin: list all teachers.
@@ -534,19 +560,18 @@ def manage_teachers(request):
     form              = TeacherCreationForm()
     teachers          = teachers.prefetch_related('subjects')
  
-    from .school_year_utils import resolve_view_year
+    from .school_year_utils import resolve_view_semester
 
-    current_year, view_year = resolve_view_year(request)
-    all_years = SchoolYear.objects.all().order_by('-name')
- 
+    current_semester, view_semester = resolve_view_semester(request)
+    all_semesters = Semester.objects.select_related('school_year').order_by('-school_year__name', '-number')
+
     import json
- 
-    # Build teacher_pk → [current-year subjects] map for the edit modal
+
     teacher_subjects_map = {}
-    if view_year:
+    if view_semester:
         assignments = (
             TeacherSubjectAssignment.objects
-            .filter(school_year=view_year, teacher__in=teachers)
+            .filter(semester=view_semester, teacher__in=teachers)
             .select_related('subject', 'teacher')
         )
         for a in assignments:
@@ -556,7 +581,7 @@ def manage_teachers(request):
             teacher_subjects_map[key].append({
                 'id': a.subject.pk, 'code': a.subject.code, 'name': a.subject.name
             })
- 
+
     context = {
         'teachers':              teachers,
         'archived_teachers':     archived_teachers,
@@ -564,9 +589,9 @@ def manage_teachers(request):
         'departments':           departments,
         'form':                  form,
         'teacher_subjects_json': json.dumps(teacher_subjects_map),
-        'current_year':          current_year,
-        'all_years':             all_years,
-        'view_year':             view_year,
+        'current_semester':      current_semester,
+        'all_semesters':         all_semesters,
+        'view_semester':         view_semester,
     }
     return render(request, 'admin_dashboard/manage_teachers.html', context)
 
@@ -599,10 +624,11 @@ def add_teacher(request):
 
             teacher = form.save()
 
-            # Assign subjects
+            # Assign subjects (both the legacy M2M list and the current-semester assignment record)
             subject_ids = request.POST.getlist('subjects[]')
             if subject_ids:
                 teacher.subjects.set(Subject.objects.filter(pk__in=subject_ids))
+            sync_teacher_semester_assignments(teacher, subject_ids, assigned_by=request.user)
 
             ActivityLog.objects.create(
                 activity_type='teacher_created',
@@ -668,9 +694,10 @@ def edit_teacher(request, pk):
 
             teacher.user.save()
 
-            # Update assigned subjects
+            # Update assigned subjects (both the legacy M2M list and the current-semester assignment record)
             subject_ids = request.POST.getlist('subjects[]')
             teacher.subjects.set(Subject.objects.filter(pk__in=subject_ids))
+            sync_teacher_semester_assignments(teacher, subject_ids, assigned_by=request.user)
 
             send_credentials_updated_email(
                 user         = teacher.user,
@@ -1466,14 +1493,16 @@ def subadmin_dashboard(request):
 # SUB-ADMIN — TEACHER MANAGEMENT
 # ============================================================================
 
+@login_required
+@user_passes_test(is_subadmin)
 def subadmin_manage_teachers(request):
-    """Sub-admin: list teachers in their department with school year subject view."""
+    """Sub-admin: list teachers in their department with semester subject view."""
     department = request.user.subadmin_profile.department
- 
+
     teachers = TeacherProfile.objects.select_related('user', 'department').filter(
         department=department, is_archived=False
     )
- 
+
     search_query = request.GET.get('search', '')
     if search_query:
         teachers = teachers.filter(
@@ -1481,30 +1510,22 @@ def subadmin_manage_teachers(request):
             Q(user__last_name__icontains=search_query) |
             Q(employee_id__icontains=search_query)
         )
- 
+
     archived_teachers = TeacherProfile.objects.select_related('user').filter(
         department=department, is_archived=True
     )
     teachers = teachers.prefetch_related('subjects')
- 
-    current_year = SchoolYear.get_current()
-    all_years    = SchoolYear.objects.all().order_by('-name')
- 
-    # Allow browsing a past school year (read-only)
-    view_year_pk = request.GET.get('year', '')
-    if view_year_pk:
-        view_year = SchoolYear.objects.filter(pk=view_year_pk).first() or current_year
-    else:
-        view_year = current_year
- 
+
+    from .school_year_utils import resolve_view_semester
+    current_semester, view_semester = resolve_view_semester(request)
+    all_semesters = Semester.objects.select_related('school_year').order_by('-school_year__name', '-number')
+
     import json
- 
-    # Subjects assigned to each teacher for view_year
     teacher_subjects_map = {}
-    if view_year:
+    if view_semester:
         assignments = (
             TeacherSubjectAssignment.objects
-            .filter(school_year=view_year, teacher__in=teachers)
+            .filter(semester=view_semester, teacher__in=teachers)
             .select_related('subject', 'teacher')
         )
         for a in assignments:
@@ -1514,11 +1535,11 @@ def subadmin_manage_teachers(request):
             teacher_subjects_map[key].append({
                 'id': a.subject.pk, 'code': a.subject.code, 'name': a.subject.name
             })
- 
+
     dept_subjects = list(
         Subject.objects.filter(departments=department, is_archived=False).order_by('code').values('id', 'code', 'name')
     )
- 
+
     context = {
         'teachers':              teachers,
         'archived_teachers':     archived_teachers,
@@ -1526,9 +1547,9 @@ def subadmin_manage_teachers(request):
         'department':            department,
         'teacher_subjects_json': json.dumps(teacher_subjects_map),
         'dept_subjects_json':    json.dumps(dept_subjects),
-        'current_year':          current_year,
-        'all_years':             all_years,
-        'view_year':             view_year,
+        'current_semester':      current_semester,
+        'all_semesters':         all_semesters,
+        'view_semester':         view_semester,
     }
     return render(request, 'subadmin_dashboard/manage_teachers.html', context)
 
@@ -1563,10 +1584,11 @@ def subadmin_add_teacher(request):
 
             teacher = form.save()
 
-            # Assign subjects
+            # Assign subjects (both the legacy M2M list and the current-semester assignment record)
             subject_ids = request.POST.getlist('subjects[]')
             if subject_ids:
                 teacher.subjects.set(Subject.objects.filter(pk__in=subject_ids))
+            sync_teacher_semester_assignments(teacher, subject_ids, assigned_by=request.user)
 
             ActivityLog.objects.create(
                 activity_type='teacher_created',
@@ -1632,9 +1654,10 @@ def subadmin_edit_teacher(request, pk):
 
             teacher.user.save()
 
-            # Update assigned subjects
+            # Update assigned subjects (both the legacy M2M list and the current-semester assignment record)
             subject_ids = request.POST.getlist('subjects[]')
             teacher.subjects.set(Subject.objects.filter(pk__in=subject_ids))
+            sync_teacher_semester_assignments(teacher, subject_ids, assigned_by=request.user)
 
             send_credentials_updated_email(
                 user         = teacher.user,
@@ -1796,34 +1819,26 @@ def teacher_dashboard(request):
     ).annotate(download_count=Count('downloads')).order_by('-download_count')[:3]
     recent_activities = get_teacher_recent_activities(teacher)[:15]
  
-    # ── School year support ──────────────────────────────────────────────────
-    current_year = SchoolYear.get_current()
-    all_years    = SchoolYear.objects.all().order_by('-name')
- 
-    # The teacher can switch to view a past year (read-only)
-    view_year_pk = request.GET.get('year', '')
-    if view_year_pk:
-        view_year = SchoolYear.objects.filter(pk=view_year_pk).first() or current_year
-    else:
-        view_year = current_year
- 
-    # Subjects assigned to this teacher for the viewed year
+    # ── Semester support ──────────────────────────────────────────────────
+    from .school_year_utils import resolve_view_semester
+    current_semester, view_semester = resolve_view_semester(request)
+    all_semesters = Semester.objects.select_related('school_year').order_by('-school_year__name', '-number')
+
     assigned_subjects = []
-    if view_year:
+    if view_semester:
         assigned_subjects = list(
             TeacherSubjectAssignment.objects
-            .filter(teacher=teacher, school_year=view_year)
+            .filter(teacher=teacher, semester=view_semester)
             .select_related('subject')
             .order_by('subject__code')
             .values_list('subject__id', 'subject__code', 'subject__name')
         )
-        # Convert to simple objects for template
         from types import SimpleNamespace
         assigned_subjects = [
             SimpleNamespace(id=row[0], code=row[1], name=row[2])
             for row in assigned_subjects
         ]
- 
+
     context = {
         'teacher':            teacher,
         'my_uploads':         my_uploads,
@@ -1832,10 +1847,9 @@ def teacher_dashboard(request):
         'upload_stats':       upload_stats,
         'top_downloads':      top_downloads,
         'recent_activities':  recent_activities,
-        # school year
-        'current_year':       current_year,
-        'all_years':          all_years,
-        'view_year':          view_year,
+        'current_semester':   current_semester,
+        'all_semesters':      all_semesters,
+        'view_semester':      view_semester,
         'assigned_subjects':  assigned_subjects,
     }
     return render(request, 'teacher_dashboard/dashboard.html', context)
@@ -3262,47 +3276,116 @@ def subadmin_remove_curriculum_subject(request, prog_pk, entry_pk):
 # SCHOOL YEAR MANAGEMENT — SUPERADMIN
 # ============================================================================
  
+import re
+from datetime import date
+
 @login_required
 @user_passes_test(is_admin)
 def manage_school_years(request):
-    """Superadmin: list all school years and set the current one."""
-    school_years  = SchoolYear.objects.all().order_by('-name')
-    current_year  = SchoolYear.get_current()
- 
+    """Superadmin: list all school years + their semesters."""
+    school_years = SchoolYear.objects.all().prefetch_related('semesters').order_by('-name')
+    current_year = SchoolYear.get_current()
+    current_semester = Semester.get_current()
+    today = timezone.now().date()
+
+    # ── Annotate each school year / semester with whether it's eligible
+    #    to be set as current right now (dates set AND today falls inside) ──
+    for sy in school_years:
+        sy.can_set_current = bool(
+            sy.start_date and sy.end_date and sy.start_date <= today <= sy.end_date
+        )
+        for sem in sy.semesters.all():
+            sem.can_set_current = bool(
+                sem.start_date and sem.end_date and sem.start_date <= today <= sem.end_date
+            )
+
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         action = request.POST.get('action', '')
- 
-        # ── Create ────────────────────────────────────────────────────────
+        today = timezone.now().date()
+
+        # ── Create school year ───────────────────────────────────────────
         if action == 'create':
-            name        = request.POST.get('name', '').strip()
-            start_date  = request.POST.get('start_date', '') or None
-            end_date    = request.POST.get('end_date', '')   or None
-            set_current = request.POST.get('set_current', 'false') == 'true'
- 
+            name         = request.POST.get('name', '').strip()
+            start_date_s = request.POST.get('start_date', '') or None
+            end_date_s   = request.POST.get('end_date', '')   or None
+            set_current  = request.POST.get('set_current', 'false') == 'true'
+
             if not name:
                 return JsonResponse({'success': False, 'errors': {'name': ['School year name is required.']}})
+
+            # ── Enforce YYYY-YYYY format, exactly one year apart ──────────
+            m = re.match(r'^(\d{4})-(\d{4})$', name)
+            if not m:
+                return JsonResponse({'success': False, 'errors': {
+                    'name': ['Format must be YYYY-YYYY, e.g. 2026-2027.']
+                }})
+            start_year, end_year = int(m.group(1)), int(m.group(2))
+            if end_year != start_year + 1:
+                return JsonResponse({'success': False, 'errors': {
+                    'name': ['The two years must be exactly one year apart, e.g. 2026-2027.']
+                }})
+
             if SchoolYear.objects.filter(name=name).exists():
                 return JsonResponse({'success': False, 'errors': {'name': [f'School year "{name}" already exists.']}})
- 
+
+            # ── Parse + sanity-check dates if given ────────────────────────
+            start_date_obj = end_date_obj = None
+            if start_date_s:
+                try:
+                    start_date_obj = date.fromisoformat(start_date_s)
+                except ValueError:
+                    return JsonResponse({'success': False, 'errors': {'__all__': ['Invalid start date.']}})
+            if end_date_s:
+                try:
+                    end_date_obj = date.fromisoformat(end_date_s)
+                except ValueError:
+                    return JsonResponse({'success': False, 'errors': {'__all__': ['Invalid end date.']}})
+            if start_date_obj and end_date_obj and start_date_obj >= end_date_obj:
+                return JsonResponse({'success': False, 'errors': {'__all__': ['Start date must be before end date.']}})
+
+            # ── If requesting to set current, dates must actually cover today ──
+            if set_current:
+                if not (start_date_obj and end_date_obj):
+                    return JsonResponse({'success': False, 'errors': {
+                        '__all__': ['Set both a start and end date before marking this school year as current.']
+                    }})
+                if not (start_date_obj <= today <= end_date_obj):
+                    return JsonResponse({'success': False, 'errors': {
+                        '__all__': [
+                            f"Today ({today.strftime('%b %d, %Y')}) is outside this school year's date range "
+                            f"({start_date_obj.strftime('%b %d, %Y')} – {end_date_obj.strftime('%b %d, %Y')}). "
+                            f"You can only set a school year as current if today falls within its dates."
+                        ]
+                    }})
+
             sy = SchoolYear.objects.create(
-                name=name,
-                start_date=start_date,
-                end_date=end_date,
+                name=name, start_date=start_date_obj, end_date=end_date_obj,
                 is_current=set_current,
             )
             log_activity('system', f'School year "{sy.name}" created', user=request.user)
             return JsonResponse({'success': True, 'message': f'School year "{sy.name}" created successfully.'})
- 
-        # ── Set as current ────────────────────────────────────────────────
+
+        # ── Set school year as current ─────────────────────────────────────
         if action == 'set_current':
             sy_pk = request.POST.get('pk', '')
-            sy    = get_object_or_404(SchoolYear, pk=sy_pk)
+            sy = get_object_or_404(SchoolYear, pk=sy_pk)
+            if not (sy.start_date and sy.end_date):
+                return JsonResponse({'success': False, 'errors': {
+                    '__all__': ['This school year has no start/end date set. Add dates before making it current.']
+                }})
+            if not (sy.start_date <= today <= sy.end_date):
+                return JsonResponse({'success': False, 'errors': {
+                    '__all__': [
+                        f"Today ({today.strftime('%b %d, %Y')}) is outside {sy.name}'s date range "
+                        f"({sy.start_date.strftime('%b %d, %Y')} – {sy.end_date.strftime('%b %d, %Y')})."
+                    ]
+                }})
             sy.is_current = True
-            sy.save()     # save() enforces only-one-current rule
+            sy.save()
             log_activity('system', f'School year "{sy.name}" set as current', user=request.user)
             return JsonResponse({'success': True, 'message': f'"{sy.name}" is now the current school year.'})
- 
-        # ── Delete ────────────────────────────────────────────────────────
+
+        # ── Delete school year ───────────────────────────────────────────
         if action == 'delete':
             sy_pk = request.POST.get('pk', '')
             sy    = get_object_or_404(SchoolYear, pk=sy_pk)
@@ -3312,10 +3395,109 @@ def manage_school_years(request):
             sy.delete()
             log_activity('system', f'School year "{sy_name}" deleted', user=request.user)
             return JsonResponse({'success': True, 'message': f'School year "{sy_name}" deleted.'})
- 
+
+        # ── Create semester ───────────────────────────────────────────────
+        if action == 'create_semester':
+            sy_pk        = request.POST.get('school_year', '')
+            number       = request.POST.get('number', '')
+            start_date_s = request.POST.get('start_date', '') or None
+            end_date_s   = request.POST.get('end_date', '')   or None
+            set_current  = request.POST.get('set_current', 'false') == 'true'
+
+            sy = SchoolYear.objects.filter(pk=sy_pk).first()
+            if not sy:
+                return JsonResponse({'success': False, 'errors': {'__all__': ['School year not found.']}})
+            try:
+                number = int(number)
+            except (TypeError, ValueError):
+                return JsonResponse({'success': False, 'errors': {'__all__': ['Invalid semester number.']}})
+            if number not in (1, 2):
+                return JsonResponse({'success': False, 'errors': {'__all__': ['Semester must be 1 or 2.']}})
+            if Semester.objects.filter(school_year=sy, number=number).exists():
+                return JsonResponse({'success': False, 'errors': {'__all__': [f'Semester {number} already exists for {sy.name}.']}})
+
+            start_date_obj = end_date_obj = None
+            if start_date_s:
+                try:
+                    start_date_obj = date.fromisoformat(start_date_s)
+                except ValueError:
+                    return JsonResponse({'success': False, 'errors': {'__all__': ['Invalid start date.']}})
+            if end_date_s:
+                try:
+                    end_date_obj = date.fromisoformat(end_date_s)
+                except ValueError:
+                    return JsonResponse({'success': False, 'errors': {'__all__': ['Invalid end date.']}})
+            if start_date_obj and end_date_obj and start_date_obj >= end_date_obj:
+                return JsonResponse({'success': False, 'errors': {'__all__': ['Start date must be before end date.']}})
+
+            # ── Semester dates should stay inside the parent school year's range ──
+            if sy.start_date and start_date_obj and start_date_obj < sy.start_date:
+                return JsonResponse({'success': False, 'errors': {
+                    '__all__': [f"Semester start date can't be before the school year's start date ({sy.start_date.strftime('%b %d, %Y')})."]
+                }})
+            if sy.end_date and end_date_obj and end_date_obj > sy.end_date:
+                return JsonResponse({'success': False, 'errors': {
+                    '__all__': [f"Semester end date can't be after the school year's end date ({sy.end_date.strftime('%b %d, %Y')})."]
+                }})
+
+            if set_current:
+                if not (start_date_obj and end_date_obj):
+                    return JsonResponse({'success': False, 'errors': {
+                        '__all__': ['Set both a start and end date before marking this semester as current.']
+                    }})
+                if not (start_date_obj <= today <= end_date_obj):
+                    return JsonResponse({'success': False, 'errors': {
+                        '__all__': [
+                            f"Today ({today.strftime('%b %d, %Y')}) is outside this semester's date range "
+                            f"({start_date_obj.strftime('%b %d, %Y')} – {end_date_obj.strftime('%b %d, %Y')})."
+                        ]
+                    }})
+
+            sem = Semester.objects.create(
+                school_year=sy, number=number,
+                start_date=start_date_obj, end_date=end_date_obj,
+                is_current=set_current,
+            )
+            log_activity('system', f'{sem} created', user=request.user)
+            return JsonResponse({'success': True, 'message': f'{sem} created successfully.'})
+
+        # ── Set semester as current ──────────────────────────────────────
+        if action == 'set_current_semester':
+            sem_pk = request.POST.get('pk', '')
+            sem = get_object_or_404(Semester, pk=sem_pk)
+            if not (sem.start_date and sem.end_date):
+                return JsonResponse({'success': False, 'errors': {
+                    '__all__': ['This semester has no start/end date set. Add dates before making it current.']
+                }})
+            if not (sem.start_date <= today <= sem.end_date):
+                return JsonResponse({'success': False, 'errors': {
+                    '__all__': [
+                        f"Today ({today.strftime('%b %d, %Y')}) is outside {sem}'s date range "
+                        f"({sem.start_date.strftime('%b %d, %Y')} – {sem.end_date.strftime('%b %d, %Y')})."
+                    ]
+                }})
+            sem.is_current = True
+            sem.save()  # save() enforces only-one-current + syncs SchoolYear.is_current
+            log_activity('system', f'{sem} set as current semester', user=request.user)
+            return JsonResponse({'success': True, 'message': f'{sem} is now the current semester.'})
+
+        # ── Delete semester ──────────────────────────────────────────────
+        if action == 'delete_semester':
+            sem_pk = request.POST.get('pk', '')
+            sem = get_object_or_404(Semester, pk=sem_pk)
+            if sem.is_current:
+                return JsonResponse({'success': False, 'errors': {'__all__': ['Cannot delete the current semester.']}})
+            sem_name = str(sem)
+            sem.delete()
+            log_activity('system', f'{sem_name} deleted', user=request.user)
+            return JsonResponse({'success': True, 'message': f'{sem_name} deleted.'})
+        pass
+        
     context = {
-        'school_years': school_years,
-        'current_year': current_year,
+        'school_years':     school_years,
+        'current_year':     current_year,
+        'current_semester': current_semester,
+        'today':            today,
     }
     return render(request, 'admin_dashboard/manage_school_years.html', context)
  
@@ -3328,47 +3510,45 @@ def manage_school_years(request):
 def get_teacher_subject_assignments(request):
     """
     AJAX GET: return a teacher's subject assignments.
- 
+
     Params:
-      teacher_pk      — required
-      school_year_pk  — optional; defaults to current year
-      all_years       — optional; if '1', returns full history for the history accordion
+      teacher_pk    — required
+      semester_pk   — optional; defaults to current semester
+      all_semesters — optional; if '1', returns full history for the history accordion
     """
-    teacher_pk  = request.GET.get('teacher_pk', '')
-    sy_pk       = request.GET.get('school_year_pk', '')
-    all_years   = request.GET.get('all_years', '0') == '1'
- 
+    teacher_pk    = request.GET.get('teacher_pk', '')
+    sem_pk        = request.GET.get('semester_pk', '')
+    all_semesters = request.GET.get('all_semesters', '0') == '1'
+
     if not teacher_pk:
-        return JsonResponse({'subjects': [], 'school_year': None, 'history': []})
- 
-    # ── Full history (for accordion in edit modal) ────────────────────────
-    if all_years:
+        return JsonResponse({'subjects': [], 'semester': None, 'history': []})
+
+    if all_semesters:
         history = []
-        all_school_years = SchoolYear.objects.all().order_by('-name')
-        current = SchoolYear.get_current()
- 
-        for sy in all_school_years:
+        semesters = Semester.objects.select_related('school_year').order_by('-school_year__name', '-number')
+        current = Semester.get_current()
+
+        for sem in semesters:
             assignments = (
                 TeacherSubjectAssignment.objects
-                .filter(teacher_id=teacher_pk, school_year=sy)
+                .filter(teacher_id=teacher_pk, semester=sem)
                 .select_related('subject')
                 .order_by('subject__code')
             )
             history.append({
-                'school_year': sy.name,
-                'is_current':  sy.is_current,
+                'semester_label': str(sem),
+                'is_current':     sem.is_current,
                 'subjects': [
                     {'id': a.subject.pk, 'code': a.subject.code, 'name': a.subject.name}
                     for a in assignments
                 ],
             })
- 
-        # Also return current year's subjects for the picker
+
         current_subjects = []
         if current:
             current_assignments = (
                 TeacherSubjectAssignment.objects
-                .filter(teacher_id=teacher_pk, school_year=current)
+                .filter(teacher_id=teacher_pk, semester=current)
                 .select_related('subject')
                 .order_by('subject__code')
             )
@@ -3376,81 +3556,76 @@ def get_teacher_subject_assignments(request):
                 {'id': a.subject.pk, 'code': a.subject.code, 'name': a.subject.name}
                 for a in current_assignments
             ]
- 
+
         return JsonResponse({
-            'subjects':    current_subjects,
-            'school_year': {'id': current.pk, 'name': current.name} if current else None,
-            'history':     history,
+            'subjects': current_subjects,
+            'semester': {'id': current.pk, 'label': str(current)} if current else None,
+            'history':  history,
         })
- 
-    # ── Single year (default — current or specified) ──────────────────────
-    if sy_pk:
-        sy = get_object_or_404(SchoolYear, pk=sy_pk)
+
+    if sem_pk:
+        sem = get_object_or_404(Semester, pk=sem_pk)
     else:
-        sy = SchoolYear.get_current()
- 
-    if not sy:
-        return JsonResponse({'subjects': [], 'school_year': None, 'history': []})
- 
+        sem = Semester.get_current()
+
+    if not sem:
+        return JsonResponse({'subjects': [], 'semester': None, 'history': []})
+
     assignments = (
         TeacherSubjectAssignment.objects
-        .filter(teacher_id=teacher_pk, school_year=sy)
+        .filter(teacher_id=teacher_pk, semester=sem)
         .select_related('subject')
         .order_by('subject__code')
     )
- 
+
     return JsonResponse({
         'subjects': [
             {'id': a.subject.pk, 'code': a.subject.code, 'name': a.subject.name}
             for a in assignments
         ],
-        'school_year': {'id': sy.pk, 'name': sy.name},
-        'history': [],
+        'semester': {'id': sem.pk, 'label': str(sem)},
+        'history':  [],
     })
  
  
 @login_required
 def save_teacher_subject_assignments(request):
     """
-    AJAX POST: replace a teacher's subject assignments for the CURRENT school year.
-    Only editable for the current school year.
+    AJAX POST: replace a teacher's subject assignments for the CURRENT semester only.
     Body params: teacher_pk, subject_ids[] (list)
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed.'}, status=405)
- 
+
     teacher_pk  = request.POST.get('teacher_pk', '')
     subject_ids = request.POST.getlist('subject_ids[]')
- 
-    sy = SchoolYear.get_current()
-    if not sy:
-        return JsonResponse({'success': False, 'error': 'No current school year is set. Please ask your administrator to configure it.'})
- 
-    # Permission: superadmin can edit any teacher; subadmin only their dept
+
+    sem = Semester.get_current()
+    if not sem:
+        return JsonResponse({'success': False, 'error': 'No current semester is set. Please ask your administrator to configure it.'})
+
     teacher = get_object_or_404(TeacherProfile, pk=teacher_pk)
     if not request.user.is_staff:
-        # Must be subadmin of the same department
         dept = get_subadmin_department(request.user)
         if not dept or teacher.department_id != dept.pk:
             return JsonResponse({'success': False, 'error': 'Permission denied.'}, status=403)
- 
-    # Replace assignments for this teacher + current school year
-    TeacherSubjectAssignment.objects.filter(teacher=teacher, school_year=sy).delete()
- 
+
+    TeacherSubjectAssignment.objects.filter(teacher=teacher, semester=sem).delete()
+
     subjects = Subject.objects.filter(pk__in=subject_ids)
     for subject in subjects:
         TeacherSubjectAssignment.objects.create(
             teacher=teacher,
             subject=subject,
-            school_year=sy,
+            semester=sem,
             assigned_by=request.user,
         )
- 
+
     log_activity(
         'teacher_updated',
-        f"Subjects for {teacher.user.get_full_name()} updated for school year {sy.name} "
+        f"Subjects for {teacher.user.get_full_name()} updated for {sem} "
         f"by {request.user.get_full_name()} ({len(subjects)} subjects)",
         user=request.user,
     )
- 
-    return JsonResponse({'success': True, 'message': f'Subject assignments updated for {sy.name}.'})
+
+    return JsonResponse({'success': True, 'message': f'Subject assignments updated for {sem}.'})
