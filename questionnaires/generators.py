@@ -13,7 +13,7 @@ import os
 import re
 from django.conf import settings
 
-TEMPLATE_PATH = r"C:\DJANGO PROJECTS\TESTBANKINGSYSTEM\bisu_template.docx"
+TEMPLbisu_template.docx"
 
 # ── Shared document formatting constants ─────────────────────────────────────
 FONT_NAME = 'Arial Narrow'
