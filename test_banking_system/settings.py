@@ -14,6 +14,7 @@ ALLOWED_HOSTS = ['qvrbmzwj-2000.asse.devtunnels.ms/',
                  'localhost', 
                  '127.0.0.1',
                  'https://testbankingsystem-6ik71xycq-justine-andrieabella-9237s-projects.vercel.app',
+                 'testbankingsystem-6ik71xycq-justine-andrieabella-9237s-projects.vercel.app',
                  '.vercel.app'
                  ]
 CSRF_TRUSTED_ORIGINS = ['https://qvrbmzwj-2000.asse.devtunnels.ms/']
