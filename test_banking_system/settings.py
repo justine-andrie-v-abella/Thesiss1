@@ -10,14 +10,15 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-fallback-key')
 
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['qvrbmzwj-2000.asse.devtunnels.ms/',
-                 'localhost', 
-                 '127.0.0.1',
-                 'https://testbankingsystem-6ik71xycq-justine-andrieabella-9237s-projects.vercel.app',
-                 'testbankingsystem-6ik71xycq-justine-andrieabella-9237s-projects.vercel.app',
-                 '.vercel.app'
+ALLOWED_HOSTS = [
+                'localhost',
+                '127.0.0.1',
+                'qvrbmzwj-2000.asse.devtunnels.ms',
+                '.vercel.app',
                  ]
-CSRF_TRUSTED_ORIGINS = ['https://qvrbmzwj-2000.asse.devtunnels.ms/']
+CSRF_TRUSTED_ORIGINS = ['https://qvrbmzwj-2000.asse.devtunnels.ms/',
+                        'https://*.vercel.app',
+                        ]
 
 
 INSTALLED_APPS = [
