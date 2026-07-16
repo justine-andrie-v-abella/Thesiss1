@@ -10,6 +10,15 @@
 <script id="ws-archived-data" type="application/json">{{ archived_folders_json|safe }}</script>
 <script id="ws-subjects-data" type="application/json">{{ subjects_json|safe }}</script>
 
+{% if is_read_only %}
+<div class="max-w-7xl mx-auto px-6 pt-4">
+    <div class="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 mb-2">
+        <i class="bi bi-lock-fill flex-shrink-0"></i>
+        <span>This questionnaire belongs to a past semester and is read-only. You can view it but not save changes.</span>
+    </div>
+</div>
+{% endif %}
+
 <!-- ══════════════════════════════════════════════════════════
      OVERVIEW — Folder Grid
 ════════════════════════════════════════════════════════════ -->
