@@ -244,12 +244,96 @@ def upload_questionnaire(request):
 
         if form.is_valid():
             questionnaire = form.save(commit=False)
-            questionnaire.uploader   = teacher
-            questionnaire.department = teacher.department
-            # Stamp with the CURRENT year/semester server-side — never trust the client.
+            questionnaire.uploader           = teacher
+            questionnaire.department         = teacher.department
+            questionnaire.extraction_status  = 'processing'
+            # Stamp with the CURRENT year server-side — never trust the client.
             if current_year:
                 questionnaire.school_year = current_year.name
-            # ... keep the rest of your existing save + AI extraction logic here ...
+
+            curriculum_id = request.POST.get('curriculum_id', '').strip()
+            if curriculum_id:
+                from accounts.models import Curriculum
+                questionnaire.curriculum = Curriculum.objects.filter(pk=curriculum_id).first()
+
+            questionnaire.save()
+
+            try:
+                question_types_qs = form.cleaned_data.get('question_types')
+                if question_types_qs:
+                    type_names = [qt.name for qt in question_types_qs]
+                else:
+                    type_names = list(
+                        QuestionType.objects.filter(is_active=True)
+                                            .values_list('name', flat=True)
+                    )
+
+                extractor = get_extractor()
+                created_questions = extractor.process_questionnaire(
+                    questionnaire,
+                    type_names,
+                    mode='extract',
+                )
+
+                if not created_questions:
+                    questionnaire.file.delete(save=False)
+                    questionnaire.delete()
+                    messages.error(
+                        request,
+                        'The AI could not extract any questions from this file. '
+                        'Please make sure it includes an answer key and try again.',
+                    )
+                    _restrict_subject_queryset(form, assigned_subject_ids)
+                    return render(request, 'teacher_dashboard/upload_questionnaire.html', _base_context(form))
+
+                questionnaire.extraction_status = 'pending_review'
+                questionnaire.save()
+
+                request.session['pending_questionnaire_pk'] = questionnaire.pk
+                request.session['pending_source']           = 'extract'
+                request.session.modified = True
+
+                messages.success(
+                    request,
+                    f'Extracted {len(created_questions)} question(s)! '
+                    f'Review and select the ones you want to keep.',
+                )
+                return redirect('questionnaires:review_extracted')
+
+            except Exception as e:
+                try:
+                    questionnaire.file.delete(save=False)
+                    questionnaire.delete()
+                except Exception:
+                    pass
+
+                ActivityLog.objects.create(
+                    activity_type='extraction_failed',
+                    user=request.user,
+                    description='AI question extraction failed — file was not saved.',
+                )
+
+                err = str(e)
+                if 'credit balance is too low' in err or ('credit' in err.lower() and 'low' in err.lower()):
+                    up_msg = (
+                        'The AI service account has run out of credits. '
+                        'Please contact the administrator to top up the API credits.'
+                    )
+                elif any(code in err for code in ('503', '429', 'UNAVAILABLE',
+                                                'RESOURCE_EXHAUSTED',
+                                                'rate limit', 'overloaded')):
+                    up_msg = (
+                        'The AI service is temporarily unavailable due to high demand. '
+                        'Your file was not saved. Please wait a moment and try again.'
+                    )
+                else:
+                    up_msg = (
+                        f'Extraction failed: {err}. '
+                        f'Your file was not saved. Please try again.'
+                    )
+                messages.error(request, up_msg)
+                _restrict_subject_queryset(form, assigned_subject_ids)
+                return render(request, 'teacher_dashboard/upload_questionnaire.html', _base_context(form))
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
