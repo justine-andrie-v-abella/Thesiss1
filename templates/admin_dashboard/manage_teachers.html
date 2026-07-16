@@ -823,6 +823,9 @@
     </div>
 </div>
 
+
+<script>
+
     // ── URL templates ────────────────────────────────────────────────────────
     const EDIT_URL_TEMPLATE        = "{% url 'accounts:edit_teacher' pk=0 %}";
     const ARCHIVE_URL_TEMPLATE     = "{% url 'accounts:archive_teacher' pk=0 %}";
@@ -830,11 +833,8 @@
     const SUBJECTS_AJAX_URL        = "{% url 'accounts:get_subjects_by_department' %}";
     const ASSIGNMENTS_GET_URL      = "{% url 'accounts:get_teacher_subject_assignments' %}";
     const ASSIGNMENTS_SAVE_URL     = "{% url 'accounts:save_teacher_subject_assignments' %}";
-    const HAS_CURRENT_YEAR         = {{ current_year|yesno:"true,false" }};
-    const CURRENT_YEAR_NAME        = "{{ current_year.name|default:'' }}";
-
-<script>
-
+    const HAS_CURRENT_SEMESTER     = {% if current_semester %}true{% else %}false{% endif %};
+    const CURRENT_SEMESTER_LABEL   = "{% if current_semester %}{{ current_semester.school_year.name }} · Sem {{ current_semester.number }}{% endif %}";
 
     function makeUrl(template, pk) {
         return template.replace('/0/', '/' + pk + '/');
@@ -1161,50 +1161,55 @@
     }
 
     /* ── Edit form submit — save profile + subject assignments ───────────── */
-    function submitEditTeacher() {
-        setBtnLoading('editSubmitBtn');
-        const form = document.getElementById('editForm');
-        const data = new FormData(form);
+    
+    async function submitEditTeacher() {
+    setBtnLoading('editSubmitBtn');
+    const form = document.getElementById('editForm');
+    const data = new FormData(form);
 
-        fetch(form.action, {
+    try {
+        const editResp = await fetch(form.action, {
             method: 'POST',
             headers: { 'X-CSRFToken': getCookie('csrftoken') },
             body: data,
-        })
-        .then(r => r.json())
-        .then(result => {
-            if (result.success) {
-                // Also save subject assignments separately
-                if (HAS_CURRENT_SEMESTER && currentEditTeacherPk) {
-                    const assignData = new FormData();
-                    assignData.append('teacher_pk', currentEditTeacherPk);
-                    subjectState.edit.forEach((s, id) => {
-                        assignData.append('subject_ids[]', id);
-                    });
-                    return fetch(ASSIGNMENTS_SAVE_URL, {
-                        method: 'POST',
-                        headers: { 'X-CSRFToken': getCookie('csrftoken') },
-                        body: assignData,
-                    })
-                    .then(r => r.json())
-                    .then(() => {
-                        sessionStorage.setItem('flashMessage', result.message);
-                        window.location.reload();
-                    });
-                } else {
-                    sessionStorage.setItem('flashMessage', result.message);
-                    window.location.reload();
-                }
-            } else {
-                resetBtn('editSubmitBtn');
-                showFormErrors('edit', EDIT_FIELDS, result.errors || {});
-            }
-        })
-        .catch(() => {
-            resetBtn('editSubmitBtn');
-            showFormErrors('edit', EDIT_FIELDS, { '__all__': ['An unexpected error occurred. Please try again.'] });
         });
+        const result = await editResp.json();
+
+        if (!result.success) {
+            resetBtn('editSubmitBtn');
+            showFormErrors('edit', EDIT_FIELDS, result.errors || {});
+            return;
+        }
+
+        if (HAS_CURRENT_SEMESTER && currentEditTeacherPk) {
+            const assignData = new FormData();
+            assignData.append('teacher_pk', currentEditTeacherPk);
+            subjectState.edit.forEach((s, id) => {
+                assignData.append('subject_ids[]', id);
+            });
+
+            const assignResp = await fetch(ASSIGNMENTS_SAVE_URL, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                body: assignData,
+            });
+            const assignResult = await assignResp.json();
+
+            if (!assignResult.success) {
+                console.error('Subject assignment save failed:', assignResult.error);
+                // Teacher profile was saved fine — just warn about subjects, still reload
+            }
+        }
+
+        sessionStorage.setItem('flashMessage', result.message);
+        window.location.reload();
+
+    } catch (err) {
+        console.error('submitEditTeacher failed:', err);
+        resetBtn('editSubmitBtn');
+        showFormErrors('edit', EDIT_FIELDS, { '__all__': ['An unexpected error occurred. Please try again.'] });
     }
+}
 
     /* ── Open modals ────────────────────────────────────────────────────────*/
     function onAddDeptChange(deptId) {
