@@ -13,7 +13,7 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = ['qvrbmzwj-2000.asse.devtunnels.ms/',
                  'localhost', 
                  '127.0.0.1',
-                 'testbankingsystem-6ik71xycq-justine-andrieabella-9237s-projects.vercel.app',
+                 'https://testbankingsystem-6ik71xycq-justine-andrieabella-9237s-projects.vercel.app',
                  '.vercel.app'
                  ]
 CSRF_TRUSTED_ORIGINS = ['https://qvrbmzwj-2000.asse.devtunnels.ms/']
