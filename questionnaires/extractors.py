@@ -3,6 +3,7 @@
 # AI-Powered Question Extraction System using Anthropic Claude API
 # ============================================================================
 
+import io
 import os
 import json
 import re
@@ -62,7 +63,18 @@ class AIQuestionExtractor:
         from questionnaires.models import ExtractedQuestion, QuestionType
 
         # Step 1: Read file content
-        file_content = self._read_file(questionnaire.file.path, questionnaire.file_type)
+        # NOTE: .path only works with local FileSystemStorage — it does not
+        # exist for S3-compatible backends (Backblaze/S3/R2), which is what
+        # caused "This backend doesn't support absolute paths." Reading the
+        # raw bytes through Django's storage API instead works identically
+        # regardless of which storage backend is configured.
+        questionnaire.file.open('rb')
+        try:
+            file_bytes = questionnaire.file.read()
+        finally:
+            questionnaire.file.close()
+
+        file_content = self._read_file(file_bytes, questionnaire.file_type)
 
         if not file_content.strip():
             raise ValueError("File is empty or could not be read")
@@ -150,16 +162,16 @@ class AIQuestionExtractor:
 
         return created_questions
 
-    def _read_file(self, file_path: str, file_type: str) -> str:
-        """Read content from various file types"""
+    def _read_file(self, file_bytes: bytes, file_type: str) -> str:
+        """Read content from various file types, given raw bytes instead of a path."""
         if file_type == 'txt':
-            return self._read_txt(file_path)
+            return self._read_txt(file_bytes)
         elif file_type == 'pdf':
-            return self._read_pdf(file_path)
+            return self._read_pdf(file_bytes)
         elif file_type in ['docx', 'doc']:
-            return self._read_docx(file_path)
+            return self._read_docx(file_bytes)
         elif file_type in ['xlsx', 'xls']:
-            return self._read_xlsx(file_path)
+            return self._read_xlsx(file_bytes)
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
 
@@ -270,11 +282,10 @@ class AIQuestionExtractor:
         # Fallback: use para.text if all runs were plain (handles edge cases)
         return result if result else para.text.strip()
 
-    def _read_txt(self, file_path: str) -> str:
-        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            return f.read()
+    def _read_txt(self, file_bytes: bytes) -> str:
+        return file_bytes.decode('utf-8', errors='ignore')
 
-    def _read_pdf(self, file_path: str) -> str:
+    def _read_pdf(self, file_bytes: bytes) -> str:
         """
         Extract text from a PDF with formatting cues preserved where possible.
 
@@ -285,24 +296,23 @@ class AIQuestionExtractor:
         """
         if _PYMUPDF_AVAILABLE:
             try:
-                return self._read_pdf_pymupdf(file_path)
+                return self._read_pdf_pymupdf(file_bytes)
             except Exception as e:
                 logger.warning("PyMuPDF failed (%s), falling back to PyPDF2", e)
 
         # ── PyPDF2 fallback ────────────────────────────────────────────────
         text = []
         try:
-            with open(file_path, 'rb') as f:
-                pdf_reader = PyPDF2.PdfReader(f)
-                for page in pdf_reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text.append(page_text)
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
+            for page in pdf_reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text.append(page_text)
         except Exception as e:
             raise ValueError(f"Failed to read PDF: {str(e)}")
         return '\n\n'.join(text)
 
-    def _read_pdf_pymupdf(self, file_path: str) -> str:
+    def _read_pdf_pymupdf(self, file_bytes: bytes) -> str:
         """
         PyMuPDF-based PDF extraction.
 
@@ -380,7 +390,10 @@ class AIQuestionExtractor:
 
         pages_text = []
         try:
-            doc = fitz.open(file_path)
+            # fitz supports opening directly from an in-memory byte stream via
+            # the stream= parameter — no local path required. This is the key
+            # change from the original fitz.open(file_path).
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
             for page in doc:
                 page_width = page.rect.width
 
@@ -423,7 +436,7 @@ class AIQuestionExtractor:
         except Exception as e:
             raise ValueError(f"PyMuPDF error: {str(e)}") from e
 
-    def _read_docx(self, file_path: str) -> str:
+    def _read_docx(self, file_bytes: bytes) -> str:
         """
         Extract DOCX text in reading order, preserving answer-key formatting
         cues ([RED:...], [BOLD:...], etc.).
@@ -439,7 +452,9 @@ class AIQuestionExtractor:
             ).strip()
 
         try:
-            doc = Document(file_path)
+            # python-docx's Document() accepts a file-like object directly —
+            # this is the key change from the original Document(file_path).
+            doc = Document(io.BytesIO(file_bytes))
             text = []
 
             # Build element → paragraph object map so we can use
@@ -484,9 +499,11 @@ class AIQuestionExtractor:
         except Exception as e:
             raise ValueError(f"Failed to read DOCX: {str(e)}")
 
-    def _read_xlsx(self, file_path: str) -> str:
+    def _read_xlsx(self, file_bytes: bytes) -> str:
         try:
-            workbook = openpyxl.load_workbook(file_path)
+            # openpyxl's load_workbook() accepts a file-like object directly —
+            # this is the key change from the original load_workbook(file_path).
+            workbook = openpyxl.load_workbook(io.BytesIO(file_bytes))
             text = []
             for sheet in workbook.worksheets:
                 text.append(f"\n=== {sheet.title} ===\n")
