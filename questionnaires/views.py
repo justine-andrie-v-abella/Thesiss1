@@ -1421,16 +1421,15 @@ def all_questionnaires(request):
 def download_questionnaire(request, pk):
     from .models import Download
     from .generators import generate_bisu_questionnaire
-    import os
-
+ 
     questionnaire = get_object_or_404(Questionnaire, pk=pk)
-
+ 
     Download.objects.create(
         questionnaire=questionnaire,
         user=request.user if request.user.is_authenticated else None,
         ip_address=get_client_ip(request),
     )
-
+ 
     if hasattr(request.user, 'teacher_profile'):
         if questionnaire.uploader != request.user.teacher_profile:
             ActivityLog.objects.create(
@@ -1441,10 +1440,13 @@ def download_questionnaire(request, pk):
                     f'your "{questionnaire.title}"'
                 ),
             )
-
+ 
     download_type = request.GET.get('type', 'original')
-
+ 
     if download_type == 'original':
+        # questionnaire.file uses Django's storage API (FileField.open()),
+        # so once DEFAULT_FILE_STORAGE points at S3/R2 this works correctly
+        # without ever touching local disk.
         try:
             return FileResponse(
                 questionnaire.file.open('rb'),
@@ -1453,10 +1455,10 @@ def download_questionnaire(request, pk):
             )
         except (FileNotFoundError, ValueError):
             raise Http404("Original file not found")
-
+ 
     elif download_type == 'generated':
         question_ids_param = request.GET.get('questions', '')
-
+ 
         if question_ids_param:
             try:
                 question_ids = [
@@ -1474,36 +1476,31 @@ def download_questionnaire(request, pk):
             selected_questions = questionnaire.extracted_questions.filter(
                 is_approved=True
             ).select_related('question_type').order_by('created_at')
-
+ 
         if not selected_questions.exists():
             messages.warning(request, 'No questions available to generate the document.')
             return redirect('questionnaires:my_uploads')
-
+ 
         try:
-            file_format         = request.GET.get('format', 'docx').lower()
-            docx_path, pdf_path = generate_bisu_questionnaire(questionnaire, selected_questions)
-
-            if file_format == 'pdf' and pdf_path and os.path.exists(pdf_path):
-                filepath     = pdf_path
-                content_type = 'application/pdf'
-                filename     = os.path.basename(pdf_path)
-            else:
-                filepath     = docx_path
-                content_type = (
+            # generate_bisu_questionnaire now returns an in-memory buffer —
+            # nothing is written to local disk, so this works on Vercel.
+            buffer, filename = generate_bisu_questionnaire(questionnaire, selected_questions)
+ 
+            response = FileResponse(
+                buffer,
+                as_attachment=True,
+                filename=filename,
+                content_type=(
                     'application/vnd.openxmlformats-officedocument'
                     '.wordprocessingml.document'
-                )
-                filename = os.path.basename(docx_path)
-
-            file_handle = open(filepath, 'rb')
-            response    = FileResponse(file_handle, content_type=content_type)
-            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                ),
+            )
             return response
-
+ 
         except Exception as e:
             messages.error(request, f'Failed to generate questionnaire: {str(e)}')
             return redirect('questionnaires:my_uploads')
-
+ 
     else:
         raise Http404("Invalid download type")
 
@@ -1899,18 +1896,17 @@ def workspace_remove_question(request, folder_id, question_id):
 
 @login_required
 def download_workspace(request):
-    import os
     from .generators import generate_bisu_questionnaire
-
+ 
     if request.user.is_staff:
         messages.error(request, 'Admins cannot use the workspace download.')
         return redirect('accounts:admin_dashboard')
-
+ 
     question_ids_param = request.GET.get('questions', '').strip()
     if not question_ids_param:
         messages.error(request, 'No questions specified for download.')
         return redirect('questionnaires:workspace')
-
+ 
     try:
         question_ids = [
             int(i) for i in question_ids_param.split(',')
@@ -1919,24 +1915,24 @@ def download_workspace(request):
     except (ValueError, TypeError):
         messages.error(request, 'Invalid question selection.')
         return redirect('questionnaires:workspace')
-
+ 
     if not question_ids:
         messages.error(request, 'No valid question IDs provided.')
         return redirect('questionnaires:workspace')
-
+ 
     teacher = get_object_or_404(TeacherProfile, user=request.user)
-
+ 
     owned_ids = set(
         WorkspaceFolderQuestion.objects.filter(
             folder__teacher=teacher,
             question_id__in=question_ids,
         ).values_list('question_id', flat=True)
     )
-
+ 
     if not owned_ids:
         messages.error(request, 'None of the selected questions belong to your workspace.')
         return redirect('questionnaires:workspace')
-
+ 
     selected_questions = ExtractedQuestion.objects.filter(
         pk__in=owned_ids,
     ).select_related(
@@ -1945,13 +1941,13 @@ def download_workspace(request):
     ).order_by(
         'questionnaire__subject__code', 'question_type__name', 'created_at',
     )
-
+ 
     if not selected_questions.exists():
         messages.error(request, 'None of the selected questions could be found.')
         return redirect('questionnaires:workspace')
-
+ 
     first_quest = selected_questions.first().questionnaire
-
+ 
     class WorkspaceQuestionnaireProxy:
         def __init__(self, base_questionnaire, questions):
             self.pk          = None
@@ -1963,25 +1959,15 @@ def download_workspace(request):
             self.department = base_questionnaire.department
             self.subject    = base_questionnaire.subject
             self.uploader   = base_questionnaire.uploader
-
+            # No extracted_questions relation on the proxy — generator
+            # checks hasattr() before using it, so this is safe.
+ 
     proxy = WorkspaceQuestionnaireProxy(first_quest, selected_questions)
-
+ 
     try:
-        file_format         = request.GET.get('format', 'docx').lower()
-        docx_path, pdf_path = generate_bisu_questionnaire(proxy, selected_questions)
-
-        if file_format == 'pdf' and pdf_path and os.path.exists(pdf_path):
-            filepath     = pdf_path
-            content_type = 'application/pdf'
-            filename     = 'BISU_Workspace_Questionnaire.pdf'
-        else:
-            filepath     = docx_path
-            content_type = (
-                'application/vnd.openxmlformats-officedocument'
-                '.wordprocessingml.document'
-            )
-            filename = 'BISU_Workspace_Questionnaire.docx'
-
+        buffer, _ = generate_bisu_questionnaire(proxy, selected_questions)
+        filename = 'BISU_Workspace_Questionnaire.docx'
+ 
         ActivityLog.objects.create(
             activity_type='questionnaire_downloaded',
             user=request.user,
@@ -1991,12 +1977,17 @@ def download_workspace(request):
                 f'{selected_questions.values("questionnaire__subject__code").distinct().count()} subject(s)'
             ),
         )
-
-        file_handle = open(filepath, 'rb')
-        response    = FileResponse(file_handle, content_type=content_type)
+ 
+        response = FileResponse(
+            buffer,
+            content_type=(
+                'application/vnd.openxmlformats-officedocument'
+                '.wordprocessingml.document'
+            ),
+        )
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
-
+ 
     except Exception as e:
         messages.error(request, f'Failed to generate workspace document: {str(e)}')
         return redirect('questionnaires:workspace')

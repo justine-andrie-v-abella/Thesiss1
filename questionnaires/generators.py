@@ -1,6 +1,6 @@
 # ============================================================================
 # FILE: questionnaires/generators.py
-# BISU Questionnaire Generator - Creates formatted DOCX and PDF files
+# BISU Questionnaire Generator - Creates formatted DOCX files
 # ============================================================================
 
 from docx import Document
@@ -11,9 +11,12 @@ from docx.oxml import OxmlElement
 import io
 import os
 import re
-from django.conf import settings
 
-TEMPLbisu_template.docx"
+# ── Template path ─────────────────────────────────────────────────────────
+# Built from this file's own location so it works no matter what the
+# process's working directory is (this matters on Vercel/serverless).
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_PATH = os.path.join(BASE_DIR, "bisu_template.docx")
 
 # ── Shared document formatting constants ─────────────────────────────────────
 FONT_NAME = 'Arial Narrow'
@@ -34,7 +37,7 @@ class BISUQuestionnaireGenerator:
 
         # Apply global formatting defaults to the Normal style so every
         # paragraph and run inherits Arial Narrow 12 pt, single spacing, 0 pt
-        # before/after — this covers both DOCX and the PDF rendered from it.
+        # before/after.
         self._setup_default_style()
 
     # =========================================================================
@@ -664,34 +667,15 @@ class BISUQuestionnaireGenerator:
         r.font.color.rgb = RGBColor(150, 150, 150)
 
     # =========================================================================
-    # SAVE METHODS
+    # SAVE — IN MEMORY ONLY (no local disk writes; safe on Vercel)
     # =========================================================================
 
     def save_to_buffer(self):
+        """Return the generated document as an in-memory BytesIO buffer."""
         buffer = io.BytesIO()
         self.doc.save(buffer)
         buffer.seek(0)
         return buffer
-
-    def save_docx(self, filepath):
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        self.doc.save(filepath)
-        return filepath
-
-    def save_pdf(self, filepath):
-        docx_path = filepath.replace('.pdf', '_temp.docx')
-        self.save_docx(docx_path)
-        try:
-            from docx2pdf import convert
-            convert(docx_path, filepath)
-            os.remove(docx_path)
-            return filepath
-        except ImportError:
-            print("Warning: docx2pdf not installed. Returning DOCX instead.")
-            return docx_path
-        except Exception as e:
-            print(f"PDF conversion failed: {e}")
-            return docx_path
 
 
 # =============================================================================
@@ -700,21 +684,31 @@ class BISUQuestionnaireGenerator:
 
 def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
     """
-    Generate BISU questionnaire from database objects using the Word template.
-    Returns: tuple (docx_path, pdf_path)  — pdf_path may be None.
-    """
-    from .models import ExtractedQuestion
+    Generate a BISU questionnaire from database objects using the Word template.
 
+    Returns: (buffer, filename)
+        buffer   — io.BytesIO containing the .docx file, ready to stream
+        filename — suggested download filename
+
+    NOTE: PDF output has been removed. docx2pdf requires a real installation
+    of Microsoft Word or LibreOffice to shell out to, which does not exist on
+    Vercel's serverless Linux runtime — it would fail on every request there.
+    If you need PDF output in production, wire up an external conversion
+    service (e.g. Gotenberg, CloudConvert, Adobe PDF Services API) and call
+    it here with the docx bytes from save_to_buffer().
+    """
     selected_list = list(selected_questions)
     selected_ids  = {q.id for q in selected_list}
 
-    section_headers = list(
-        questionnaire_obj.extracted_questions
-        .filter(question_type__name='section_header')
-        .exclude(id__in=selected_ids)
-        .select_related('question_type')
-        .order_by('created_at')
-    )
+    section_headers = []
+    if hasattr(questionnaire_obj, 'extracted_questions'):
+        section_headers = list(
+            questionnaire_obj.extracted_questions
+            .filter(question_type__name='section_header')
+            .exclude(id__in=selected_ids)
+            .select_related('question_type')
+            .order_by('created_at')
+        )
 
     if section_headers:
         all_questions = sorted(
@@ -769,21 +763,9 @@ def generate_bisu_questionnaire(questionnaire_obj, selected_questions):
     generator = BISUQuestionnaireGenerator()
     generator.generate_questionnaire(questionnaire_data)
 
-    output_dir = os.path.join(settings.MEDIA_ROOT, 'generated_questionnaires')
-    os.makedirs(output_dir, exist_ok=True)
-
     safe_name = f"{questionnaire_obj.subject.code}_{questionnaire_obj.title}".replace(' ', '_')
     safe_name = "".join(c for c in safe_name if c.isalnum() or c in ('_', '-'))
+    filename  = f"{safe_name}.docx"
 
-    docx_path = os.path.join(output_dir, f"{safe_name}.docx")
-    pdf_path  = os.path.join(output_dir, f"{safe_name}.pdf")
-
-    generator.save_docx(docx_path)
-
-    try:
-        generator.save_pdf(pdf_path)
-    except Exception as e:
-        print(f"PDF generation failed: {e}")
-        pdf_path = None
-
-    return docx_path, pdf_path
+    buffer = generator.save_to_buffer()
+    return buffer, filename

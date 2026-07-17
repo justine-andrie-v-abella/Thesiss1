@@ -32,6 +32,13 @@ INSTALLED_APPS = [
     'questionnaires',
 ]
 
+# ── Cloud storage app (django-storages) ─────────────────────────────────────
+# Added conditionally below, once we know whether USE_S3 is on, so that
+# local dev without any bucket configured still works normally.
+USE_S3 = config('USE_S3', default=False, cast=bool)
+if USE_S3:
+    INSTALLED_APPS += ['storages']
+
 MIDDLEWARE = [
     'accounts.middleware.SessionDatabaseErrorMiddleware',  # ← FIRST
     'django.middleware.security.SecurityMiddleware',
@@ -99,9 +106,55 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+# Static files (CSS/JS bundled with your repo) are read-only and served fine
+# from Vercel as-is — this is NOT the same problem as MEDIA below, so it's
+# left untouched.
 
-MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# ============================================================================
+# MEDIA / FILE STORAGE
+# ----------------------------------------------------------------------------
+# Vercel's serverless filesystem is read-only outside of /tmp, and /tmp does
+# not persist between requests or survive redeploys. Local FileSystemStorage
+# (the Django default) CANNOT be used for user uploads or generated files in
+# that environment — this is why uploads and generated docx/pdf files were
+# failing/disappearing.
+#
+# USE_S3=True switches MEDIA storage to an S3-compatible bucket (works with
+# AWS S3 as-is, or Cloudflare R2 / Backblaze B2 / DigitalOcean Spaces by also
+# setting AWS_S3_ENDPOINT_URL). Set USE_S3=False (or leave unset) for local
+# development, where writing to BASE_DIR/media works fine.
+# ============================================================================
+
+if USE_S3:
+    AWS_ACCESS_KEY_ID     = config('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_REGION_NAME    = config('AWS_S3_REGION_NAME', default='auto')
+
+    # Leave AWS_S3_ENDPOINT_URL unset for real AWS S3.
+    # For Cloudflare R2, set it to: https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+    AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default=None)
+
+    AWS_DEFAULT_ACL       = None
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_QUERYSTRING_AUTH  = True   # signed, expiring URLs — set False only if the bucket is public
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',
+    }
+
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+    if AWS_S3_ENDPOINT_URL:
+        MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/'
+    else:
+        MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/'
+
+    # MEDIA_ROOT is irrelevant once DEFAULT_FILE_STORAGE points at S3, but
+    # Django expects the setting to exist.
+    MEDIA_ROOT = BASE_DIR / 'media'
+else:
+    MEDIA_URL  = 'media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
