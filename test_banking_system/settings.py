@@ -104,7 +104,7 @@ TIME_ZONE = 'Asia/Manila'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 # Static files (CSS/JS bundled with your repo) are read-only and served fine
 # from Vercel as-is — this is NOT the same problem as MEDIA below, so it's
