@@ -36,7 +36,6 @@ INSTALLED_APPS = [
 # Added conditionally below, once we know whether USE_S3 is on, so that
 # local dev without any bucket configured still works normally.
 USE_S3 = config('USE_S3', default=False, cast=bool)
-print(f"DEBUG: USE_S3 = {USE_S3}")
 if USE_S3:
     INSTALLED_APPS += ['storages']
 
