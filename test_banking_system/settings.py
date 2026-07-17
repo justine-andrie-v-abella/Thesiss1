@@ -42,6 +42,7 @@ if USE_S3:
 MIDDLEWARE = [
     'accounts.middleware.SessionDatabaseErrorMiddleware',  # ← FIRST
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -105,6 +106,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  
 STATICFILES_DIRS = [BASE_DIR / 'static']
 # Static files (CSS/JS bundled with your repo) are read-only and served fine
 # from Vercel as-is — this is NOT the same problem as MEDIA below, so it's
@@ -130,47 +132,41 @@ if USE_S3:
     AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
     AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
     AWS_S3_REGION_NAME    = config('AWS_S3_REGION_NAME', default='auto')
-
-    # Leave AWS_S3_ENDPOINT_URL unset for real AWS S3.
-    # For Cloudflare R2, set it to: https://<ACCOUNT_ID>.r2.cloudflarestorage.com
     AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default=None)
-
     AWS_DEFAULT_ACL       = None
     AWS_S3_FILE_OVERWRITE = False
-    AWS_QUERYSTRING_AUTH  = True   # signed, expiring URLs — set False only if the bucket is public
+    AWS_QUERYSTRING_AUTH  = True
     AWS_S3_OBJECT_PARAMETERS = {
         'CacheControl': 'max-age=86400',
     }
 
     STORAGES = {
-    "default": {
-        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
-    },
-    "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-    },
-}
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 
     if AWS_S3_ENDPOINT_URL:
         MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/'
     else:
         MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/'
 
-    # MEDIA_ROOT is irrelevant once DEFAULT_FILE_STORAGE points at S3, but
-    # Django expects the setting to exist.
     MEDIA_ROOT = BASE_DIR / 'media'
 else:
-    MEDIA_URL  = 'media/'
+    MEDIA_URL  = '/media/'
     MEDIA_ROOT = BASE_DIR / 'media'
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
         },
         "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
         },
     }
-
+    
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_URL = 'accounts:login'
