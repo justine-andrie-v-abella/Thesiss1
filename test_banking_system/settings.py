@@ -36,6 +36,7 @@ INSTALLED_APPS = [
 # Added conditionally below, once we know whether USE_S3 is on, so that
 # local dev without any bucket configured still works normally.
 USE_S3 = config('USE_S3', default=False, cast=bool)
+print(f"DEBUG: USE_S3 = {USE_S3}")
 if USE_S3:
     INSTALLED_APPS += ['storages']
 
@@ -142,7 +143,14 @@ if USE_S3:
         'CacheControl': 'max-age=86400',
     }
 
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
     if AWS_S3_ENDPOINT_URL:
         MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/'
@@ -155,6 +163,14 @@ if USE_S3:
 else:
     MEDIA_URL  = 'media/'
     MEDIA_ROOT = BASE_DIR / 'media'
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
